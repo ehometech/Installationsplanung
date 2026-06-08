@@ -206,6 +206,36 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
 
+
+  /* ── INSTALLATION MODAL ── */
+  .inst-modal { width: 460px; max-width: 96vw; }
+  .inst-section { margin-bottom: 14px; }
+  .inst-section-title {
+    font-size: 10px; font-weight: 700; color: var(--ac);
+    text-transform: uppercase; letter-spacing: .7px;
+    margin-bottom: 8px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--bd);
+  }
+  .inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .inst-card {
+    background: var(--sf2); border: 2px solid var(--bd); border-radius: 6px;
+    padding: 7px 9px; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 7px; font-size: 11px;
+  }
+  .inst-card:hover { border-color: var(--ac); color: var(--ac); }
+  .inst-card.selected { border-color: var(--ac); background: rgba(245,166,35,.12); color: var(--ac); }
+  .inst-card .ic-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+  .inst-card .ic-name { font-weight: 600; font-size: 11px; }
+  .inst-card .ic-sub  { font-size: 9px; color: var(--tx3); margin-top: 1px; }
+  .inst-row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
+  .inst-row label { font-size: 10px; color: var(--tx2); min-width: 120px; flex-shrink: 0; }
+  .inst-hint { font-size: 9px; color: var(--tx3); margin-top: 3px; line-height: 1.4; }
+  .wire-seg-info {
+    background: var(--sf2); border: 1px solid var(--bd); border-radius: 5px;
+    padding: 7px 10px; margin-bottom: 10px; font-size: 11px; color: var(--tx2);
+  }
+  .wire-seg-info strong { color: var(--tx); }
+
 </style>
 
   <!-- Firebase SDKs -->
@@ -241,7 +271,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <button class="btn bg bsm" id="fbLoginBtn" onclick="googleLogin()" style="gap:6px">
     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="14" height="14"> Google Login
   </button>
-  <button class="btn bg bsm hid" id="fbDebugBtn" onclick="showFbDebug()" style="font-size:9px;color:var(--tx3)" title="Firebase Debug Info">🔍</button>
   <button class="btn bg bsm hid" id="fbLogoutBtn" onclick="googleLogout()">Abmelden</button>
   <div class="vs"></div>
   <button class="btn bg bsm" onclick="showProjectManager()" id="projMgrBtn" title="Projekte verwalten">📁 Projekte</button>
@@ -530,6 +559,133 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <div style="flex:1"></div>
       <button class="btn bg" onclick="document.getElementById('symEditModal').classList.add('hid')">Abbrechen</button>
       <button class="btn ba" onclick="saveEditedSymbol()">✓ Speichern</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- INSTALLATION PROPERTIES MODAL -->
+<div class="modal-ov hid" id="instModal">
+  <div class="modal inst-modal">
+    <h3 id="instModalTitle">⚡ Installationseigenschaften</h3>
+
+    <!-- SYMBOL SECTION -->
+    <div id="instSymSection">
+      <div class="inst-section">
+        <div class="inst-section-title">📍 Montageart</div>
+        <div class="inst-grid">
+          <div class="inst-card" onclick="selInst('montage','UP')" id="mc-UP">
+            <div class="ic-icon">🔲</div><div><div class="ic-name">Unterputz (UP)</div><div class="ic-sub">In der Wand versenkt</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('montage','AP')" id="mc-AP">
+            <div class="ic-icon">📦</div><div><div class="ic-name">Aufputz (AP)</div><div class="ic-sub">Auf der Wand</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('montage','HW')" id="mc-HW">
+            <div class="ic-icon">🪟</div><div><div class="ic-name">Hohlwand (HW)</div><div class="ic-sub">Gipskarton/Rigips</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('montage','DE')" id="mc-DE">
+            <div class="ic-icon">⬆</div><div><div class="ic-name">Decke</div><div class="ic-sub">Deckenmontage</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('montage','BO')" id="mc-BO">
+            <div class="ic-icon">⬇</div><div><div class="ic-name">Boden</div><div class="ic-sub">Bodendose</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('montage','SA')" id="mc-SA">
+            <div class="ic-icon">🏗</div><div><div class="ic-name">Schaltschrank</div><div class="ic-sub">Hutschiene</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="inst-section">
+        <div class="inst-section-title">📏 Höhe & Raummaße</div>
+        <div class="inst-row">
+          <label>Montagehöhe (UK Dose)</label>
+          <input class="rp-input" id="instHoehe" type="number" value="40" min="0" max="350" step="5" style="width:70px">
+          <span style="font-size:11px;color:var(--tx2)">cm vom Boden</span>
+        </div>
+        <div class="inst-row">
+          <label>Raumhöhe</label>
+          <input class="rp-input" id="instRaumhoehe" type="number" value="250" min="200" max="400" step="5" style="width:70px">
+          <span style="font-size:11px;color:var(--tx2)">cm</span>
+        </div>
+        <div class="inst-hint">Standard: Steckdose 40cm · Schalter 105cm · Küche 115cm · Rauchmelder 250cm · Klingel 100cm</div>
+      </div>
+
+      <div class="inst-section">
+        <div class="inst-section-title">🔌 Kabelzuführung</div>
+        <div class="inst-grid">
+          <div class="inst-card" onclick="selInst('kabelzufuhr','unten')" id="kc-unten">
+            <div class="ic-icon">⬇</div><div><div class="ic-name">Von unten</div><div class="ic-sub">Aus Boden/Fußleiste</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('kabelzufuhr','oben')" id="kc-oben">
+            <div class="ic-icon">⬆</div><div><div class="ic-name">Von oben</div><div class="ic-sub">Aus Decke/Wand oben</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('kabelzufuhr','links')" id="kc-links">
+            <div class="ic-icon">⬅</div><div><div class="ic-name">Von links</div><div class="ic-sub">Horizontal links</div></div>
+          </div>
+          <div class="inst-card" onclick="selInst('kabelzufuhr','rechts')" id="kc-rechts">
+            <div class="ic-icon">➡</div><div><div class="ic-name">Von rechts</div><div class="ic-sub">Horizontal rechts</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WIRE SECTION -->
+    <div id="instWireSection" style="display:none">
+      <div class="wire-seg-info" id="instWireInfo">Leitungspunkt</div>
+      <div class="inst-section">
+        <div class="inst-section-title">🏗 Verlegeart</div>
+        <div class="inst-grid">
+          <div class="inst-card" onclick="selWireInst('verlegeart','UP')" id="wc-UP">
+            <div class="ic-icon">🔲</div><div><div class="ic-name">Unterputz (UP)</div><div class="ic-sub">In Wandschlitz</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','AP')" id="wc-AP">
+            <div class="ic-icon">📦</div><div><div class="ic-name">Aufputz (AP)</div><div class="ic-sub">Kabelkanal/sichtbar</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','HR')" id="wc-HR">
+            <div class="ic-icon">🟡</div><div><div class="ic-name">In Rohr (HR)</div><div class="ic-sub">Wellrohr/Leerrohr</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','EZ')" id="wc-EZ">
+            <div class="ic-icon">🔃</div><div><div class="ic-name">Einziehen</div><div class="ic-sub">In bestehendes Rohr</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','ER')" id="wc-ER">
+            <div class="ic-icon">🌍</div><div><div class="ic-name">Erdverlegung</div><div class="ic-sub">NYY/Erdkabel</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','HD')" id="wc-HD">
+            <div class="ic-icon">🏠</div><div><div class="ic-name">Hohldecke</div><div class="ic-sub">Über Abhangdecke</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','FU')" id="wc-FU">
+            <div class="ic-icon">🟫</div><div><div class="ic-name">Fußboden</div><div class="ic-sub">Unter Estrich</div></div>
+          </div>
+          <div class="inst-card" onclick="selWireInst('verlegeart','HW')" id="wc-HW">
+            <div class="ic-icon">🪟</div><div><div class="ic-name">Hohlwand</div><div class="ic-sub">In Rigips</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="inst-section">
+        <div class="inst-section-title">📐 Trassendetails</div>
+        <div class="inst-row">
+          <label>Trassenhöhe</label>
+          <input class="rp-input" id="instTrasseHoehe" type="number" value="20" min="0" max="300" step="5" style="width:70px">
+          <span style="font-size:11px;color:var(--tx2)">cm vom Boden</span>
+        </div>
+        <div class="inst-row">
+          <label>Rohrtyp</label>
+          <select class="rp-sel" id="instRohrTyp">
+            <option value="">— kein Rohr —</option>
+            <option value="M20">Wellrohr M20</option>
+            <option value="M25">Wellrohr M25</option>
+            <option value="M32">Wellrohr M32</option>
+            <option value="KMR20">KMR-Rohr 20mm</option>
+            <option value="KMR25">KMR-Rohr 25mm</option>
+            <option value="EB50">Erdkabel-Schutzrohr 50mm</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="mft">
+      <button class="btn bg" onclick="closeInstModal()">Abbrechen</button>
+      <button class="btn ba" onclick="confirmInstModal()">✓ Übernehmen</button>
     </div>
   </div>
 </div>
@@ -1122,6 +1278,7 @@ let state = {
   panStart: null,
   wirePoints: [],
   undoStack: [],
+  raumhoehe: 250,
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -1490,28 +1647,9 @@ let fbUnsubscribe = null;
 // ── Init Firebase ──
 function initFirebase() {
   try {
-    if (typeof firebase === 'undefined') {
-      setFbStatus('offline', 'Firebase SDK nicht geladen!');
-      console.error('Firebase SDK missing');
-      return;
-    }
     fbApp  = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     fbDb   = firebase.firestore();
     fbAuth = firebase.auth();
-    console.log('[Firebase] Init OK, project:', FIREBASE_CONFIG.projectId);
-    console.log('[Firebase] Auth domain:', FIREBASE_CONFIG.authDomain);
-    console.log('[Firebase] Current domain:', window.location.hostname);
-
-    // Handle redirect result (from signInWithRedirect)
-    fbAuth.getRedirectResult().then(result => {
-      if (result && result.user) {
-        setStatus('✅ Angemeldet als ' + result.user.displayName);
-      }
-    }).catch(err => {
-      if (err.code !== 'auth/no-auth-event') {
-        console.warn('Redirect result Fehler:', err);
-      }
-    });
 
     fbAuth.onAuthStateChanged(user => {
       currentUser = user;
@@ -1531,31 +1669,12 @@ function initFirebase() {
 
 // ── Auth ──
 function googleLogin() {
-  if (!fbAuth) {
-    setStatus('❌ Firebase nicht bereit — Seite neu laden');
-    return;
-  }
+  if (!fbAuth) return;
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('email');
-  provider.addScope('profile');
-  // Try popup first, fallback to redirect
-  fbAuth.signInWithPopup(provider)
-    .then(result => {
-      setStatus('✅ Angemeldet als ' + result.user.displayName);
-    })
-    .catch(err => {
-      console.warn('Popup fehlgeschlagen, versuche Redirect:', err.code);
-      if (err.code === 'auth/popup-blocked' ||
-          err.code === 'auth/popup-closed-by-user' ||
-          err.code === 'auth/cancelled-popup-request') {
-        // Fallback: redirect method
-        fbAuth.signInWithRedirect(provider).catch(e2 => {
-          setStatus('❌ Login Fehler: ' + e2.message);
-        });
-      } else {
-        setStatus('❌ Login Fehler: ' + err.message + ' (' + err.code + ')');
-      }
-    });
+  fbAuth.signInWithPopup(provider).catch(err => {
+    console.warn('Login Fehler:', err);
+    setStatus('Login fehlgeschlagen: ' + err.message);
+  });
 }
 function googleLogout() {
   if (!fbAuth) return;
@@ -1597,9 +1716,9 @@ function setFbStatus(type, msg) {
 async function loadProjectList() {
   if (!currentUser || !fbDb) return;
   try {
-    // Note: no orderBy to avoid needing composite index
     const snap = await fbDb.collection(GRUNDRISS_COLLECTION)
       .where('uid', '==', currentUser.uid)
+      .orderBy('updatedAt', 'desc')
       .get();
 
     const list = document.getElementById('projList');
@@ -1752,20 +1871,8 @@ async function saveToCloud() {
   setFbStatus('syncing', 'Speichert...');
   cloudSaveLock = Date.now() + 10000; // 10 sec lock
   try {
-    // Strip non-serializable data (OffscreenCanvas etc.)
-    const symbolsToSave = state.symbols.map(s => {
-      const clean = {};
-      for (const [k, v] of Object.entries(s)) {
-        // Skip DOM objects, functions, OffscreenCanvas
-        if (v === null || v === undefined) { clean[k] = null; continue; }
-        const t = typeof v;
-        if (t === 'function') continue;
-        if (t === 'object' && (v instanceof HTMLElement || v instanceof OffscreenCanvas ||
-            v instanceof HTMLImageElement || v instanceof CanvasRenderingContext2D)) continue;
-        try { JSON.stringify(v); clean[k] = v; } catch(e) { /* skip */ }
-      }
-      return clean;
-    });
+    // Symbols: strip large imgData for firestore (save separately)
+    const symbolsToSave = state.symbols.map(s => ({ ...s }));
     // CustomSymbols: strip imgData if too large (>500kb total)
     const csToSave = {};
     let totalSize = 0;
@@ -1788,11 +1895,7 @@ async function saveToCloud() {
   } catch(e) {
     console.warn('[Firebase] save:', e);
     setFbStatus('offline', 'Speicherfehler');
-    let msg = e.message || String(e);
-    if (e.code === 'permission-denied') msg = 'Keine Berechtigung — Firestore-Regeln prüfen';
-    if (e.code === 'unauthenticated')   msg = 'Nicht angemeldet';
-    if (msg.includes('index'))          msg = 'Firestore-Index fehlt — Konsole prüfen';
-    setStatus('❌ Speichern fehlgeschlagen: ' + msg);
+    setStatus('❌ Cloud-Speichern fehlgeschlagen: ' + e.message);
   }
 }
 
@@ -1811,24 +1914,120 @@ function showProjectManager() {
 }
 
 
-// ── Firebase Debug ──
-function showFbDebug() {
-  const info = [
-    'Firebase Projekt: ' + FIREBASE_CONFIG.projectId,
-    'Auth Domain: ' + FIREBASE_CONFIG.authDomain,
-    'Aktuelle Domain: ' + window.location.hostname,
-    'Aktueller User: ' + (currentUser ? currentUser.email : 'nicht angemeldet'),
-    'Projekt ID: ' + (currentProjectId || 'keins'),
-    'Firebase ready: ' + (fbApp ? 'Ja' : 'Nein'),
-    'Firestore ready: ' + (fbDb ? 'Ja' : 'Nein'),
-    'Auth ready: ' + (fbAuth ? 'Ja' : 'Nein'),
-    '',
-    'WICHTIG: Die Domain "' + window.location.hostname + '"',
-    'muss in Firebase Console unter',
-    'Authentication → Settings → Authorized Domains',
-    'eingetragen sein!'
-  ].join('\n');
-  alert(info);
+// ═══════════════════════════════════════════════════
+//  INSTALLATION PROPERTIES
+// ═══════════════════════════════════════════════════
+let instMode = 'symbol';
+let instTargetId = null;
+let instWireIdx = null;
+let _instSel = { montage:'UP', kabelzufuhr:'unten', hoehe:40, raumhoehe:250, verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
+let _pendingWireInst = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
+
+function openInstModal(symId) {
+  const sym = state.symbols.find(s => s.id === symId);
+  if (!sym) return;
+  instMode = 'symbol';
+  instTargetId = symId;
+  _instSel.montage     = sym.montage     || 'UP';
+  _instSel.kabelzufuhr = sym.kabelzufuhr || 'unten';
+  _instSel.hoehe       = sym.hoehe       != null ? sym.hoehe : getDefaultHoehe(sym.type);
+  _instSel.raumhoehe   = sym.raumhoehe   || state.raumhoehe || 250;
+  document.getElementById('instModalTitle').textContent = '⚡ ' + (SYMBOLS[sym.type]?.name || sym.type) + ' — Installation';
+  document.getElementById('instSymSection').style.display = 'block';
+  document.getElementById('instWireSection').style.display = 'none';
+  document.getElementById('instHoehe').value = _instSel.hoehe;
+  document.getElementById('instRaumhoehe').value = _instSel.raumhoehe;
+  updateInstCards('montage', _instSel.montage, 'mc-');
+  updateInstCards('kabelzufuhr', _instSel.kabelzufuhr, 'kc-');
+  document.getElementById('instModal').classList.remove('hid');
+}
+
+function openWireInstModal(wIdx) {
+  const wire = state.wires[wIdx];
+  if (!wire) return;
+  instMode = 'wire';
+  instWireIdx = wIdx;
+  _instSel.verlegeart  = wire.verlegeart  || _pendingWireInst.verlegeart || 'UP';
+  _instSel.trasseHoehe = wire.trasseHoehe || _pendingWireInst.trasseHoehe || 20;
+  _instSel.rohrTyp     = wire.rohrTyp     || _pendingWireInst.rohrTyp || '';
+  document.getElementById('instModalTitle').textContent = '🔌 Leitung — Verlegeeigenschaften';
+  document.getElementById('instSymSection').style.display = 'none';
+  document.getElementById('instWireSection').style.display = 'block';
+  const len = wire.laenge_m ? wire.laenge_m + 'm' : '—';
+  document.getElementById('instWireInfo').innerHTML =
+    'Leitung: <strong>' + (wire.circuit||'—') + '</strong> · Phase: <strong>' + (wire.phase||'L1') +
+    '</strong> · Länge: <strong>' + len + '</strong> · Kabel: <strong>' + (wire.kabel||'—') + '</strong>';
+  document.getElementById('instTrasseHoehe').value = _instSel.trasseHoehe;
+  document.getElementById('instRohrTyp').value = _instSel.rohrTyp;
+  updateInstCards('verlegeart', _instSel.verlegeart, 'wc-');
+  document.getElementById('instModal').classList.remove('hid');
+}
+
+function selInst(key, val) {
+  _instSel[key] = val;
+  if (key === 'montage')     updateInstCards('montage', val, 'mc-');
+  if (key === 'kabelzufuhr') updateInstCards('kabelzufuhr', val, 'kc-');
+}
+function selWireInst(key, val) {
+  _instSel[key] = val;
+  if (key === 'verlegeart') updateInstCards('verlegeart', val, 'wc-');
+}
+function updateInstCards(key, val, prefix) {
+  const maps = {
+    montage:     ['UP','AP','HW','DE','BO','SA'],
+    kabelzufuhr: ['unten','oben','links','rechts'],
+    verlegeart:  ['UP','AP','HR','EZ','ER','HD','FU','HW']
+  };
+  (maps[key]||[]).forEach(v => {
+    const el = document.getElementById(prefix + v);
+    if (el) el.classList.toggle('selected', v === val);
+  });
+}
+function confirmInstModal() {
+  if (instMode === 'symbol') {
+    const sym = state.symbols.find(s => s.id === instTargetId);
+    if (sym) {
+      sym.montage     = _instSel.montage;
+      sym.kabelzufuhr = _instSel.kabelzufuhr;
+      sym.hoehe       = parseInt(document.getElementById('instHoehe').value) || 40;
+      sym.raumhoehe   = parseInt(document.getElementById('instRaumhoehe').value) || 250;
+      state.raumhoehe = sym.raumhoehe;
+    }
+  } else {
+    const wire = state.wires[instWireIdx];
+    if (wire) {
+      wire.verlegeart  = _instSel.verlegeart;
+      wire.trasseHoehe = parseInt(document.getElementById('instTrasseHoehe').value) || 20;
+      wire.rohrTyp     = document.getElementById('instRohrTyp').value;
+      _pendingWireInst.verlegeart  = wire.verlegeart;
+      _pendingWireInst.trasseHoehe = wire.trasseHoehe;
+      _pendingWireInst.rohrTyp     = wire.rohrTyp;
+    }
+  }
+  closeInstModal();
+  render();
+  renderProps(state.symbols.find(s => s.id === state.selectedId) || null);
+  setStatus('✅ Installationseigenschaften gespeichert');
+}
+function closeInstModal() {
+  document.getElementById('instModal').classList.add('hid');
+}
+function getDefaultHoehe(type) {
+  const d = {
+    steckdose_1:40,steckdose_2:40,steckdose_ip44:40,steckdose_fi:40,cee16:40,cee32:40,usb_steckdose:40,
+    ausschalter:105,wechselschalter:105,kreuzschalter:105,serienschalter:105,dimmer:105,
+    taster:105,taster_leuchte:105,jalousietaster:105,
+    bewegungsmelder:200,praesenzmelder:250,
+    deckenleuchte:250,wandleuchte:180,einbaustrahler:250,notleuchte:250,aussenleuchte:220,
+    elektroherd:85,backofen:85,waschmaschine:85,trockner:85,geschirrspueler:85,
+    boiler:150,durchlauferhitzer:150,klimaanlage:220,
+    klingel:100,gegensprechanlage:150,thermostat:150,
+    rauchmelder:250,co_melder:30
+  };
+  return d[type] || 40;
+}
+function vLegeLabel(t) {
+  return {UP:'UP',AP:'AP',HR:'Rohr',EZ:'Einz.',ER:'Erde',HD:'HD',FU:'FB',HW:'HW'}[t]||t||'';
 }
 
 // ═══════════════════════════════════════════════════
@@ -2185,6 +2384,7 @@ function handleWireClick(pt) {
   state.wirePoints.push(snapped);
   if (state.wirePoints.length >= 2 && isNearStart(state.wirePoints[state.wirePoints.length-1])) {
     finishWire();
+    return;
   }
 }
 function finishWire() {
@@ -2195,11 +2395,17 @@ function finishWire() {
     points: [...state.wirePoints],
     circuit: null, phase: 'L1',
     kabel: 'NYM-J 3×1.5',
-    laenge_m: calcWireLength(state.wirePoints)
+    laenge_m: calcWireLength(state.wirePoints),
+    verlegeart:  _pendingWireInst.verlegeart  || 'UP',
+    trasseHoehe: _pendingWireInst.trasseHoehe || 20,
+    rohrTyp:     _pendingWireInst.rohrTyp     || '',
   });
+  const newIdx = state.wires.length - 1;
   state.wirePoints = [];
   render();
-  setStatus('Leitung gespeichert (' + state.wires.length + ' Leitungen)');
+  setStatus('Leitung gespeichert — Verlegeeigenschaften eingeben');
+  // Open installation modal for the new wire
+  setTimeout(() => openWireInstModal(newIdx), 80);
 }
 function calcWireLength(pts) {
   if (!state.scale) return null;
@@ -2267,7 +2473,9 @@ function placeSymbol(key, x, y) {
     document.getElementById('uploadZone').style.display = 'none';
   }
   render();
-  setStatus(`${sym.name} platziert`);
+  setStatus(sym.name + ' platziert');
+  // Open installation modal automatically
+  setTimeout(() => openInstModal(s.id), 80);
   return s;
 }
 function hitTest(x, y) {
@@ -2361,11 +2569,20 @@ function drawWires() {
     ctx.moveTo(wire.points[0].x, wire.points[0].y);
     for (let i=1; i<wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
     ctx.stroke();
-    // Length label midpoint
-    if (wire.laenge_m) {
+    // Length + installation label
+    if (wire.laenge_m || wire.verlegeart) {
       const mid = wire.points[Math.floor(wire.points.length/2)];
-      ctx.fillStyle=col; ctx.font=`${10/state.zoom}px IBM Plex Mono,monospace`;
-      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y-4/state.zoom);
+      ctx.fillStyle=col;
+      if (wire.laenge_m) {
+        ctx.font=`bold ${10/state.zoom}px IBM Plex Mono,monospace`;
+        ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y-4/state.zoom);
+      }
+      if (wire.verlegeart) {
+        ctx.font=`${8/state.zoom}px IBM Plex Mono,monospace`;
+        ctx.fillStyle='rgba(0,100,200,.9)';
+        const vl = (vLegeLabel(wire.verlegeart)||'') + (wire.rohrTyp?' ('+wire.rohrTyp+')':'') + (wire.trasseHoehe?' '+wire.trasseHoehe+'cm':'');
+        ctx.fillText(vl, mid.x+4/state.zoom, mid.y+8/state.zoom);
+      }
     }
   }
 }
@@ -2401,6 +2618,13 @@ function drawSymbols() {
     ctx.textAlign='center';
     const lbl = (sym.label||def.name).substring(0,16);
     ctx.fillText(lbl, 0, SZ/2+10/state.zoom);
+    // Installation badge
+    if (sym.montage || sym.hoehe != null) {
+      const bTxt = (sym.montage||'') + (sym.hoehe!=null?' '+sym.hoehe+'cm':'');
+      ctx.font=`${7/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.fillStyle='#0077cc';
+      ctx.fillText(bTxt, 0, SZ/2+20/state.zoom);
+    }
     // Circuit badge
     if (sym.circuit && def.circuits) {
       const ph = sym.phase||'L1';
@@ -2475,6 +2699,13 @@ function renderProps(sym) {
       </div>
       <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:6px;font-size:10px" onclick="deleteSelected()">🗑 Löschen</button>
     </div>
+    <div class="rp-divider"></div>
+    <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">⚡ Installation</div>
+    <div class="rp-stat">Montageart: <span>${sym.montage||'—'}</span></div>
+    <div class="rp-stat">Höhe: <span>${sym.hoehe!=null?sym.hoehe+'cm':'—'}</span></div>
+    <div class="rp-stat">Raumhöhe: <span>${sym.raumhoehe!=null?sym.raumhoehe+'cm':'—'}</span></div>
+    <div class="rp-stat">Kabelzuführung: <span>${sym.kabelzufuhr||'—'}</span></div>
+    <button class="btn bg" style="width:100%;margin-top:5px;font-size:10px" onclick="openInstModal('${sym.id}')">✏️ Installation bearbeiten</button>
     <div class="rp-divider"></div>
     <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Position</div>
     <div class="rp-stat">X: <span>${Math.round(sym.x)}px</span></div>
@@ -2898,6 +3129,36 @@ function exportPDF() {
     border:1px solid transparent; border-radius:4px; cursor:pointer; color:var(--tx3); font-size:14px;
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
+
+
+  /* ── INSTALLATION MODAL ── */
+  .inst-modal { width: 460px; max-width: 96vw; }
+  .inst-section { margin-bottom: 14px; }
+  .inst-section-title {
+    font-size: 10px; font-weight: 700; color: var(--ac);
+    text-transform: uppercase; letter-spacing: .7px;
+    margin-bottom: 8px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--bd);
+  }
+  .inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .inst-card {
+    background: var(--sf2); border: 2px solid var(--bd); border-radius: 6px;
+    padding: 7px 9px; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 7px; font-size: 11px;
+  }
+  .inst-card:hover { border-color: var(--ac); color: var(--ac); }
+  .inst-card.selected { border-color: var(--ac); background: rgba(245,166,35,.12); color: var(--ac); }
+  .inst-card .ic-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+  .inst-card .ic-name { font-weight: 600; font-size: 11px; }
+  .inst-card .ic-sub  { font-size: 9px; color: var(--tx3); margin-top: 1px; }
+  .inst-row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
+  .inst-row label { font-size: 10px; color: var(--tx2); min-width: 120px; flex-shrink: 0; }
+  .inst-hint { font-size: 9px; color: var(--tx3); margin-top: 3px; line-height: 1.4; }
+  .wire-seg-info {
+    background: var(--sf2); border: 1px solid var(--bd); border-radius: 5px;
+    padding: 7px 10px; margin-bottom: 10px; font-size: 11px; color: var(--tx2);
+  }
+  .wire-seg-info strong { color: var(--tx); }
 
 </style>
     
