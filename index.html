@@ -206,36 +206,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
 
-
-  /* ── INSTALLATION MODAL ── */
-  .inst-modal { width: 460px; max-width: 96vw; }
-  .inst-section { margin-bottom: 14px; }
-  .inst-section-title {
-    font-size: 10px; font-weight: 700; color: var(--ac);
-    text-transform: uppercase; letter-spacing: .7px;
-    margin-bottom: 8px; padding-bottom: 4px;
-    border-bottom: 1px solid var(--bd);
-  }
-  .inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .inst-card {
-    background: var(--sf2); border: 2px solid var(--bd); border-radius: 6px;
-    padding: 7px 9px; cursor: pointer; transition: all .15s;
-    display: flex; align-items: center; gap: 7px; font-size: 11px;
-  }
-  .inst-card:hover { border-color: var(--ac); color: var(--ac); }
-  .inst-card.selected { border-color: var(--ac); background: rgba(245,166,35,.12); color: var(--ac); }
-  .inst-card .ic-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
-  .inst-card .ic-name { font-weight: 600; font-size: 11px; }
-  .inst-card .ic-sub  { font-size: 9px; color: var(--tx3); margin-top: 1px; }
-  .inst-row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
-  .inst-row label { font-size: 10px; color: var(--tx2); min-width: 120px; flex-shrink: 0; }
-  .inst-hint { font-size: 9px; color: var(--tx3); margin-top: 3px; line-height: 1.4; }
-  .wire-seg-info {
-    background: var(--sf2); border: 1px solid var(--bd); border-radius: 5px;
-    padding: 7px 10px; margin-bottom: 10px; font-size: 11px; color: var(--tx2);
-  }
-  .wire-seg-info strong { color: var(--tx); }
-
 </style>
 
   <!-- Firebase SDKs -->
@@ -323,8 +293,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="startCalibrate()" title="Maßstab kalibrieren" id="btnCal">📏</button>
       <span style="font-size:10px;color:var(--tx3);font-family:var(--mono)" id="scaleLabel">Kein Maßstab</span>
       <div class="vs"></div>
-      <button class="tool-btn" onclick="undoAction()" title="Rückgängig">↩</button>
-      <button class="tool-btn" onclick="clearAll()" title="Alles löschen">🗑</button>
+      <button class="tool-btn" onclick="undoAction()" title="Rückgängig (Ctrl+Z)" id="btnUndo">↩</button>
+      <button class="tool-btn" onclick="redoAction()" title="Wiederholen (Ctrl+Y)" id="btnRedo">↪</button>
+      <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählte Leitung löschen" id="btnDelWire" style="color:var(--rd)">✂</button>
+      <button class="tool-btn" onclick="clearAll()" title="Alles löschen" style="color:var(--rd)">🗑</button>
       <div class="vs"></div>
       <label class="btn bg" style="cursor:pointer">
         📁 Grundriss laden
@@ -559,133 +531,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <div style="flex:1"></div>
       <button class="btn bg" onclick="document.getElementById('symEditModal').classList.add('hid')">Abbrechen</button>
       <button class="btn ba" onclick="saveEditedSymbol()">✓ Speichern</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- INSTALLATION PROPERTIES MODAL -->
-<div class="modal-ov hid" id="instModal">
-  <div class="modal inst-modal">
-    <h3 id="instModalTitle">⚡ Installationseigenschaften</h3>
-
-    <!-- SYMBOL SECTION -->
-    <div id="instSymSection">
-      <div class="inst-section">
-        <div class="inst-section-title">📍 Montageart</div>
-        <div class="inst-grid">
-          <div class="inst-card" onclick="selInst('montage','UP')" id="mc-UP">
-            <div class="ic-icon">🔲</div><div><div class="ic-name">Unterputz (UP)</div><div class="ic-sub">In der Wand versenkt</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('montage','AP')" id="mc-AP">
-            <div class="ic-icon">📦</div><div><div class="ic-name">Aufputz (AP)</div><div class="ic-sub">Auf der Wand</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('montage','HW')" id="mc-HW">
-            <div class="ic-icon">🪟</div><div><div class="ic-name">Hohlwand (HW)</div><div class="ic-sub">Gipskarton/Rigips</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('montage','DE')" id="mc-DE">
-            <div class="ic-icon">⬆</div><div><div class="ic-name">Decke</div><div class="ic-sub">Deckenmontage</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('montage','BO')" id="mc-BO">
-            <div class="ic-icon">⬇</div><div><div class="ic-name">Boden</div><div class="ic-sub">Bodendose</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('montage','SA')" id="mc-SA">
-            <div class="ic-icon">🏗</div><div><div class="ic-name">Schaltschrank</div><div class="ic-sub">Hutschiene</div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="inst-section">
-        <div class="inst-section-title">📏 Höhe & Raummaße</div>
-        <div class="inst-row">
-          <label>Montagehöhe (UK Dose)</label>
-          <input class="rp-input" id="instHoehe" type="number" value="40" min="0" max="350" step="5" style="width:70px">
-          <span style="font-size:11px;color:var(--tx2)">cm vom Boden</span>
-        </div>
-        <div class="inst-row">
-          <label>Raumhöhe</label>
-          <input class="rp-input" id="instRaumhoehe" type="number" value="250" min="200" max="400" step="5" style="width:70px">
-          <span style="font-size:11px;color:var(--tx2)">cm</span>
-        </div>
-        <div class="inst-hint">Standard: Steckdose 40cm · Schalter 105cm · Küche 115cm · Rauchmelder 250cm · Klingel 100cm</div>
-      </div>
-
-      <div class="inst-section">
-        <div class="inst-section-title">🔌 Kabelzuführung</div>
-        <div class="inst-grid">
-          <div class="inst-card" onclick="selInst('kabelzufuhr','unten')" id="kc-unten">
-            <div class="ic-icon">⬇</div><div><div class="ic-name">Von unten</div><div class="ic-sub">Aus Boden/Fußleiste</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('kabelzufuhr','oben')" id="kc-oben">
-            <div class="ic-icon">⬆</div><div><div class="ic-name">Von oben</div><div class="ic-sub">Aus Decke/Wand oben</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('kabelzufuhr','links')" id="kc-links">
-            <div class="ic-icon">⬅</div><div><div class="ic-name">Von links</div><div class="ic-sub">Horizontal links</div></div>
-          </div>
-          <div class="inst-card" onclick="selInst('kabelzufuhr','rechts')" id="kc-rechts">
-            <div class="ic-icon">➡</div><div><div class="ic-name">Von rechts</div><div class="ic-sub">Horizontal rechts</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- WIRE SECTION -->
-    <div id="instWireSection" style="display:none">
-      <div class="wire-seg-info" id="instWireInfo">Leitungspunkt</div>
-      <div class="inst-section">
-        <div class="inst-section-title">🏗 Verlegeart</div>
-        <div class="inst-grid">
-          <div class="inst-card" onclick="selWireInst('verlegeart','UP')" id="wc-UP">
-            <div class="ic-icon">🔲</div><div><div class="ic-name">Unterputz (UP)</div><div class="ic-sub">In Wandschlitz</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','AP')" id="wc-AP">
-            <div class="ic-icon">📦</div><div><div class="ic-name">Aufputz (AP)</div><div class="ic-sub">Kabelkanal/sichtbar</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','HR')" id="wc-HR">
-            <div class="ic-icon">🟡</div><div><div class="ic-name">In Rohr (HR)</div><div class="ic-sub">Wellrohr/Leerrohr</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','EZ')" id="wc-EZ">
-            <div class="ic-icon">🔃</div><div><div class="ic-name">Einziehen</div><div class="ic-sub">In bestehendes Rohr</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','ER')" id="wc-ER">
-            <div class="ic-icon">🌍</div><div><div class="ic-name">Erdverlegung</div><div class="ic-sub">NYY/Erdkabel</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','HD')" id="wc-HD">
-            <div class="ic-icon">🏠</div><div><div class="ic-name">Hohldecke</div><div class="ic-sub">Über Abhangdecke</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','FU')" id="wc-FU">
-            <div class="ic-icon">🟫</div><div><div class="ic-name">Fußboden</div><div class="ic-sub">Unter Estrich</div></div>
-          </div>
-          <div class="inst-card" onclick="selWireInst('verlegeart','HW')" id="wc-HW">
-            <div class="ic-icon">🪟</div><div><div class="ic-name">Hohlwand</div><div class="ic-sub">In Rigips</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="inst-section">
-        <div class="inst-section-title">📐 Trassendetails</div>
-        <div class="inst-row">
-          <label>Trassenhöhe</label>
-          <input class="rp-input" id="instTrasseHoehe" type="number" value="20" min="0" max="300" step="5" style="width:70px">
-          <span style="font-size:11px;color:var(--tx2)">cm vom Boden</span>
-        </div>
-        <div class="inst-row">
-          <label>Rohrtyp</label>
-          <select class="rp-sel" id="instRohrTyp">
-            <option value="">— kein Rohr —</option>
-            <option value="M20">Wellrohr M20</option>
-            <option value="M25">Wellrohr M25</option>
-            <option value="M32">Wellrohr M32</option>
-            <option value="KMR20">KMR-Rohr 20mm</option>
-            <option value="KMR25">KMR-Rohr 25mm</option>
-            <option value="EB50">Erdkabel-Schutzrohr 50mm</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <div class="mft">
-      <button class="btn bg" onclick="closeInstModal()">Abbrechen</button>
-      <button class="btn ba" onclick="confirmInstModal()">✓ Übernehmen</button>
     </div>
   </div>
 </div>
@@ -1278,7 +1123,8 @@ let state = {
   panStart: null,
   wirePoints: [],
   undoStack: [],
-  raumhoehe: 250,
+  wireDrawing: false,   // true when dragging wire from symbol
+  wireSrcId: null,      // source symbol id
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -1881,7 +1727,25 @@ async function saveToCloud() {
       if (totalSize + sz < 800000) { csToSave[k] = v; totalSize += sz; }
     }
 
-    await fbDb.collection(GRUNDRISS_COLLECTION).doc(currentProjectId).update({
+    // Save floorplan as base64 (compressed)
+    let floorplanData = null;
+    if (state.floorplan && state.floorplan.img) {
+      try {
+        const fc = document.createElement('canvas');
+        // Resize to max 1800px to stay under Firestore 1MB limit
+        const maxW = 1800, maxH = 1800;
+        let fw = state.floorplan.w, fh = state.floorplan.h;
+        if (fw > maxW || fh > maxH) {
+          const ratio = Math.min(maxW/fw, maxH/fh);
+          fw = Math.round(fw*ratio); fh = Math.round(fh*ratio);
+        }
+        fc.width = fw; fc.height = fh;
+        fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
+        floorplanData = fc.toDataURL('image/jpeg', 0.75);
+      } catch(imgErr) { console.warn('Floorplan save error:', imgErr); }
+    }
+
+    const updateData = {
       name: document.getElementById('projName').value || 'Projekt',
       symbols: symbolsToSave,
       wires: state.wires,
@@ -1889,7 +1753,10 @@ async function saveToCloud() {
       customSymbols: csToSave,
       symbolCount: state.symbols.length,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if (floorplanData) updateData.floorplanData = floorplanData;
+
+    await fbDb.collection(GRUNDRISS_COLLECTION).doc(currentProjectId).update(updateData);
     setFbStatus('online', 'Gespeichert ✓ ' + new Date().toLocaleTimeString('de-DE'));
     setStatus('☁ In Cloud gespeichert!');
   } catch(e) {
@@ -1915,119 +1782,196 @@ function showProjectManager() {
 
 
 // ═══════════════════════════════════════════════════
-//  INSTALLATION PROPERTIES
+//  SMART WIRE — Drag from Symbol to Symbol
 // ═══════════════════════════════════════════════════
-let instMode = 'symbol';
-let instTargetId = null;
-let instWireIdx = null;
-let _instSel = { montage:'UP', kabelzufuhr:'unten', hoehe:40, raumhoehe:250, verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
 let _pendingWireInst = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
 
-function openInstModal(symId) {
-  const sym = state.symbols.find(s => s.id === symId);
-  if (!sym) return;
-  instMode = 'symbol';
-  instTargetId = symId;
-  _instSel.montage     = sym.montage     || 'UP';
-  _instSel.kabelzufuhr = sym.kabelzufuhr || 'unten';
-  _instSel.hoehe       = sym.hoehe       != null ? sym.hoehe : getDefaultHoehe(sym.type);
-  _instSel.raumhoehe   = sym.raumhoehe   || state.raumhoehe || 250;
-  document.getElementById('instModalTitle').textContent = '⚡ ' + (SYMBOLS[sym.type]?.name || sym.type) + ' — Installation';
-  document.getElementById('instSymSection').style.display = 'block';
-  document.getElementById('instWireSection').style.display = 'none';
-  document.getElementById('instHoehe').value = _instSel.hoehe;
-  document.getElementById('instRaumhoehe').value = _instSel.raumhoehe;
-  updateInstCards('montage', _instSel.montage, 'mc-');
-  updateInstCards('kabelzufuhr', _instSel.kabelzufuhr, 'kc-');
-  document.getElementById('instModal').classList.remove('hid');
+function startWireFromSymbol(sym, pt) {
+  state.wireDrawing = true;
+  state.wireSrcId = sym.id;
+  state.wirePoints = [{ x: sym.x, y: sym.y }];
+  canvas.style.cursor = 'crosshair';
+  setStatus('🔌 Leitung ziehen → zu Steckdose/Schalter ziehen und loslassen');
 }
 
-function openWireInstModal(wIdx) {
-  const wire = state.wires[wIdx];
-  if (!wire) return;
-  instMode = 'wire';
-  instWireIdx = wIdx;
-  _instSel.verlegeart  = wire.verlegeart  || _pendingWireInst.verlegeart || 'UP';
-  _instSel.trasseHoehe = wire.trasseHoehe || _pendingWireInst.trasseHoehe || 20;
-  _instSel.rohrTyp     = wire.rohrTyp     || _pendingWireInst.rohrTyp || '';
-  document.getElementById('instModalTitle').textContent = '🔌 Leitung — Verlegeeigenschaften';
-  document.getElementById('instSymSection').style.display = 'none';
-  document.getElementById('instWireSection').style.display = 'block';
-  const len = wire.laenge_m ? wire.laenge_m + 'm' : '—';
-  document.getElementById('instWireInfo').innerHTML =
-    'Leitung: <strong>' + (wire.circuit||'—') + '</strong> · Phase: <strong>' + (wire.phase||'L1') +
-    '</strong> · Länge: <strong>' + len + '</strong> · Kabel: <strong>' + (wire.kabel||'—') + '</strong>';
-  document.getElementById('instTrasseHoehe').value = _instSel.trasseHoehe;
-  document.getElementById('instRohrTyp').value = _instSel.rohrTyp;
-  updateInstCards('verlegeart', _instSel.verlegeart, 'wc-');
-  document.getElementById('instModal').classList.remove('hid');
-}
+function finishSmartWire(pt) {
+  if (!state.wireDrawing) return;
+  state.wireDrawing = false;
+  canvas.style.cursor = 'default';
+  octx.clearRect(0, 0, overlay.width, overlay.height);
 
-function selInst(key, val) {
-  _instSel[key] = val;
-  if (key === 'montage')     updateInstCards('montage', val, 'mc-');
-  if (key === 'kabelzufuhr') updateInstCards('kabelzufuhr', val, 'kc-');
-}
-function selWireInst(key, val) {
-  _instSel[key] = val;
-  if (key === 'verlegeart') updateInstCards('verlegeart', val, 'wc-');
-}
-function updateInstCards(key, val, prefix) {
-  const maps = {
-    montage:     ['UP','AP','HW','DE','BO','SA'],
-    kabelzufuhr: ['unten','oben','links','rechts'],
-    verlegeart:  ['UP','AP','HR','EZ','ER','HD','FU','HW']
-  };
-  (maps[key]||[]).forEach(v => {
-    const el = document.getElementById(prefix + v);
-    if (el) el.classList.toggle('selected', v === val);
+  // Check if released on another symbol
+  const target = hitTest(pt.x, pt.y);
+  const endPt = target ? { x: target.x, y: target.y } : pt;
+
+  // Need at least some distance
+  const src = state.wirePoints[0];
+  if (Math.hypot(endPt.x - src.x, endPt.y - src.y) < 15) {
+    state.wirePoints = [];
+    state.wireSrcId = null;
+    return;
+  }
+
+  // Build wire points: from src → horizontal/vertical routing → end
+  const points = buildSmartRoute(src, endPt);
+  state.wirePoints = points;
+
+  saveUndo();
+  const circuit = autoCircuitName();
+  // Assign circuit to connected symbols
+  const srcSym = state.symbols.find(s => s.id === state.wireSrcId);
+  if (srcSym && !srcSym.circuit) srcSym.circuit = circuit;
+  if (target && !target.circuit) target.circuit = circuit;
+  else if (target && target.circuit) {
+    // Use existing circuit from target
+  }
+
+  state.wires.push({
+    id: gid(),
+    points,
+    circuit: srcSym?.circuit || circuit,
+    phase: srcSym?.phase || 'L1',
+    kabel: srcSym?.kabel || 'NYM-J 3×1.5',
+    laenge_m: calcWireLength(points),
+    verlegeart: _pendingWireInst.verlegeart || 'UP',
+    trasseHoehe: _pendingWireInst.trasseHoehe || 20,
+    rohrTyp: _pendingWireInst.rohrTyp || '',
+    srcId: state.wireSrcId,
+    dstId: target?.id || null,
   });
+
+  const newIdx = state.wires.length - 1;
+  state.wirePoints = [];
+  state.wireSrcId = null;
+  render();
+  setStatus('✅ Leitung ' + (srcSym?.circuit||circuit) + ' verbunden' + (target ? ' → ' + (target.label||'') : ''));
+  setTimeout(() => openWireInstModal && openWireInstModal(newIdx), 80);
 }
-function confirmInstModal() {
-  if (instMode === 'symbol') {
-    const sym = state.symbols.find(s => s.id === instTargetId);
-    if (sym) {
-      sym.montage     = _instSel.montage;
-      sym.kabelzufuhr = _instSel.kabelzufuhr;
-      sym.hoehe       = parseInt(document.getElementById('instHoehe').value) || 40;
-      sym.raumhoehe   = parseInt(document.getElementById('instRaumhoehe').value) || 250;
-      state.raumhoehe = sym.raumhoehe;
-    }
-  } else {
-    const wire = state.wires[instWireIdx];
-    if (wire) {
-      wire.verlegeart  = _instSel.verlegeart;
-      wire.trasseHoehe = parseInt(document.getElementById('instTrasseHoehe').value) || 20;
-      wire.rohrTyp     = document.getElementById('instRohrTyp').value;
-      _pendingWireInst.verlegeart  = wire.verlegeart;
-      _pendingWireInst.trasseHoehe = wire.trasseHoehe;
-      _pendingWireInst.rohrTyp     = wire.rohrTyp;
+
+function buildSmartRoute(from, to) {
+  // L-shaped routing: horizontal then vertical
+  const mid = { x: to.x, y: from.y };
+  return [from, mid, to];
+}
+
+function renderSmartWirePreview(pt) {
+  if (!state.wireDrawing || !state.wirePoints.length) return;
+  const src = state.wirePoints[0];
+  const route = buildSmartRoute(src, pt);
+  const target = hitTest(pt.x, pt.y);
+
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  octx.save();
+  octx.setTransform(state.zoom, 0, 0, state.zoom, state.pan.x, state.pan.y);
+
+  // Wire line
+  octx.strokeStyle = target ? '#27ae60' : 'rgba(88,166,255,.9)';
+  octx.lineWidth = 2.5 / state.zoom;
+  octx.setLineDash([]);
+  octx.beginPath();
+  octx.moveTo(route[0].x, route[0].y);
+  for (let i = 1; i < route.length; i++) octx.lineTo(route[i].x, route[i].y);
+  octx.stroke();
+
+  // Highlight target symbol
+  if (target) {
+    octx.beginPath();
+    octx.arc(target.x, target.y, 20/state.zoom, 0, Math.PI*2);
+    octx.strokeStyle = '#27ae60';
+    octx.lineWidth = 3/state.zoom;
+    octx.stroke();
+  }
+
+  // Length label
+  if (state.scale) {
+    const len = (calcWireLengthPts(route) / state.scale).toFixed(1);
+    octx.fillStyle = '#f5a623';
+    octx.font = `bold ${11/state.zoom}px IBM Plex Mono,monospace`;
+    octx.fillText(len + 'm', pt.x + 8/state.zoom, pt.y - 8/state.zoom);
+  }
+  octx.restore();
+}
+
+function calcWireLengthPts(pts) {
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
+  return d;
+}
+
+// Cancel long press on move
+document.addEventListener('touchmove', () => {
+  if (state._longPressTimer) { clearTimeout(state._longPressTimer); state._longPressTimer = null; }
+}, { passive: true });
+document.addEventListener('touchend', () => {
+  if (state._longPressTimer) { clearTimeout(state._longPressTimer); state._longPressTimer = null; }
+}, { passive: true });
+
+
+// ── Redo Stack ──
+let redoStack = [];
+
+const _origSaveUndo = saveUndo;
+// Patch saveUndo to clear redo
+function saveUndo() {
+  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
+  if (state.undoStack.length > 50) state.undoStack.shift();
+  redoStack = []; // clear redo on new action
+}
+
+function redoAction() {
+  if (!redoStack.length) return;
+  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
+  const s = JSON.parse(redoStack.pop());
+  state.symbols = s.symbols; state.wires = s.wires;
+  state.selectedId = null;
+  render(); renderProps(null); setStatus('Wiederholt');
+}
+
+// Override undoAction to feed redo
+const _origUndo = undoAction;
+function undoAction() {
+  if (!state.undoStack.length) return;
+  redoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
+  const s = JSON.parse(state.undoStack.pop());
+  state.symbols = s.symbols; state.wires = s.wires;
+  state.selectedId = null;
+  render(); renderProps(null); setStatus('Rückgängig');
+}
+
+// ── Delete selected wire ──
+let selectedWireId = null;
+
+function deleteSelectedWire() {
+  if (selectedWireId) {
+    saveUndo();
+    state.wires = state.wires.filter(w => w.id !== selectedWireId);
+    selectedWireId = null;
+    render();
+    setStatus('Leitung gelöscht');
+    return;
+  }
+  if (state.selectedId) { deleteSelected(); return; }
+  setStatus('Kein Element ausgewählt');
+}
+
+// Wire click selection
+function hitTestWire(x, y) {
+  const THRESH = 8 / state.zoom;
+  for (let i = state.wires.length - 1; i >= 0; i--) {
+    const w = state.wires[i];
+    for (let j = 1; j < w.points.length; j++) {
+      const a = w.points[j-1], b = w.points[j];
+      const d = distToSegment(x, y, a.x, a.y, b.x, b.y);
+      if (d < THRESH) return w;
     }
   }
-  closeInstModal();
-  render();
-  renderProps(state.symbols.find(s => s.id === state.selectedId) || null);
-  setStatus('✅ Installationseigenschaften gespeichert');
+  return null;
 }
-function closeInstModal() {
-  document.getElementById('instModal').classList.add('hid');
-}
-function getDefaultHoehe(type) {
-  const d = {
-    steckdose_1:40,steckdose_2:40,steckdose_ip44:40,steckdose_fi:40,cee16:40,cee32:40,usb_steckdose:40,
-    ausschalter:105,wechselschalter:105,kreuzschalter:105,serienschalter:105,dimmer:105,
-    taster:105,taster_leuchte:105,jalousietaster:105,
-    bewegungsmelder:200,praesenzmelder:250,
-    deckenleuchte:250,wandleuchte:180,einbaustrahler:250,notleuchte:250,aussenleuchte:220,
-    elektroherd:85,backofen:85,waschmaschine:85,trockner:85,geschirrspueler:85,
-    boiler:150,durchlauferhitzer:150,klimaanlage:220,
-    klingel:100,gegensprechanlage:150,thermostat:150,
-    rauchmelder:250,co_melder:30
-  };
-  return d[type] || 40;
-}
-function vLegeLabel(t) {
-  return {UP:'UP',AP:'AP',HR:'Rohr',EZ:'Einz.',ER:'Erde',HD:'HD',FU:'FB',HW:'HW'}[t]||t||'';
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay;
+  if (dx===0 && dy===0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
 }
 
 // ═══════════════════════════════════════════════════
@@ -2165,6 +2109,7 @@ function setupEvents() {
   canvas.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('dblclick', onDblClick);
+  canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
   // Touch events for canvas
   canvas.addEventListener('touchstart', onTouchStart, { passive: false });
   canvas.addEventListener('touchmove', onTouchMoveCanvas, { passive: false });
@@ -2177,6 +2122,12 @@ function setupEvents() {
     }
     if (e.key === 'Escape') { state.wirePoints = []; state.selectedId = null; render(); }
     if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undoAction(); }
+    if ((e.ctrlKey||e.metaKey) && (e.key==='y'||e.key==='Z')) { e.preventDefault(); redoAction(); }
+    if (e.key==='Delete'||e.key==='Backspace') {
+      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+      if (selectedWireId) { deleteSelectedWire(); e.preventDefault(); }
+      else if (state.selectedId) { deleteSelected(); e.preventDefault(); }
+    }
   });
 }
 
@@ -2191,12 +2142,43 @@ function onMouseDown(e) {
   if (state.calibrating) { handleCalibrate(pt); return; }
   if (state.tool === 'wire') { handleWireClick(pt); return; }
   if (state.tool === 'measure') { handleMeasureClick(pt, e); return; }
-  // Select tool
+
   const hit = hitTest(pt.x, pt.y);
   if (hit) {
     selectSymbol(hit.id);
+    // Right-click OR Ctrl+click on symbol = start wire from it
+    if (e.button === 2 || e.ctrlKey) {
+      e.preventDefault();
+      startWireFromSymbol(hit, pt);
+      return;
+    }
     state.dragging = { id: hit.id, offX: pt.x - hit.x, offY: pt.y - hit.y };
   } else {
+    // Check wire hit
+    const wireHit = hitTestWire(pt.x, pt.y);
+    if (wireHit) {
+      selectedWireId = wireHit.id;
+      state.selectedId = null;
+      // Show wire props
+      const w = wireHit;
+      const wb = document.getElementById('rpBody');
+      if (wb) wb.innerHTML = `
+        <div class="pg">
+          <div class="pgt">Leitung ${w.circuit||'—'}</div>
+          <div class="rp-stat">Stromkreis: <span>${w.circuit||'—'}</span></div>
+          <div class="rp-stat">Phase: <span>${w.phase||'L1'}</span></div>
+          <div class="rp-stat">Länge: <span>${w.laenge_m||'—'}m</span></div>
+          <div class="rp-stat">Kabel: <span>${w.kabel||'—'}</span></div>
+          <div class="rp-stat">Verlegeart: <span>${w.verlegeart||'—'}</span></div>
+          <div class="rp-stat">Trassenhöhe: <span>${w.trasseHoehe!=null?w.trasseHoehe+'cm':'—'}</span></div>
+          ${w.rohrTyp?'<div class="rp-stat">Rohr: <span>'+w.rohrTyp+'</span></div>':''}
+          <button class="btn bg" style="width:100%;margin-top:6px;font-size:10px" onclick="openWireInstModal&&openWireInstModal(${state.wires.indexOf(w)})">✏️ Verlegung bearbeiten</button>
+          <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:4px;font-size:10px" onclick="deleteSelectedWire()">🗑 Leitung löschen</button>
+        </div>`;
+      render();
+      return;
+    }
+    selectedWireId = null;
     state.selectedId = null;
     state.panning = true;
     state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
@@ -2224,6 +2206,10 @@ function onMouseMove(e) {
   if (state.tool === 'wire' && state.wirePoints.length > 0) {
     renderWirePreview(pt); return;
   }
+  // Smart wire drag preview
+  if (state.wireDrawing) {
+    renderSmartWirePreview(pt); return;
+  }
   if (state.calibrating && state.calPoints.length === 1) {
     renderCalPreview(pt);
   }
@@ -2232,6 +2218,11 @@ function onMouseMove(e) {
 }
 function onMouseUp(e) {
   if (state.dragging) { saveUndo(); state.dragging = null; }
+  // Finish smart wire if released on a symbol
+  if (state.wireDrawing) {
+    const pt = clientToCanvas(e.clientX, e.clientY);
+    finishSmartWire(pt);
+  }
   state.panning = false; state.panStart = null;
 }
 function onWheel(e) {
@@ -2269,6 +2260,13 @@ function onTouchStart(e) {
     const hit = hitTest(pt.x, pt.y);
     if (hit) {
       selectSymbol(hit.id);
+      // Long press timer for wire drawing on touch
+      state._longPressTimer = setTimeout(() => {
+        state.dragging = null;
+        startWireFromSymbol(hit, pt);
+        // Haptic feedback if available
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 500);
       state.dragging = { id: hit.id, offX: pt.x - hit.x, offY: pt.y - hit.y };
     } else {
       state.selectedId = null;
@@ -2311,6 +2309,13 @@ function onTouchMoveCanvas(e) {
 }
 function onTouchEndCanvas(e) {
   if (state.dragging) { saveUndo(); state.dragging = null; }
+  if (state.wireDrawing) {
+    const t = e.changedTouches[0];
+    if (t) {
+      const pt = clientToCanvas(t.clientX, t.clientY);
+      finishSmartWire(pt);
+    }
+  }
   state.panning = false; touchPanStart = null;
 }
 
@@ -2384,28 +2389,44 @@ function handleWireClick(pt) {
   state.wirePoints.push(snapped);
   if (state.wirePoints.length >= 2 && isNearStart(state.wirePoints[state.wirePoints.length-1])) {
     finishWire();
-    return;
   }
 }
 function finishWire() {
   if (state.wirePoints.length < 2) { state.wirePoints = []; return; }
   saveUndo();
+  const circuit = autoCircuitName();
   state.wires.push({
     id: gid(),
     points: [...state.wirePoints],
-    circuit: null, phase: 'L1',
+    circuit, phase: 'L1',
     kabel: 'NYM-J 3×1.5',
     laenge_m: calcWireLength(state.wirePoints),
-    verlegeart:  _pendingWireInst.verlegeart  || 'UP',
-    trasseHoehe: _pendingWireInst.trasseHoehe || 20,
-    rohrTyp:     _pendingWireInst.rohrTyp     || '',
+    verlegeart: _pendingWireInst?.verlegeart || 'UP',
+    trasseHoehe: _pendingWireInst?.trasseHoehe || 20,
+    rohrTyp: _pendingWireInst?.rohrTyp || '',
   });
   const newIdx = state.wires.length - 1;
   state.wirePoints = [];
   render();
-  setStatus('Leitung gespeichert — Verlegeeigenschaften eingeben');
-  // Open installation modal for the new wire
-  setTimeout(() => openWireInstModal(newIdx), 80);
+  setStatus('Leitung ' + circuit + ' gespeichert');
+  setTimeout(() => openWireInstModal && openWireInstModal(newIdx), 80);
+}
+
+function autoCircuitName() {
+  // Group by FI number: F01.1, F01.2 ...
+  const existing = state.wires.map(w => w.circuit).filter(Boolean);
+  // Find highest number
+  let maxFI = 0, maxSub = 0;
+  existing.forEach(c => {
+    const m = c.match(/^F(\d+)\.(\d+)$/);
+    if (m) {
+      const fi = parseInt(m[1]), sub = parseInt(m[2]);
+      if (fi > maxFI || (fi === maxFI && sub > maxSub)) { maxFI = fi; maxSub = sub; }
+    }
+  });
+  if (maxFI === 0) return 'F01.1';
+  const nextSub = maxSub + 1;
+  return `F${String(maxFI).padStart(2,'0')}.${nextSub}`;
 }
 function calcWireLength(pts) {
   if (!state.scale) return null;
@@ -2473,9 +2494,7 @@ function placeSymbol(key, x, y) {
     document.getElementById('uploadZone').style.display = 'none';
   }
   render();
-  setStatus(sym.name + ' platziert');
-  // Open installation modal automatically
-  setTimeout(() => openInstModal(s.id), 80);
+  setStatus(`${sym.name} platziert`);
   return s;
 }
 function hitTest(x, y) {
@@ -2563,26 +2582,19 @@ const PHASE_COLORS = { L1:'#e74c3c', L2:'#d4ac0d', L3:'#27ae60', 'L1+N':'#e74c3c
 function drawWires() {
   for (const wire of state.wires) {
     const col = PHASE_COLORS[wire.phase] || PHASE_COLORS.default;
-    ctx.strokeStyle = col; ctx.lineWidth = 2/state.zoom;
+    const isSelWire = wire.id === selectedWireId;
+    ctx.strokeStyle = isSelWire ? '#f5a623' : col;
+    ctx.lineWidth = isSelWire ? 3.5/state.zoom : 2/state.zoom;
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(wire.points[0].x, wire.points[0].y);
     for (let i=1; i<wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
     ctx.stroke();
-    // Length + installation label
-    if (wire.laenge_m || wire.verlegeart) {
+    // Length label midpoint
+    if (wire.laenge_m) {
       const mid = wire.points[Math.floor(wire.points.length/2)];
-      ctx.fillStyle=col;
-      if (wire.laenge_m) {
-        ctx.font=`bold ${10/state.zoom}px IBM Plex Mono,monospace`;
-        ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y-4/state.zoom);
-      }
-      if (wire.verlegeart) {
-        ctx.font=`${8/state.zoom}px IBM Plex Mono,monospace`;
-        ctx.fillStyle='rgba(0,100,200,.9)';
-        const vl = (vLegeLabel(wire.verlegeart)||'') + (wire.rohrTyp?' ('+wire.rohrTyp+')':'') + (wire.trasseHoehe?' '+wire.trasseHoehe+'cm':'');
-        ctx.fillText(vl, mid.x+4/state.zoom, mid.y+8/state.zoom);
-      }
+      ctx.fillStyle=col; ctx.font=`${10/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y-4/state.zoom);
     }
   }
 }
@@ -2618,13 +2630,6 @@ function drawSymbols() {
     ctx.textAlign='center';
     const lbl = (sym.label||def.name).substring(0,16);
     ctx.fillText(lbl, 0, SZ/2+10/state.zoom);
-    // Installation badge
-    if (sym.montage || sym.hoehe != null) {
-      const bTxt = (sym.montage||'') + (sym.hoehe!=null?' '+sym.hoehe+'cm':'');
-      ctx.font=`${7/state.zoom}px IBM Plex Mono,monospace`;
-      ctx.fillStyle='#0077cc';
-      ctx.fillText(bTxt, 0, SZ/2+20/state.zoom);
-    }
     // Circuit badge
     if (sym.circuit && def.circuits) {
       const ph = sym.phase||'L1';
@@ -2699,13 +2704,6 @@ function renderProps(sym) {
       </div>
       <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:6px;font-size:10px" onclick="deleteSelected()">🗑 Löschen</button>
     </div>
-    <div class="rp-divider"></div>
-    <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">⚡ Installation</div>
-    <div class="rp-stat">Montageart: <span>${sym.montage||'—'}</span></div>
-    <div class="rp-stat">Höhe: <span>${sym.hoehe!=null?sym.hoehe+'cm':'—'}</span></div>
-    <div class="rp-stat">Raumhöhe: <span>${sym.raumhoehe!=null?sym.raumhoehe+'cm':'—'}</span></div>
-    <div class="rp-stat">Kabelzuführung: <span>${sym.kabelzufuhr||'—'}</span></div>
-    <button class="btn bg" style="width:100%;margin-top:5px;font-size:10px" onclick="openInstModal('${sym.id}')">✏️ Installation bearbeiten</button>
     <div class="rp-divider"></div>
     <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Position</div>
     <div class="rp-stat">X: <span>${Math.round(sym.x)}px</span></div>
@@ -3129,36 +3127,6 @@ function exportPDF() {
     border:1px solid transparent; border-radius:4px; cursor:pointer; color:var(--tx3); font-size:14px;
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
-
-
-  /* ── INSTALLATION MODAL ── */
-  .inst-modal { width: 460px; max-width: 96vw; }
-  .inst-section { margin-bottom: 14px; }
-  .inst-section-title {
-    font-size: 10px; font-weight: 700; color: var(--ac);
-    text-transform: uppercase; letter-spacing: .7px;
-    margin-bottom: 8px; padding-bottom: 4px;
-    border-bottom: 1px solid var(--bd);
-  }
-  .inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .inst-card {
-    background: var(--sf2); border: 2px solid var(--bd); border-radius: 6px;
-    padding: 7px 9px; cursor: pointer; transition: all .15s;
-    display: flex; align-items: center; gap: 7px; font-size: 11px;
-  }
-  .inst-card:hover { border-color: var(--ac); color: var(--ac); }
-  .inst-card.selected { border-color: var(--ac); background: rgba(245,166,35,.12); color: var(--ac); }
-  .inst-card .ic-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
-  .inst-card .ic-name { font-weight: 600; font-size: 11px; }
-  .inst-card .ic-sub  { font-size: 9px; color: var(--tx3); margin-top: 1px; }
-  .inst-row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
-  .inst-row label { font-size: 10px; color: var(--tx2); min-width: 120px; flex-shrink: 0; }
-  .inst-hint { font-size: 9px; color: var(--tx3); margin-top: 3px; line-height: 1.4; }
-  .wire-seg-info {
-    background: var(--sf2); border: 1px solid var(--bd); border-radius: 5px;
-    padding: 7px 10px; margin-bottom: 10px; font-size: 11px; color: var(--tx2);
-  }
-  .wire-seg-info strong { color: var(--tx); }
 
 </style>
     
