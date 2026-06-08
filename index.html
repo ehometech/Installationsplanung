@@ -206,6 +206,13 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
 
+
+  .type-sat_dose .ico, .type-sat_dose_2 .ico, .type-koax_dose .ico,
+  .type-multimedia_dose .ico, .type-hdmi_dose .ico
+    { background:rgba(21,101,192,.2); color:#1565c0; font-family:var(--mono); font-weight:700; font-size:7px; }
+  .type-lan_dose .ico, .type-lan_dose_doppelt .ico, .type-telefon_dose .ico
+    { background:rgba(106,27,154,.2); color:#6a1b9a; font-family:var(--mono); font-weight:700; font-size:8px; }
+
 </style>
 
   <!-- Firebase SDKs -->
@@ -293,10 +300,21 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="startCalibrate()" title="Maßstab kalibrieren" id="btnCal">📏</button>
       <span style="font-size:10px;color:var(--tx3);font-family:var(--mono)" id="scaleLabel">Kein Maßstab</span>
       <div class="vs"></div>
-      <button class="tool-btn" onclick="undoAction()" title="Rückgängig (Ctrl+Z)" id="btnUndo">↩</button>
-      <button class="tool-btn" onclick="redoAction()" title="Wiederholen (Ctrl+Y)" id="btnRedo">↪</button>
-      <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählte Leitung löschen" id="btnDelWire" style="color:var(--rd)">✂</button>
-      <button class="tool-btn" onclick="clearAll()" title="Alles löschen" style="color:var(--rd)">🗑</button>
+      <button class="tool-btn" onclick="undoAction()" title="Rückgängig">↩</button>
+      <button class="tool-btn" onclick="clearAll()" title="Alles löschen">🗑</button>
+      <div class="vs"></div>
+      <select class="rp-sel" id="wireTypeSelect" onchange="setActiveWireType(this.value)" style="width:130px;font-size:10px" title="Leitungstyp">
+        <option value="strom">⚡ Strom NYM-J</option>
+        <option value="strom3">⚡ Drehstrom NYM-J 5</option>
+        <option value="erde">🌍 Erdkabel NYY-J</option>
+        <option value="daten">💻 Datenkabel CAT6</option>
+        <option value="sat">📡 SAT-Kabel Koax</option>
+        <option value="telefon">📞 Telefonkabel</option>
+        <option value="bus">🔶 KNX/Bus</option>
+      </select>
+      <div class="vs"></div>
+      <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählt löschen (Entf)" style="color:var(--rd)">✂</button>
+      <button class="tool-btn" onclick="undoAction()" title="Rückgängig (Strg+Z)">↩</button>
       <div class="vs"></div>
       <label class="btn bg" style="cursor:pointer">
         📁 Grundriss laden
@@ -1123,8 +1141,6 @@ let state = {
   panStart: null,
   wirePoints: [],
   undoStack: [],
-  wireDrawing: false,   // true when dragging wire from symbol
-  wireSrcId: null,      // source symbol id
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -1727,22 +1743,18 @@ async function saveToCloud() {
       if (totalSize + sz < 800000) { csToSave[k] = v; totalSize += sz; }
     }
 
-    // Save floorplan as base64 (compressed)
+    // Save floorplan as compressed JPEG
     let floorplanData = null;
     if (state.floorplan && state.floorplan.img) {
       try {
         const fc = document.createElement('canvas');
-        // Resize to max 1800px to stay under Firestore 1MB limit
-        const maxW = 1800, maxH = 1800;
+        const maxD = 1600;
         let fw = state.floorplan.w, fh = state.floorplan.h;
-        if (fw > maxW || fh > maxH) {
-          const ratio = Math.min(maxW/fw, maxH/fh);
-          fw = Math.round(fw*ratio); fh = Math.round(fh*ratio);
-        }
+        if (fw > maxD || fh > maxD) { const r = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r); fh=Math.round(fh*r); }
         fc.width = fw; fc.height = fh;
         fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-        floorplanData = fc.toDataURL('image/jpeg', 0.75);
-      } catch(imgErr) { console.warn('Floorplan save error:', imgErr); }
+        floorplanData = fc.toDataURL('image/jpeg', 0.72);
+      } catch(fe) { console.warn('Floorplan save:', fe); }
     }
 
     const updateData = {
@@ -1781,197 +1793,12 @@ function showProjectManager() {
 }
 
 
-// ═══════════════════════════════════════════════════
-//  SMART WIRE — Drag from Symbol to Symbol
-// ═══════════════════════════════════════════════════
-let _pendingWireInst = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
-
-function startWireFromSymbol(sym, pt) {
-  state.wireDrawing = true;
-  state.wireSrcId = sym.id;
-  state.wirePoints = [{ x: sym.x, y: sym.y }];
-  canvas.style.cursor = 'crosshair';
-  setStatus('🔌 Leitung ziehen → zu Steckdose/Schalter ziehen und loslassen');
-}
-
-function finishSmartWire(pt) {
-  if (!state.wireDrawing) return;
-  state.wireDrawing = false;
-  canvas.style.cursor = 'default';
-  octx.clearRect(0, 0, overlay.width, overlay.height);
-
-  // Check if released on another symbol
-  const target = hitTest(pt.x, pt.y);
-  const endPt = target ? { x: target.x, y: target.y } : pt;
-
-  // Need at least some distance
-  const src = state.wirePoints[0];
-  if (Math.hypot(endPt.x - src.x, endPt.y - src.y) < 15) {
-    state.wirePoints = [];
-    state.wireSrcId = null;
-    return;
-  }
-
-  // Build wire points: from src → horizontal/vertical routing → end
-  const points = buildSmartRoute(src, endPt);
-  state.wirePoints = points;
-
-  saveUndo();
-  const circuit = autoCircuitName();
-  // Assign circuit to connected symbols
-  const srcSym = state.symbols.find(s => s.id === state.wireSrcId);
-  if (srcSym && !srcSym.circuit) srcSym.circuit = circuit;
-  if (target && !target.circuit) target.circuit = circuit;
-  else if (target && target.circuit) {
-    // Use existing circuit from target
-  }
-
-  state.wires.push({
-    id: gid(),
-    points,
-    circuit: srcSym?.circuit || circuit,
-    phase: srcSym?.phase || 'L1',
-    kabel: srcSym?.kabel || 'NYM-J 3×1.5',
-    laenge_m: calcWireLength(points),
-    verlegeart: _pendingWireInst.verlegeart || 'UP',
-    trasseHoehe: _pendingWireInst.trasseHoehe || 20,
-    rohrTyp: _pendingWireInst.rohrTyp || '',
-    srcId: state.wireSrcId,
-    dstId: target?.id || null,
-  });
-
-  const newIdx = state.wires.length - 1;
-  state.wirePoints = [];
-  state.wireSrcId = null;
-  render();
-  setStatus('✅ Leitung ' + (srcSym?.circuit||circuit) + ' verbunden' + (target ? ' → ' + (target.label||'') : ''));
-  setTimeout(() => openWireInstModal && openWireInstModal(newIdx), 80);
-}
-
-function buildSmartRoute(from, to) {
-  // L-shaped routing: horizontal then vertical
-  const mid = { x: to.x, y: from.y };
-  return [from, mid, to];
-}
-
-function renderSmartWirePreview(pt) {
-  if (!state.wireDrawing || !state.wirePoints.length) return;
-  const src = state.wirePoints[0];
-  const route = buildSmartRoute(src, pt);
-  const target = hitTest(pt.x, pt.y);
-
-  octx.clearRect(0, 0, overlay.width, overlay.height);
-  octx.save();
-  octx.setTransform(state.zoom, 0, 0, state.zoom, state.pan.x, state.pan.y);
-
-  // Wire line
-  octx.strokeStyle = target ? '#27ae60' : 'rgba(88,166,255,.9)';
-  octx.lineWidth = 2.5 / state.zoom;
-  octx.setLineDash([]);
-  octx.beginPath();
-  octx.moveTo(route[0].x, route[0].y);
-  for (let i = 1; i < route.length; i++) octx.lineTo(route[i].x, route[i].y);
-  octx.stroke();
-
-  // Highlight target symbol
-  if (target) {
-    octx.beginPath();
-    octx.arc(target.x, target.y, 20/state.zoom, 0, Math.PI*2);
-    octx.strokeStyle = '#27ae60';
-    octx.lineWidth = 3/state.zoom;
-    octx.stroke();
-  }
-
-  // Length label
-  if (state.scale) {
-    const len = (calcWireLengthPts(route) / state.scale).toFixed(1);
-    octx.fillStyle = '#f5a623';
-    octx.font = `bold ${11/state.zoom}px IBM Plex Mono,monospace`;
-    octx.fillText(len + 'm', pt.x + 8/state.zoom, pt.y - 8/state.zoom);
-  }
-  octx.restore();
-}
-
-function calcWireLengthPts(pts) {
-  let d = 0;
-  for (let i = 1; i < pts.length; i++) d += Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
-  return d;
-}
-
-// Cancel long press on move
-document.addEventListener('touchmove', () => {
-  if (state._longPressTimer) { clearTimeout(state._longPressTimer); state._longPressTimer = null; }
-}, { passive: true });
-document.addEventListener('touchend', () => {
-  if (state._longPressTimer) { clearTimeout(state._longPressTimer); state._longPressTimer = null; }
-}, { passive: true });
-
-
-// ── Redo Stack ──
-let redoStack = [];
-
-const _origSaveUndo = saveUndo;
-// Patch saveUndo to clear redo
-function saveUndo() {
-  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
-  if (state.undoStack.length > 50) state.undoStack.shift();
-  redoStack = []; // clear redo on new action
-}
-
-function redoAction() {
-  if (!redoStack.length) return;
-  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
-  const s = JSON.parse(redoStack.pop());
-  state.symbols = s.symbols; state.wires = s.wires;
-  state.selectedId = null;
-  render(); renderProps(null); setStatus('Wiederholt');
-}
-
-// Override undoAction to feed redo
-const _origUndo = undoAction;
-function undoAction() {
-  if (!state.undoStack.length) return;
-  redoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
-  const s = JSON.parse(state.undoStack.pop());
-  state.symbols = s.symbols; state.wires = s.wires;
-  state.selectedId = null;
-  render(); renderProps(null); setStatus('Rückgängig');
-}
-
-// ── Delete selected wire ──
-let selectedWireId = null;
-
-function deleteSelectedWire() {
-  if (selectedWireId) {
-    saveUndo();
-    state.wires = state.wires.filter(w => w.id !== selectedWireId);
-    selectedWireId = null;
-    render();
-    setStatus('Leitung gelöscht');
-    return;
-  }
-  if (state.selectedId) { deleteSelected(); return; }
-  setStatus('Kein Element ausgewählt');
-}
-
-// Wire click selection
-function hitTestWire(x, y) {
-  const THRESH = 8 / state.zoom;
-  for (let i = state.wires.length - 1; i >= 0; i--) {
-    const w = state.wires[i];
-    for (let j = 1; j < w.points.length; j++) {
-      const a = w.points[j-1], b = w.points[j];
-      const d = distToSegment(x, y, a.x, a.y, b.x, b.y);
-      if (d < THRESH) return w;
-    }
-  }
-  return null;
-}
-function distToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx-ax, dy = by-ay;
-  if (dx===0 && dy===0) return Math.hypot(px-ax, py-ay);
-  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
-  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+function setActiveWireType(type) {
+  if (!window._pendingWireInst) window._pendingWireInst = {};
+  window._pendingWireInst.wireType = type;
+  const wt = WIRE_TYPES[type] || WIRE_TYPES.strom;
+  window._pendingWireInst.kabel = wt.kabel;
+  setStatus('Leitungstyp: ' + wt.label);
 }
 
 // ═══════════════════════════════════════════════════
@@ -2109,7 +1936,6 @@ function setupEvents() {
   canvas.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('dblclick', onDblClick);
-  canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
   // Touch events for canvas
   canvas.addEventListener('touchstart', onTouchStart, { passive: false });
   canvas.addEventListener('touchmove', onTouchMoveCanvas, { passive: false });
@@ -2122,11 +1948,11 @@ function setupEvents() {
     }
     if (e.key === 'Escape') { state.wirePoints = []; state.selectedId = null; render(); }
     if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undoAction(); }
-    if ((e.ctrlKey||e.metaKey) && (e.key==='y'||e.key==='Z')) { e.preventDefault(); redoAction(); }
     if (e.key==='Delete'||e.key==='Backspace') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
-      if (selectedWireId) { deleteSelectedWire(); e.preventDefault(); }
-      else if (state.selectedId) { deleteSelected(); e.preventDefault(); }
+      e.preventDefault();
+      if (selectedWireId) deleteSelectedWire();
+      else if (state.selectedId) deleteSelected();
     }
   });
 }
@@ -2142,39 +1968,18 @@ function onMouseDown(e) {
   if (state.calibrating) { handleCalibrate(pt); return; }
   if (state.tool === 'wire') { handleWireClick(pt); return; }
   if (state.tool === 'measure') { handleMeasureClick(pt, e); return; }
-
+  // Select tool
   const hit = hitTest(pt.x, pt.y);
   if (hit) {
     selectSymbol(hit.id);
-    // Right-click OR Ctrl+click on symbol = start wire from it
-    if (e.button === 2 || e.ctrlKey) {
-      e.preventDefault();
-      startWireFromSymbol(hit, pt);
-      return;
-    }
     state.dragging = { id: hit.id, offX: pt.x - hit.x, offY: pt.y - hit.y };
   } else {
-    // Check wire hit
+    // Check wire click
     const wireHit = hitTestWire(pt.x, pt.y);
     if (wireHit) {
       selectedWireId = wireHit.id;
       state.selectedId = null;
-      // Show wire props
-      const w = wireHit;
-      const wb = document.getElementById('rpBody');
-      if (wb) wb.innerHTML = `
-        <div class="pg">
-          <div class="pgt">Leitung ${w.circuit||'—'}</div>
-          <div class="rp-stat">Stromkreis: <span>${w.circuit||'—'}</span></div>
-          <div class="rp-stat">Phase: <span>${w.phase||'L1'}</span></div>
-          <div class="rp-stat">Länge: <span>${w.laenge_m||'—'}m</span></div>
-          <div class="rp-stat">Kabel: <span>${w.kabel||'—'}</span></div>
-          <div class="rp-stat">Verlegeart: <span>${w.verlegeart||'—'}</span></div>
-          <div class="rp-stat">Trassenhöhe: <span>${w.trasseHoehe!=null?w.trasseHoehe+'cm':'—'}</span></div>
-          ${w.rohrTyp?'<div class="rp-stat">Rohr: <span>'+w.rohrTyp+'</span></div>':''}
-          <button class="btn bg" style="width:100%;margin-top:6px;font-size:10px" onclick="openWireInstModal&&openWireInstModal(${state.wires.indexOf(w)})">✏️ Verlegung bearbeiten</button>
-          <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:4px;font-size:10px" onclick="deleteSelectedWire()">🗑 Leitung löschen</button>
-        </div>`;
+      renderWireProps(wireHit);
       render();
       return;
     }
@@ -2206,10 +2011,6 @@ function onMouseMove(e) {
   if (state.tool === 'wire' && state.wirePoints.length > 0) {
     renderWirePreview(pt); return;
   }
-  // Smart wire drag preview
-  if (state.wireDrawing) {
-    renderSmartWirePreview(pt); return;
-  }
   if (state.calibrating && state.calPoints.length === 1) {
     renderCalPreview(pt);
   }
@@ -2218,11 +2019,6 @@ function onMouseMove(e) {
 }
 function onMouseUp(e) {
   if (state.dragging) { saveUndo(); state.dragging = null; }
-  // Finish smart wire if released on a symbol
-  if (state.wireDrawing) {
-    const pt = clientToCanvas(e.clientX, e.clientY);
-    finishSmartWire(pt);
-  }
   state.panning = false; state.panStart = null;
 }
 function onWheel(e) {
@@ -2260,13 +2056,6 @@ function onTouchStart(e) {
     const hit = hitTest(pt.x, pt.y);
     if (hit) {
       selectSymbol(hit.id);
-      // Long press timer for wire drawing on touch
-      state._longPressTimer = setTimeout(() => {
-        state.dragging = null;
-        startWireFromSymbol(hit, pt);
-        // Haptic feedback if available
-        if (navigator.vibrate) navigator.vibrate(50);
-      }, 500);
       state.dragging = { id: hit.id, offX: pt.x - hit.x, offY: pt.y - hit.y };
     } else {
       state.selectedId = null;
@@ -2309,13 +2098,6 @@ function onTouchMoveCanvas(e) {
 }
 function onTouchEndCanvas(e) {
   if (state.dragging) { saveUndo(); state.dragging = null; }
-  if (state.wireDrawing) {
-    const t = e.changedTouches[0];
-    if (t) {
-      const pt = clientToCanvas(t.clientX, t.clientY);
-      finishSmartWire(pt);
-    }
-  }
   state.panning = false; touchPanStart = null;
 }
 
@@ -2395,39 +2177,26 @@ function finishWire() {
   if (state.wirePoints.length < 2) { state.wirePoints = []; return; }
   saveUndo();
   const circuit = autoCircuitName();
+  const wt = window._pendingWireInst || {};
   state.wires.push({
     id: gid(),
     points: [...state.wirePoints],
-    circuit, phase: 'L1',
-    kabel: 'NYM-J 3×1.5',
-    laenge_m: calcWireLength(state.wirePoints),
-    verlegeart: _pendingWireInst?.verlegeart || 'UP',
-    trasseHoehe: _pendingWireInst?.trasseHoehe || 20,
-    rohrTyp: _pendingWireInst?.rohrTyp || '',
+    circuit,
+    phase: 'L1',
+    wireType: wt.wireType || 'strom',
+    kabel: wt.kabel || 'NYM-J 3×1.5',
+    verlegeart: wt.verlegeart || 'UP',
+    trasseHoehe: wt.trasseHoehe || 20,
+    rohrTyp: wt.rohrTyp || '',
+    laenge_m: calcWireLength(state.wirePoints)
   });
-  const newIdx = state.wires.length - 1;
   state.wirePoints = [];
   render();
   setStatus('Leitung ' + circuit + ' gespeichert');
-  setTimeout(() => openWireInstModal && openWireInstModal(newIdx), 80);
 }
 
-function autoCircuitName() {
-  // Group by FI number: F01.1, F01.2 ...
-  const existing = state.wires.map(w => w.circuit).filter(Boolean);
-  // Find highest number
-  let maxFI = 0, maxSub = 0;
-  existing.forEach(c => {
-    const m = c.match(/^F(\d+)\.(\d+)$/);
-    if (m) {
-      const fi = parseInt(m[1]), sub = parseInt(m[2]);
-      if (fi > maxFI || (fi === maxFI && sub > maxSub)) { maxFI = fi; maxSub = sub; }
-    }
-  });
-  if (maxFI === 0) return 'F01.1';
-  const nextSub = maxSub + 1;
-  return `F${String(maxFI).padStart(2,'0')}.${nextSub}`;
-}
+window._pendingWireInst = { wireType:'strom', kabel:'NYM-J 3×1.5', verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
+
 function calcWireLength(pts) {
   if (!state.scale) return null;
   let total = 0;
@@ -2577,26 +2346,106 @@ function drawCalPoints() {
   }
 }
 
-const PHASE_COLORS = { L1:'#e74c3c', L2:'#d4ac0d', L3:'#27ae60', 'L1+N':'#e74c3c', 'L1+L2+L3':'#9b59b6', 'L1+L2':'#e67e22', default:'#58a6ff' };
+
+// Wire types with colors and styles
+const WIRE_TYPES = {
+  strom:   { label:'Strom (NYM-J)',      color:'#e74c3c', dash:[],        width:2.5, kabel:'NYM-J 3×1.5' },
+  strom3:  { label:'Drehstrom (NYM-J 5)',color:'#9b59b6', dash:[],        width:2.5, kabel:'NYM-J 5×2.5' },
+  erde:    { label:'Erdkabel (NYY-J)',    color:'#795548', dash:[],        width:3,   kabel:'NYY-J 5×6' },
+  daten:   { label:'Datenkabel (CAT6)',   color:'#9c27b0', dash:[6,3],     width:2,   kabel:'CAT 6 U/UTP' },
+  sat:     { label:'SAT-Kabel (Koax)',    color:'#1565c0', dash:[8,3],     width:2,   kabel:'Koax RG-6' },
+  telefon: { label:'Telefonkabel',        color:'#607d8b', dash:[4,2],     width:1.8, kabel:'J-Y(St)Y 2×2×0.6' },
+  bus:     { label:'KNX/Bus-Kabel',       color:'#ff5722', dash:[3,2],     width:1.8, kabel:'YCYM 2×2×0.8' },
+  custom:  { label:'Benutzerdefiniert',   color:'#27ae60', dash:[],        width:2,   kabel:'—' },
+};
+
+const PHASE_COLORS = {
+  L1:'#e74c3c', L2:'#d4ac0d', L3:'#27ae60', N:'#2980b9',
+  'L1+N':'#e74c3c', 'L1+L2+L3':'#9b59b6', 'L1+L2':'#e67e22',
+  default:'#58a6ff'
+};
+
+function getWireColor(wire) {
+  if (wire.customColor) return wire.customColor;
+  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
+  return PHASE_COLORS[wire.phase] || PHASE_COLORS.default;
+}
+function getWireDash(wire) {
+  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].dash;
+  return [];
+}
+function getWireWidth(wire) {
+  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].width;
+  return 2;
+}
+
+
+let selectedWireId = null;
 
 function drawWires() {
   for (const wire of state.wires) {
-    const col = PHASE_COLORS[wire.phase] || PHASE_COLORS.default;
-    const isSelWire = wire.id === selectedWireId;
-    ctx.strokeStyle = isSelWire ? '#f5a623' : col;
-    ctx.lineWidth = isSelWire ? 3.5/state.zoom : 2/state.zoom;
-    ctx.setLineDash([]);
+    const isSel = wire.id === selectedWireId;
+    const col = isSel ? '#f5a623' : getWireColor(wire);
+    const dash = isSel ? [] : getWireDash(wire);
+    const lw   = isSel ? 4 : getWireWidth(wire);
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw / state.zoom;
+    ctx.setLineDash(dash.map(d => d / state.zoom));
     ctx.beginPath();
     ctx.moveTo(wire.points[0].x, wire.points[0].y);
-    for (let i=1; i<wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
+    for (let i = 1; i < wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
     ctx.stroke();
-    // Length label midpoint
+    ctx.setLineDash([]);
+
+    // Circuit label
+    const mid = wire.points[Math.floor(wire.points.length/2)];
+    ctx.fillStyle = col;
+    ctx.font = `bold ${10/state.zoom}px IBM Plex Mono,monospace`;
+    if (wire.circuit) ctx.fillText(wire.circuit, mid.x+4/state.zoom, mid.y-4/state.zoom);
     if (wire.laenge_m) {
-      const mid = wire.points[Math.floor(wire.points.length/2)];
-      ctx.fillStyle=col; ctx.font=`${10/state.zoom}px IBM Plex Mono,monospace`;
-      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y-4/state.zoom);
+      ctx.font = `${8/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+7/state.zoom);
+    }
+    // Verlegeart
+    if (wire.verlegeart) {
+      ctx.font = `${7/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.fillStyle = 'rgba(0,120,200,.85)';
+      const vl = {'UP':'UP','AP':'AP','HR':'Rohr','EZ':'Einz.','ER':'Erde','HD':'HD','FU':'FB','HW':'HW'}[wire.verlegeart]||wire.verlegeart;
+      ctx.fillText(vl+(wire.trasseHoehe?' '+wire.trasseHoehe+'cm':''), mid.x+4/state.zoom, mid.y+15/state.zoom);
     }
   }
+}
+
+// Wire hit test
+function hitTestWire(x, y) {
+  const T = 8 / state.zoom;
+  for (let i = state.wires.length-1; i >= 0; i--) {
+    const w = state.wires[i];
+    for (let j = 1; j < w.points.length; j++) {
+      const a = w.points[j-1], b = w.points[j];
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const len2 = dx*dx+dy*dy;
+      if (len2 === 0) continue;
+      const t = Math.max(0, Math.min(1, ((x-a.x)*dx+(y-a.y)*dy)/len2));
+      const d = Math.hypot(x-(a.x+t*dx), y-(a.y+t*dy));
+      if (d < T) return w;
+    }
+  }
+  return null;
+}
+
+function deleteSelectedWire() {
+  if (selectedWireId) {
+    if (!confirm('Leitung löschen?')) return;
+    saveUndo();
+    state.wires = state.wires.filter(w => w.id !== selectedWireId);
+    selectedWireId = null;
+    render(); renderProps(null);
+    setStatus('Leitung gelöscht');
+    return;
+  }
+  if (state.selectedId) deleteSelected();
 }
 
 function drawSymbols() {
@@ -2722,6 +2571,104 @@ function rotateSelected(deg) {
 }
 function openSymModal(sym) { /* Alias for props */ }
 function closeSymModal() { document.getElementById('symModal').classList.add('hid'); }
+
+
+function renderWireProps(wire) {
+  const body = document.getElementById('rpBody');
+  if (!body) return;
+  const col = getWireColor(wire);
+  const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2'];
+  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 5×6','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8'];
+  const verlegeArten = ['UP','AP','HR','EZ','ER','HD','FU','HW'];
+  const verlegeNames = {'UP':'Unterputz','AP':'Aufputz','HR':'In Rohr','EZ':'Einziehen','ER':'Erdkabel','HD':'Hohldecke','FU':'Fußboden','HW':'Hohlwand'};
+
+  // Wire type options
+  const wtOpts = Object.entries(WIRE_TYPES).map(([k,v]) =>
+    `<option value="${k}" ${(wire.wireType||'strom')===k?'selected':''}>${v.label}</option>`
+  ).join('');
+  const phOpts = phases.map(p => `<option ${p===wire.phase?'selected':''}>${p}</option>`).join('');
+  const kaOpts = kabels.map(k => `<option ${k===wire.kabel?'selected':''}>${k}</option>`).join('');
+  const vlOpts = verlegeArten.map(v => `<option value="${v}" ${v===(wire.verlegeart||'UP')?'selected':''}>${v} — ${verlegeNames[v]||v}</option>`).join('');
+
+  body.innerHTML = `
+    <div class="pg">
+      <div class="pgt" style="display:flex;align-items:center;gap:6px">
+        <div style="width:20px;height:3px;background:${col};border-radius:2px"></div>
+        Leitung ${esc(wire.circuit||'—')}
+      </div>
+
+      <div class="rp-row"><label class="rp-lbl">Leitungstyp</label>
+        <select class="rp-sel" onchange="updWire('${wire.id}','wireType',this.value)">${wtOpts}</select></div>
+
+      <div class="rp-row"><label class="rp-lbl">🎨 Farbe</label>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="color" value="${wire.customColor||col}"
+            oninput="updWire('${wire.id}','customColor',this.value)"
+            style="width:36px;height:28px;border:1px solid var(--bd);border-radius:3px;cursor:pointer;background:none;padding:2px">
+          <button class="btn bg" style="font-size:9px;padding:3px 7px" onclick="updWire('${wire.id}','customColor',null)">Auto</button>
+          <div style="flex:1;height:4px;background:${col};border-radius:2px"></div>
+        </div></div>
+
+      <div class="rp-row"><label class="rp-lbl">Stromkreis</label>
+        <input class="rp-input" value="${esc(wire.circuit||'')}" oninput="updWire('${wire.id}','circuit',this.value)"></div>
+
+      <div class="rp-row"><label class="rp-lbl">Phase</label>
+        <select class="rp-sel" onchange="updWire('${wire.id}','phase',this.value)">${phOpts}</select></div>
+
+      <div class="rp-row"><label class="rp-lbl">Kabeltyp</label>
+        <select class="rp-sel" onchange="updWire('${wire.id}','kabel',this.value)">${kaOpts}</select></div>
+
+      <div class="rp-row"><label class="rp-lbl">Verlegeart</label>
+        <select class="rp-sel" onchange="updWire('${wire.id}','verlegeart',this.value)">${vlOpts}</select></div>
+
+      <div class="rp-row"><label class="rp-lbl">Trassenhöhe (cm)</label>
+        <input class="rp-input" type="number" value="${wire.trasseHoehe||20}" min="0" max="300"
+          oninput="updWire('${wire.id}','trasseHoehe',+this.value)" style="width:70px">
+      </div>
+
+      <div class="rp-row"><label class="rp-lbl">Länge</label>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ac)">${wire.laenge_m||'—'}m</span></div>
+
+      <div class="rp-divider"></div>
+      <div style="display:flex;gap:5px">
+        <button class="btn bg" style="flex:1;font-size:10px" onclick="splitWireCircuit('${wire.id}')">✂ Neuer SK</button>
+        <button class="btn" style="flex:1;font-size:10px;background:var(--rd);color:white" onclick="deleteSelectedWire()">🗑 Löschen</button>
+      </div>
+    </div>
+  `;
+}
+
+function updWire(id, key, val) {
+  const wire = state.wires.find(w => w.id === id);
+  if (!wire) return;
+  wire[key] = val;
+  render();
+  renderWireProps(wire);
+}
+
+function splitWireCircuit(id) {
+  const wire = state.wires.find(w => w.id === id);
+  if (!wire) return;
+  // Auto new circuit number
+  const existing = state.wires.map(w=>w.circuit).filter(Boolean);
+  let maxFI=0, maxSub=0;
+  existing.forEach(c=>{const m=c.match(/^F(\d+)\.(\d+)$/);if(m){const fi=parseInt(m[1]),sub=parseInt(m[2]);if(fi>maxFI||(fi===maxFI&&sub>maxSub)){maxFI=fi;maxSub=sub;}}});
+  const next = maxFI===0?'F01.1':`F${String(maxFI).padStart(2,'0')}.${maxSub+1}`;
+  wire.circuit = next;
+  render(); renderWireProps(wire);
+  setStatus('Neuer Stromkreis: ' + next);
+}
+
+
+function autoCircuitName() {
+  const existing = state.wires.map(w=>w.circuit).filter(Boolean);
+  let maxFI=0, maxSub=0;
+  existing.forEach(c=>{
+    const m=c.match(/^F(\d+)\.(\d+)$/);
+    if(m){const fi=parseInt(m[1]),sub=parseInt(m[2]);if(fi>maxFI||(fi===maxFI&&sub>maxSub)){maxFI=fi;maxSub=sub;}}
+  });
+  return maxFI===0?'F01.1':`F${String(maxFI).padStart(2,'0')}.${maxSub+1}`;
+}
 
 // ═══════════════════════════════════════════════════
 //  STROMKREISE AUTO-GENERIERUNG
@@ -3127,6 +3074,13 @@ function exportPDF() {
     border:1px solid transparent; border-radius:4px; cursor:pointer; color:var(--tx3); font-size:14px;
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
+
+
+  .type-sat_dose .ico, .type-sat_dose_2 .ico, .type-koax_dose .ico,
+  .type-multimedia_dose .ico, .type-hdmi_dose .ico
+    { background:rgba(21,101,192,.2); color:#1565c0; font-family:var(--mono); font-weight:700; font-size:7px; }
+  .type-lan_dose .ico, .type-lan_dose_doppelt .ico, .type-telefon_dose .ico
+    { background:rgba(106,27,154,.2); color:#6a1b9a; font-family:var(--mono); font-weight:700; font-size:8px; }
 
 </style>
     
