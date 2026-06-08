@@ -212,6 +212,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -2577,6 +2578,31 @@ function setTool(t) {
 // ═══════════════════════════════════════════════════
 function loadFloorplan(e) {
   const file = e.target.files[0];
+    // PDF-Unterstützung via PDF.js
+    if (file.type === 'application/pdf') {
+          const url = URL.createObjectURL(file);
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          pdfjsLib.getDocument(url).promise.then(pdf => {
+                  pdf.getPage(1).then(page => {
+                            const viewport = page.getViewport({ scale: 2.0 });
+                            const offCanvas = document.createElement('canvas');
+                            offCanvas.width = viewport.width;
+                            offCanvas.height = viewport.height;
+                            const ctx2 = offCanvas.getContext('2d');
+                            page.render({ canvasContext: ctx2, viewport }).promise.then(() => {
+                                        const img = new Image();
+                                        img.onload = () => {
+                                                      state.floorplan = { img, w: img.width, h: img.height };
+                                                      document.getElementById('uploadZone').style.display = 'none';
+                                                      const scaleX = canvas.width / img.width * 0.9;
+                                                      const scaleY = canvas.height / img.height * 0.9;
+                                                      state.zoom = Math.min(scaleX, scaleY);
+                                                      state.pan.x = (canvas.width - img.width * state.zoom) / 2;
+                                                      state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+                                                      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
+                                                      render();
+                                        };
+                                        img.src = offCanvas.toDataURL();
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
