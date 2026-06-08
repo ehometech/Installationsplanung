@@ -312,7 +312,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
           <p>PNG, JPG oder PDF<br>Drag & Drop oder klicken</p>
           <label style="margin-top:14px;display:inline-block;cursor:pointer">
             <span class="btn ba" style="display:inline-flex">📁 Datei auswählen</span>
-            <input type="file" accept="image/*" style="display:none" onchange="loadFloorplan(event)">
+            <input type="file" accept="image/*,application/pdf,.pdf" style="display:none" onchange="loadFloorplan(event)">
           </label>
         </div>
       </div>
@@ -2578,52 +2578,71 @@ function setTool(t) {
 // ═══════════════════════════════════════════════════
 function loadFloorplan(e) {
   const file = e.target.files[0];
-    // PDF-Unterstützung via PDF.js
-    if (file.type === 'application/pdf') {
-          const url = URL.createObjectURL(file);
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-          pdfjsLib.getDocument(url).promise.then(pdf => {
-                  pdf.getPage(1).then(page => {
-                            const viewport = page.getViewport({ scale: 2.0 });
-                            const offCanvas = document.createElement('canvas');
-                            offCanvas.width = viewport.width;
-                            offCanvas.height = viewport.height;
-                            const ctx2 = offCanvas.getContext('2d');
-                            page.render({ canvasContext: ctx2, viewport }).promise.then(() => {
-                                        const img = new Image();
-                                        img.onload = () => {
-                                                      state.floorplan = { img, w: img.width, h: img.height };
-                                                      document.getElementById('uploadZone').style.display = 'none';
-                                                      const scaleX = canvas.width / img.width * 0.9;
-                                                      const scaleY = canvas.height / img.height * 0.9;
-                                                      state.zoom = Math.min(scaleX, scaleY);
-                                                      state.pan.x = (canvas.width - img.width * state.zoom) / 2;
-                                                      state.pan.y = (canvas.height - img.height * state.zoom) / 2;
-                                                      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
-                                                      render();
-                                        };
-                                        img.src = offCanvas.toDataURL();
   if (!file) return;
+
+  // ── PDF via PDF.js ──
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    if (typeof pdfjsLib === 'undefined') {
+      setStatus('PDF.js nicht verfuegbar — bitte Seite neu laden');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    setStatus('PDF wird geladen...');
+    pdfjsLib.getDocument(url).promise.then(function(pdf) {
+      pdf.getPage(1).then(function(page) {
+        const viewport = page.getViewport({ scale: 2.0 });
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = viewport.width;
+        offCanvas.height = viewport.height;
+        const ctx2 = offCanvas.getContext('2d');
+        page.render({ canvasContext: ctx2, viewport }).promise.then(function() {
+          const img = new Image();
+          img.onload = function() {
+            state.floorplan = { img, w: img.width, h: img.height };
+            document.getElementById('uploadZone').style.display = 'none';
+            const scaleX = canvas.width / img.width * 0.9;
+            const scaleY = canvas.height / img.height * 0.9;
+            state.zoom = Math.min(scaleX, scaleY);
+            state.pan.x = (canvas.width - img.width * state.zoom) / 2;
+            state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+            document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
+            render();
+            setStatus('PDF geladen (' + pdf.numPages + ' Seiten) — Bitte Massstab kalibrieren!');
+            URL.revokeObjectURL(url);
+          };
+          img.src = offCanvas.toDataURL('image/png');
+        });
+      });
+    }).catch(function(err) {
+      setStatus('PDF Fehler: ' + err.message);
+      URL.revokeObjectURL(url);
+    });
+    return;
+  }
+
+  // ── Bild (PNG / JPG) ──
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = function(ev) {
     const img = new Image();
-    img.onload = () => {
+    img.onload = function() {
       state.floorplan = { img, w: img.width, h: img.height };
       document.getElementById('uploadZone').style.display = 'none';
-      // Auto-fit
       const scaleX = canvas.width / img.width * 0.9;
       const scaleY = canvas.height / img.height * 0.9;
       state.zoom = Math.min(scaleX, scaleY);
-      state.pan.x = (canvas.width - img.width*state.zoom)/2;
-      state.pan.y = (canvas.height - img.height*state.zoom)/2;
-      document.getElementById('zlbl').textContent = Math.round(state.zoom*100)+'%';
+      state.pan.x = (canvas.width - img.width * state.zoom) / 2;
+      state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
       render();
-      setStatus(`Grundriss geladen: ${img.width}×${img.height}px — Bitte Maßstab kalibrieren!`);
+      setStatus('Grundriss geladen: ' + img.width + 'x' + img.height + 'px — Bitte Massstab kalibrieren!');
     };
+    img.onerror = function() { setStatus('Bild konnte nicht geladen werden'); };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
+
 
 // Upload zone drag/drop
 document.addEventListener('DOMContentLoaded', () => {
@@ -2632,7 +2651,7 @@ document.addEventListener('DOMContentLoaded', () => {
     box.addEventListener('dragover', e=>{ e.preventDefault(); box.classList.add('drag-over'); });
     box.addEventListener('dragleave', ()=>box.classList.remove('drag-over'));
     box.addEventListener('drop', e=>{ e.preventDefault(); box.classList.remove('drag-over');
-      const f=e.dataTransfer.files[0]; if(f) { const inp=document.createElement('input'); inp.type='file'; loadFloorplan({target:{files:[f]}}); }});
+      const f=e.dataTransfer.files[0]; if(f) loadFloorplan({target:{files:[f]}});});
   }
 });
 
