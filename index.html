@@ -385,9 +385,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="btn bg" onclick="printSt()">🖨 Drucken</button>
     </div>
     <table class="stbl">
-      <thead><tr><th>#</th><th>Symbol</th><th>Bezeichnung</th><th>Stromkreis</th><th>Phase</th><th>Kabel (m)</th><th>Anzahl</th></tr></thead>
+      <thead><tr><th>#</th><th>Symbol</th><th>Bezeichnung</th><th>Stromkreis</th><th>Phase</th><th>Kabellänge</th><th>Anz.</th></tr></thead>
       <tbody id="stBody"></tbody>
     </table>
+    <div id="stWires"></div>
     <div style="margin-top:16px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:14px">
       <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Zusammenfassung</div>
       <div id="stSummary" style="font-family:var(--mono);font-size:11px;color:var(--tx2)"></div>
@@ -1728,9 +1729,16 @@ async function loadProjectList() {
 }
 
 async function createNewProject() {
-  if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
+  if (!fbAuth) { alert('Firebase Auth nicht geladen — Seite neu laden!'); return; }
+  if (!currentUser) {
+    alert('Bitte zuerst mit Google anmelden! (Schaltfläche oben)');
+    return;
+  }
+  if (!fbDb) { alert('Firestore nicht verfügbar — Seite neu laden!'); return; }
+
   const nameEl = document.getElementById('newProjName');
-  const name = nameEl.value.trim() || 'Neues Projekt ' + new Date().toLocaleDateString('de-DE');
+  const name = (nameEl?.value||'').trim() || 'Projekt ' + new Date().toLocaleDateString('de-DE');
+
   try {
     setFbStatus('syncing', 'Erstelle...');
     const ref = await fbDb.collection(GRUNDRISS_COLLECTION).add({
@@ -1741,24 +1749,36 @@ async function createNewProject() {
       scale: null,
       customSymbols: {},
       symbolCount: 0,
+      raumhoehe: 250,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     currentProjectId = ref.id;
+    if (nameEl) nameEl.value = '';
+
+    // Reset all state
+    state.symbols = []; state.wires = []; state.scale = null;
+    state.selectedId = null; state.floorplan = null;
+    state.raumhoehe = 250;
+    selectedWireId = null;
+
     document.getElementById('projName').value = name;
-    nameEl.value = '';
-    // Reset canvas
-    state.symbols = []; state.wires = []; state.scale = null; state.selectedId = null;
-    state.floorplan = null;
-    document.getElementById('uploadZone').style.display = 'flex';
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'flex';
+    const pm = document.getElementById('projMgrModal');
+    if (pm) pm.classList.add('hid');
+
     render(); renderProps(null);
-    document.getElementById('projMgrModal').classList.add('hid');
     listenToProject(ref.id);
-    setFbStatus('online', 'Projekt erstellt');
-    setStatus('✅ Projekt "' + name + '" erstellt');
+    setFbStatus('online', '✅ Projekt erstellt');
+    setStatus('✅ Projekt "' + name + '" erstellt — lade jetzt deinen Grundriss hoch!');
   } catch(e) {
-    console.warn('[Firebase] createProject:', e);
-    setFbStatus('offline', 'Fehler beim Erstellen');
+    console.error('[Firebase] createProject:', e);
+    let msg = e.message || String(e);
+    if (e.code === 'permission-denied') msg = 'Keine Berechtigung — Firebase Regeln prüfen!';
+    if (e.code === 'unauthenticated')   msg = 'Nicht angemeldet!';
+    setFbStatus('offline', 'Fehler');
+    alert('Projekt erstellen fehlgeschlagen: ' + msg);
   }
 }
 
@@ -1817,16 +1837,35 @@ function listenToProject(id) {
   if (!fbDb) return;
   fbUnsubscribe = fbDb.collection(GRUNDRISS_COLLECTION).doc(id)
     .onSnapshot(snap => {
-      if (Date.now() < cloudSaveLock) return; // ignore after local save
+      if (Date.now() < cloudSaveLock) return; // ignore snapshot right after save
       if (!snap.exists) return;
       const d = snap.data();
-      // Apply remote changes if different
-      if (d.symbols) { state.symbols = d.symbols; }
-      if (d.wires)   { state.wires   = d.wires; }
-      if (d.scale !== undefined) state.scale = d.scale;
-      if (d.customSymbols) { customSymbols = d.customSymbols; mergeCustomSymbols(); }
+      // Only apply if symbols array changed (avoid overwriting local edits)
+      let changed = false;
+      if (d.symbols && JSON.stringify(d.symbols) !== JSON.stringify(state.symbols)) {
+        state.symbols = d.symbols; changed = true;
+      }
+      if (d.wires && JSON.stringify(d.wires) !== JSON.stringify(state.wires)) {
+        state.wires = d.wires; changed = true;
+      }
+      if (d.scale !== undefined && d.scale !== state.scale) { state.scale = d.scale; changed = true; }
+      if (d.raumhoehe) state.raumhoehe = d.raumhoehe;
+      if (d.customSymbols && Object.keys(d.customSymbols).length) {
+        customSymbols = d.customSymbols; mergeCustomSymbols();
+      }
       if (d.name) document.getElementById('projName').value = d.name;
-      render(); buildPalette();
+      // Restore floorplan if not already loaded
+      if (d.floorplanData && !state.floorplan) {
+        const img = new Image();
+        img.onload = () => {
+          state.floorplan = { img, w: img.width, h: img.height };
+          const uz = document.getElementById('uploadZone');
+          if (uz) uz.style.display = 'none';
+          render();
+        };
+        img.src = d.floorplanData;
+      }
+      if (changed) { render(); buildPalette(); }
       setFbStatus('online', 'Synchronisiert ✓');
     }, err => {
       console.warn('[Firebase] listener:', err);
@@ -1843,10 +1882,26 @@ async function saveToCloud() {
     return;
   }
   setFbStatus('syncing', 'Speichert...');
-  cloudSaveLock = Date.now() + 10000; // 10 sec lock
+  cloudSaveLock = Date.now() + 30000; // 30 sec lock — prevent snapshot overwrite
   try {
-    // Symbols: strip large imgData for firestore (save separately)
-    const symbolsToSave = state.symbols.map(s => ({ ...s }));
+    // Clean symbols — remove non-serializable objects (OffscreenCanvas, DOM nodes etc.)
+    const symbolsToSave = state.symbols.map(s => {
+      const clean = {};
+      for (const [k, v] of Object.entries(s)) {
+        if (v == null) { clean[k] = null; continue; }
+        if (typeof v === 'function') continue;
+        if (typeof v === 'object') {
+          if (v instanceof HTMLElement || v instanceof HTMLImageElement ||
+              v instanceof CanvasRenderingContext2D) continue;
+          // OffscreenCanvas check
+          if (typeof OffscreenCanvas !== 'undefined' && v instanceof OffscreenCanvas) continue;
+          // ImageBitmap check
+          if (typeof ImageBitmap !== 'undefined' && v instanceof ImageBitmap) continue;
+        }
+        try { JSON.stringify(v); clean[k] = v; } catch(e2) { /* skip unserializable */ }
+      }
+      return clean;
+    });
     // CustomSymbols: strip imgData if too large (>500kb total)
     const csToSave = {};
     let totalSize = 0;
@@ -3137,25 +3192,100 @@ function autoCircuitName() {
 //  STROMKREISE AUTO-GENERIERUNG
 // ═══════════════════════════════════════════════════
 function autoGenerateCircuits() {
-  // Group symbols by circuit
+  // Step 1: Auto-assign circuits to unassigned symbols
+  let circNum = 1;
+  // Find max existing circuit number
+  state.symbols.forEach(s => {
+    if (s.circuit) {
+      const m = s.circuit.match(/F(\d+)/);
+      if (m && parseInt(m[1]) >= circNum) circNum = parseInt(m[1]) + 1;
+    }
+  });
+  // Find max existing wire circuit number
+  state.wires.forEach(w => {
+    if (w.circuit) {
+      const m = w.circuit.match(/F(\d+)/);
+      if (m && parseInt(m[1]) >= circNum) circNum = parseInt(m[1]) + 1;
+    }
+  });
+
+  // Assign circuits: symbols connected by wire share a circuit
+  // Build adjacency from wires
+  const adj = {}; // symId → [symId]
+  for (const w of state.wires) {
+    if (w.srcId && w.dstId) {
+      if (!adj[w.srcId]) adj[w.srcId] = [];
+      if (!adj[w.dstId]) adj[w.dstId] = [];
+      adj[w.srcId].push(w.dstId);
+      adj[w.dstId].push(w.srcId);
+    }
+  }
+
+  // BFS to find connected components
+  const visited = new Set();
+  function bfs(startId) {
+    const group = [];
+    const queue = [startId];
+    while (queue.length) {
+      const id = queue.shift();
+      if (visited.has(id)) continue;
+      visited.add(id);
+      group.push(id);
+      (adj[id]||[]).forEach(nb => { if(!visited.has(nb)) queue.push(nb); });
+    }
+    return group;
+  }
+
+  // Assign circuits to connected groups
+  for (const s of state.symbols) {
+    const def = SYMBOLS[s.type];
+    if (!def || !def.circuits) continue;
+    if (visited.has(s.id)) {
+      // Already assigned — keep existing circuit
+      continue;
+    }
+    const group = bfs(s.id);
+    if (group.length === 0) continue;
+
+    // Check if any in group already has a circuit
+    const existingCircuit = group.map(id => state.symbols.find(x=>x.id===id))
+      .filter(Boolean).map(x=>x.circuit).find(c=>c&&c!=='SK1');
+
+    const assignedCircuit = existingCircuit ||
+      'F' + String(circNum).padStart(2,'0') + '.1';
+    if (!existingCircuit) circNum++;
+
+    group.forEach(id => {
+      const sym = state.symbols.find(x => x.id === id);
+      if (sym) sym.circuit = assignedCircuit;
+    });
+    // Also update wires in this group
+    state.wires.forEach(w => {
+      if (w.srcId && group.includes(w.srcId)) w.circuit = assignedCircuit;
+    });
+  }
+
+  // Step 2: Build circuit overview
   const groups = {};
   for (const s of state.symbols) {
     const def = SYMBOLS[s.type];
     if (!def || !def.circuits) continue;
-    const key = s.circuit || 'SK1';
+    const key = s.circuit || 'SK?';
     if (!groups[key]) groups[key] = [];
     groups[key].push(s);
   }
   state.circuits = Object.entries(groups).map(([name, syms]) => {
     const phase = syms[0]?.phase || 'L1';
     const maxA = Math.max(...syms.map(s=>s.nennstrom||16));
-    // Estimate cable length from wires in circuit
     const circWires = state.wires.filter(w=>w.circuit===name);
     const cableM = circWires.reduce((a,w)=>a+(parseFloat(w.laenge_m)||0),0);
     return { name, syms, phase, nennstrom: maxA, kabel: syms[0]?.kabel||'NYM-J 3×1.5', laenge_m: cableM };
   });
+
   renderStromkreise();
+  render(); // update canvas with new circuit labels
   switchTab('stromkreise');
+  setStatus('✅ ' + Object.keys(groups).length + ' Stromkreise automatisch generiert');
 }
 
 function renderStromkreise() {
@@ -3213,21 +3343,48 @@ function renderStueckliste() {
     groups[key].syms.push(s);
   }
   let rows='', i=1, totalCable=0, totalCircuits=new Set();
+  // Build circuit → wire length map
+  const circuitCableMap = {};
+  for (const w of state.wires) {
+    const c = w.circuit;
+    if (c && w.laenge_m) {
+      circuitCableMap[c] = (circuitCableMap[c]||0) + parseFloat(w.laenge_m||0);
+    }
+  }
+
+  // Track symbols shown per circuit (to show cable once per circuit)
+  const circuitShown = {};
+
   for (const [key, g] of Object.entries(groups)) {
     for (const s of g.syms) {
       const def=SYMBOLS[s.type]||{};
       const ph=s.phase||'';
       const phcol=ph.includes('L3')?'phase-l3':ph.startsWith('L2')?'phase-l2':'phase-l1';
-      // Estimate cable for this symbol (distance to UV if scale set)
-      const cable = s.cable_m || '—';
       if(s.circuit) totalCircuits.add(s.circuit);
+
+      // Cable length: from wires connected to this symbol
+      const symWires = state.wires.filter(w =>
+        w.srcId === s.id || w.dstId === s.id || w.circuit === s.circuit
+      );
+      const symCable = symWires.reduce((a,w) => a + parseFloat(w.laenge_m||0), 0);
+      const cableStr = symCable > 0 ? symCable.toFixed(1)+'m' :
+                       (s.circuit && circuitCableMap[s.circuit] ?
+                        circuitCableMap[s.circuit].toFixed(1)+'m' : '—');
+
+      // Installation info
+      const instInfo = [s.montage, s.hoehe!=null?s.hoehe+'cm':null].filter(Boolean).join('/');
+
       rows+=`<tr>
         <td class="mono">${i++}</td>
-        <td><svg viewBox="0 0 40 40" width="28" height="28" style="color:${def.color||'#666'};vertical-align:middle">${def.svg||''}</svg> ${def.abbr||s.type}</td>
-        <td><strong>${esc(s.label||def.name||'')}</strong>${s.kommentar?`<br><small style="color:var(--tx3)">${esc(s.kommentar)}</small>`:''}</td>
+        <td><svg viewBox="0 0 40 40" width="26" height="26" style="color:${def.color||'#666'};vertical-align:middle">${def.svg||''}</svg> <span style="font-size:10px">${def.abbr||s.type}</span></td>
+        <td>
+          <strong>${esc(s.label||def.name||'')}</strong>
+          ${instInfo?`<br><small style="color:#0077cc;font-family:var(--mono)">${instInfo}</small>`:''}
+          ${s.kommentar?`<br><small style="color:var(--tx3)">${esc(s.kommentar)}</small>`:''}
+        </td>
         <td class="mono">${s.circuit||'—'}</td>
         <td class="mono ${phcol}">${ph}</td>
-        <td class="mono">${cable}</td>
+        <td class="mono" style="color:var(--ac)">${cableStr}</td>
         <td class="mono">${s.count||1}</td>
       </tr>`;
     }
@@ -3240,6 +3397,26 @@ function renderStueckliste() {
   for (const w of state.wires) { byKabel[w.kabel]=(byKabel[w.kabel]||0)+(parseFloat(w.laenge_m)||0); }
   const byType = {};
   for (const s of state.symbols) { const n=SYMBOLS[s.type]?.name||s.type; byType[n]=(byType[n]||0)+(s.count||1); }
+
+
+  // Add wires table below symbols
+  const wires_html = state.wires.length ? `
+    <div style="margin-top:16px;font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">⚡ Leitungen</div>
+    <table class="stbl">
+      <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabel</th><th>Verlegeart</th><th>Länge</th></tr></thead>
+      <tbody>
+        ${state.wires.map((w,wi) => `<tr>
+          <td class="mono">${wi+1}</td>
+          <td class="mono" style="color:var(--ac)">${w.circuit||'—'}</td>
+          <td style="font-size:10px">${(WIRE_TYPES[w.wireType]||{label:w.wireType||'Strom'}).label}</td>
+          <td class="mono">${w.phase||'L1'}</td>
+          <td style="font-size:10px;font-family:var(--mono)">${w.kabel||'—'}</td>
+          <td class="mono">${w.verlegeart||'—'}${w.trasseHoehe?' '+w.trasseHoehe+'cm':''}</td>
+          <td class="mono" style="color:var(--ac)">${w.laenge_m?w.laenge_m+'m':'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '';
+  document.getElementById('stWires').innerHTML = wires_html;
 
   document.getElementById('stSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
