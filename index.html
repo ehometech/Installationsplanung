@@ -763,22 +763,18 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
     <!-- Mode Tabs -->
     <div style="display:flex;gap:4px;margin-bottom:10px;background:var(--bg);border-radius:6px;padding:3px">
-      <button id="ai-tab-local" onclick="setAIMode('local')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🖥 Ollama (lokal)</button>
+      <button id="ai-tab-claude" onclick="setAIMode('claude')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🧠 Claude KI (eingebaut)</button>
       <button id="ai-tab-openrouter" onclick="setAIMode('openrouter')" class="btn bg" style="flex:1;font-size:11px;padding:6px">🌐 OpenRouter (gratis)</button>
       <button id="ai-tab-offline" onclick="setAIMode('offline')" class="btn bg" style="flex:1;font-size:11px;padding:6px">📖 Wissensbasis (offline)</button>
     </div>
 
-    <!-- Mode: Ollama -->
-    <div id="ai-cfg-local" style="background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="color:var(--tx2)">Ollama URL:</span>
-        <input class="rp-input" id="ollamaUrl" value="http://localhost:11434" style="width:200px;font-size:10px;font-family:var(--mono)">
-        <span style="color:var(--tx2)">Modell:</span>
-        <input class="rp-input" id="ollamaModel" value="llama3" style="width:100px;font-size:10px;font-family:var(--mono)">
-        <button class="btn bg" onclick="testOllama()" style="font-size:10px;padding:4px 10px">Testen</button>
+    <!-- Mode: Claude (built-in via Anthropic API) -->
+    <div id="ai-cfg-claude" style="background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="color:var(--gr);font-weight:600">✅ Direkt einsatzbereit — kein Setup, kein Key nötig!</span>
       </div>
       <div style="color:var(--tx3);font-size:10px;margin-top:4px">
-        ℹ️ <a href="https://ollama.com" target="_blank" style="color:var(--bl)">ollama.com</a> installieren → <code style="background:var(--sf3);padding:1px 4px;border-radius:2px">ollama run llama3</code> → fertig. 100% lokal, kostenlos, kein Account.
+        Nutzt Claude Sonnet direkt in dieser App. Beantwortet alle Elektrofragen auf Deutsch — Normen, Schaltpläne, Kabelberechnung, KNX, DIN 18015.
       </div>
     </div>
 
@@ -820,10 +816,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <!-- Chat -->
     <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px;min-height:220px;max-height:340px;display:flex;flex-direction:column;gap:8px">
       <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx2)">
-        <strong style="color:var(--pu)">🤖 KI-Assistent</strong> — 3 Modi verfügbar:<br>
-        <span style="color:var(--gr)">🖥 Ollama</span> = 100% lokal &amp; gratis &nbsp;|&nbsp;
+        <strong style="color:var(--pu)">🤖 KI-Assistent</strong> — 3 Modi:<br>
+        <span style="color:var(--gr)">🧠 Claude KI</span> = eingebaut, sofort nutzbar &nbsp;|&nbsp;
         <span style="color:var(--bl)">🌐 OpenRouter</span> = kostenlose Cloud-Modelle &nbsp;|&nbsp;
-        <span style="color:var(--ac)">📖 Wissensbasis</span> = offline, sofort
+        <span style="color:var(--ac)">📖 Wissensbasis</span> = offline, kein Internet
       </div>
     </div>
 
@@ -4744,7 +4740,7 @@ function exportXML() {
 // ═══════════════════════════════════════════════════
 //  KI ASSISTENT — 3 Modi: Ollama / OpenRouter / Offline
 // ═══════════════════════════════════════════════════
-let aiMode = 'local'; // 'local' | 'openrouter' | 'offline'
+let aiMode = 'claude';
 
 function showAI() {
   document.getElementById('aiModal').classList.remove('hid');
@@ -4752,14 +4748,13 @@ function showAI() {
 
 function setAIMode(mode) {
   aiMode = mode;
-  ['local','openrouter','offline'].forEach(m => {
+  ['claude','openrouter','offline'].forEach(function(m) {
     const btn = document.getElementById('ai-tab-' + m);
     const cfg = document.getElementById('ai-cfg-' + m);
-    if (btn) btn.className = m === mode ? 'btn ba' : 'btn bg';
-    btn.style.flex = '1'; btn.style.fontSize = '11px'; btn.style.padding = '6px';
+    if (btn) { btn.className = m === mode ? 'btn ba' : 'btn bg'; btn.style.flex='1'; btn.style.fontSize='11px'; btn.style.padding='6px'; }
     if (cfg) cfg.style.display = m === mode ? 'block' : 'none';
   });
-  const labels = { local:'Modus: Ollama (lokal)', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
+  const labels = { claude:'Modus: Claude KI (eingebaut)', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
   const statusEl = document.getElementById('aiStatus');
   if (statusEl) statusEl.textContent = labels[mode] || '';
 }
@@ -4770,11 +4765,11 @@ function sendAI() {
   if (!msg) return;
   input.value = '';
   if (aiMode === 'offline') { askOffline(msg); return; }
-  if (aiMode === 'local') { sendOllama(msg); return; }
+  if (aiMode === 'claude') { sendClaude(msg); return; }
   if (aiMode === 'openrouter') { sendOpenRouter(msg); return; }
 }
 
-// ── Chat UI helpers ──
+// Chat UI helpers
 function aiAddMsg(role, text, color) {
   const chat = document.getElementById('aiChat');
   if (!chat) return;
@@ -4794,95 +4789,68 @@ function aiAddLoading(label) {
   const chat = document.getElementById('aiChat');
   const div = document.createElement('div');
   div.style.cssText = 'background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:9px 11px;font-size:11px;color:var(--tx3)';
-  div.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> ' + esc(label);
+  div.innerHTML = '⏳ ' + esc(label);
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
 }
 
-// ── OLLAMA (lokal) ──
-async function testOllama() {
-  const url = document.getElementById('ollamaUrl').value.trim();
-  const loader = aiAddLoading('Verbinde mit Ollama...');
+// Claude eingebaut (Anthropic API)
+async function sendClaude(msg) {
+  aiAddMsg('user', msg, 'var(--ac)');
+  const loader = aiAddLoading('Claude denkt nach...');
+  const projCtx = 'Projekt: "' + document.getElementById('projName').value + '", ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen.';
+  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur und DIN-18015-Experte. Du hilfst bei Elektroinstallationsplanung: Schaltplaene, Kabelquerschnitte, Normen, KNX, Verlegung. ' + projCtx + ' Antworte auf Deutsch, praxisbezogen, max 200 Woerter.';
   try {
-    const r = await fetch(url + '/api/tags');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await response.json();
     loader.remove();
-    const models = (d.models || []).map(function(m) { return m.name; }).join(', ') || '(keine)';
-    aiAddMsg('assistant', '✅ Ollama verbunden!\nVerfügbare Modelle: ' + models + '\n\nTipp: Falls dein Modell fehlt, führe aus:\nollama pull llama3', 'var(--gr)');
-    // Update model dropdown suggestions
-    if (d.models && d.models.length > 0) {
-      document.getElementById('ollamaModel').value = d.models[0].name;
+    if (data.content && data.content[0]) {
+      aiAddMsg('assistant', data.content[0].text, 'var(--pu)');
+    } else {
+      const errMsg = data.error ? data.error.message : 'Unbekannter Fehler';
+      aiAddMsg('assistant', 'Fehler: ' + errMsg + '\n\nTipp: Wissensbasis (offline) Modus nutzen!', 'var(--rd)');
     }
   } catch(e) {
     loader.remove();
-    aiAddMsg('assistant', '❌ Ollama nicht erreichbar: ' + e.message + '\n\nLösung:\n1. ollama.com herunterladen & installieren\n2. Terminal öffnen: ollama run llama3\n3. Nochmal testen\n\nCORS-Problem? Starte Ollama mit:\nOLLAMA_ORIGINS="*" ollama serve', 'var(--rd)');
+    aiAddMsg('assistant', 'Verbindungsfehler: ' + e.message + '\n\nTipp: Wissensbasis (offline) Modus waehlen!', 'var(--rd)');
   }
 }
 
-async function sendOllama(msg) {
-  const url = document.getElementById('ollamaUrl').value.trim();
-  const model = document.getElementById('ollamaModel').value.trim() || 'llama3';
-  aiAddMsg('user', msg, 'var(--ac)');
-  const loader = aiAddLoading('Ollama denkt nach (' + model + ')...');
-  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur. Beantworte Fragen zur Elektroinstallation auf Deutsch, präzise und praxisbezogen. Projektkontext: ' + document.getElementById('projName').value + ', ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen.';
-  try {
-    const r = await fetch(url + '/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: model, prompt: systemPrompt + '\n\nFrage: ' + msg, stream: false })
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    loader.remove();
-    aiAddMsg('assistant', d.response || 'Keine Antwort.', 'var(--gr)');
-  } catch(e) {
-    loader.remove();
-    aiAddMsg('assistant', '❌ Fehler: ' + e.message + '\n\nOllama läuft? URL korrekt? Modell verfügbar?\n→ Testen-Button klicken für Diagnose.', 'var(--rd)');
-  }
-}
-
-// ── OPENROUTER (kostenlose Cloud-Modelle) ──
+// OpenRouter (kostenlose Cloud-Modelle)
 async function sendOpenRouter(msg) {
   const key = document.getElementById('openrouterKey').value.trim();
   const model = document.getElementById('openrouterModel').value;
   if (!key) {
-    aiAddMsg('assistant', '🔑 Bitte zuerst deinen OpenRouter API-Key eingeben.\n\nKostenlos holen unter: openrouter.ai/keys\n→ Account erstellen → "Create Key" → Key einfügen\n\nModelle mit 🆓 sind völlig kostenlos nutzbar!', 'var(--yl)');
+    aiAddMsg('assistant', 'Bitte zuerst API-Key eingeben.\n\nopenrouter.ai/keys -> Account -> Key erstellen\nModelle mit kostenlos-Flag sind gratis!', 'var(--yl)');
     return;
   }
   aiAddMsg('user', msg, 'var(--ac)');
   const loader = aiAddLoading('OpenRouter (' + model.split('/').pop() + ')...');
-  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur und DIN-18015-Experte. Antworte immer auf Deutsch, fachlich korrekt und praxisnah. Aktueller Projektkontext: "' + document.getElementById('projName').value + '", ' + state.symbols.length + ' Elemente, ' + state.wires.length + ' Leitungen geplant.';
+  const sysPrompt = 'Du bist ein Elektroingenieur. Antworte auf Deutsch, fachlich korrekt. Projekt: ' + document.getElementById('projName').value;
   try {
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + key,
-        'HTTP-Referer': 'https://elektro-planer.app',
-        'X-Title': 'Elektro-Grundriss-Planer'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: msg }
-        ],
-        max_tokens: 800
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key, 'HTTP-Referer': 'https://elektro-planer.app', 'X-Title': 'Elektro-Grundriss-Planer' },
+      body: JSON.stringify({ model: model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: msg }], max_tokens: 800 })
     });
-    if (!r.ok) {
-      const errData = await r.json().catch(function() { return {}; });
-      throw new Error((errData.error && errData.error.message) || 'HTTP ' + r.status);
-    }
+    if (!r.ok) { const ed = await r.json().catch(function(){return{};}); throw new Error((ed.error && ed.error.message) || 'HTTP ' + r.status); }
     const d = await r.json();
     const answer = d.choices && d.choices[0] && d.choices[0].message ? d.choices[0].message.content : 'Keine Antwort.';
     loader.remove();
     aiAddMsg('assistant', answer, 'var(--bl)');
   } catch(e) {
     loader.remove();
-    aiAddMsg('assistant', '❌ OpenRouter Fehler: ' + e.message + '\n\nLösung:\n• API-Key korrekt eingegeben?\n• openrouter.ai/keys — neuen Key erstellen\n• Gratis-Modell gewählt (🆓 in der Liste)?', 'var(--rd)');
+    aiAddMsg('assistant', 'OpenRouter Fehler: ' + e.message + '\nKey korrekt? Gratis-Modell gewaehlt?', 'var(--rd)');
   }
 }
 
