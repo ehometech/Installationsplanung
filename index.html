@@ -754,34 +754,87 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
 <!-- KI-ASSISTENT MODAL -->
 <div class="modal-ov hid" id="aiModal">
-  <div class="modal" style="width:580px;max-height:90vh;display:flex;flex-direction:column">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <h3 style="margin:0">🤖 KI-Assistent (Gemini)</h3>
+  <div class="modal" style="width:640px;max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <h3 style="margin:0">🤖 KI-Elektro-Assistent</h3>
       <div style="flex:1"></div>
-      <input class="rp-input" id="geminiKey" placeholder="Gemini API Key (kostenlos)" style="width:200px;font-size:10px;font-family:var(--mono)" type="password">
-      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:10px;color:var(--bl);text-decoration:none">🔑 Kostenlos holen</a>
+      <button class="btn bg" onclick="document.getElementById('aiModal').classList.add('hid')" style="font-size:11px">✕ Schließen</button>
     </div>
-    <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:12px;min-height:250px;max-height:380px;display:flex;flex-direction:column;gap:8px">
-      <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:12px;color:var(--tx2)">
-        <strong style="color:var(--pu)">🤖 KI-Assistent</strong><br>
-        Hallo! Ich helfe dir bei der Elektroplanung. Frage mich z.B.:<br>
-        • "Wie viele Steckdosen brauche ich pro Raum?"<br>
-        • "Welches Kabel für eine Herdanschluss?"<br>
-        • "Was bedeutet NYY-J Leitung?"<br>
-        • "KNX Bus Topologie erklären"<br>
-        • "Schaltplan für Wechselschaltung"
+
+    <!-- Mode Tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:10px;background:var(--bg);border-radius:6px;padding:3px">
+      <button id="ai-tab-local" onclick="setAIMode('local')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🖥 Ollama (lokal)</button>
+      <button id="ai-tab-openrouter" onclick="setAIMode('openrouter')" class="btn bg" style="flex:1;font-size:11px;padding:6px">🌐 OpenRouter (gratis)</button>
+      <button id="ai-tab-offline" onclick="setAIMode('offline')" class="btn bg" style="flex:1;font-size:11px;padding:6px">📖 Wissensbasis (offline)</button>
+    </div>
+
+    <!-- Mode: Ollama -->
+    <div id="ai-cfg-local" style="background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="color:var(--tx2)">Ollama URL:</span>
+        <input class="rp-input" id="ollamaUrl" value="http://localhost:11434" style="width:200px;font-size:10px;font-family:var(--mono)">
+        <span style="color:var(--tx2)">Modell:</span>
+        <input class="rp-input" id="ollamaModel" value="llama3" style="width:100px;font-size:10px;font-family:var(--mono)">
+        <button class="btn bg" onclick="testOllama()" style="font-size:10px;padding:4px 10px">Testen</button>
+      </div>
+      <div style="color:var(--tx3);font-size:10px;margin-top:4px">
+        ℹ️ <a href="https://ollama.com" target="_blank" style="color:var(--bl)">ollama.com</a> installieren → <code style="background:var(--sf3);padding:1px 4px;border-radius:2px">ollama run llama3</code> → fertig. 100% lokal, kostenlos, kein Account.
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <input class="rp-input" id="aiInput" placeholder="Frage zur Elektroplanung..." style="flex:1" onkeydown="if(event.key==='Enter')sendAI()">
-      <button class="btn ba" onclick="sendAI()" style="background:var(--pu);border-color:var(--pu)">Senden</button>
+
+    <!-- Mode: OpenRouter -->
+    <div id="ai-cfg-openrouter" style="display:none;background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="color:var(--tx2)">API Key:</span>
+        <input class="rp-input" id="openrouterKey" placeholder="sk-or-..." type="password" style="width:220px;font-size:10px;font-family:var(--mono)">
+        <select class="rp-sel" id="openrouterModel" style="width:180px;font-size:10px">
+          <option value="mistralai/mistral-7b-instruct:free">Mistral 7B (🆓 gratis)</option>
+          <option value="huggingfaceh4/zephyr-7b-beta:free">Zephyr 7B (🆓 gratis)</option>
+          <option value="openchat/openchat-7b:free">OpenChat 7B (🆓 gratis)</option>
+          <option value="google/gemma-2-9b-it:free">Gemma 2 9B (🆓 gratis)</option>
+          <option value="meta-llama/llama-3-8b-instruct:free">Llama 3 8B (🆓 gratis)</option>
+          <option value="qwen/qwen-2-7b-instruct:free">Qwen 2 7B (🆓 gratis)</option>
+        </select>
+      </div>
+      <div style="color:var(--tx3);font-size:10px;margin-top:4px">
+        ℹ️ <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--bl)">openrouter.ai</a> → Account erstellen → API Key holen → Models mit 🆓 sind vollständig kostenlos.
+      </div>
     </div>
-    <div style="font-size:9px;color:var(--tx3);margin-top:5px;text-align:center">
-      Powered by Google Gemini — kostenlos nutzbar mit eigenem API-Key
+
+    <!-- Mode: Offline -->
+    <div id="ai-cfg-offline" style="display:none;background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
+      <div style="color:var(--gr)">✅ Kein Internet, kein Account, kein API-Key nötig.</div>
+      <div style="color:var(--tx3);font-size:10px;margin-top:2px">Eingebaute DIN 18015 Elektro-Wissensbasis — beantwortet häufige Planungsfragen sofort.</div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+        <button class="btn bg" onclick="askOffline('Wie viele Steckdosen pro Raum?')" style="font-size:9px;padding:3px 7px">Steckdosen pro Raum</button>
+        <button class="btn bg" onclick="askOffline('Kabelquerschnitt berechnen')" style="font-size:9px;padding:3px 7px">Kabelquerschnitt</button>
+        <button class="btn bg" onclick="askOffline('NYY-J Leitung erklären')" style="font-size:9px;padding:3px 7px">NYY-J erklären</button>
+        <button class="btn bg" onclick="askOffline('KNX Bus Topologie')" style="font-size:9px;padding:3px 7px">KNX Topologie</button>
+        <button class="btn bg" onclick="askOffline('Wechselschaltung erklären')" style="font-size:9px;padding:3px 7px">Wechselschaltung</button>
+        <button class="btn bg" onclick="askOffline('Fehlerstromschutzschalter FI')" style="font-size:9px;padding:3px 7px">FI-Schutzschalter</button>
+        <button class="btn bg" onclick="askOffline('Herd Anschluss Kabel')" style="font-size:9px;padding:3px 7px">Herd Anschluss</button>
+        <button class="btn bg" onclick="askOffline('Leitungsschutzschalter Auswahl')" style="font-size:9px;padding:3px 7px">LS-Schalter wählen</button>
+      </div>
     </div>
-    <div class="mft" style="margin-top:8px">
-      <button class="btn bg" onclick="document.getElementById('aiModal').classList.add('hid')">Schließen</button>
-      <button class="btn bg" onclick="document.getElementById('aiChat').innerHTML=''">🗑 Chat leeren</button>
+
+    <!-- Chat -->
+    <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px;min-height:220px;max-height:340px;display:flex;flex-direction:column;gap:8px">
+      <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx2)">
+        <strong style="color:var(--pu)">🤖 KI-Assistent</strong> — 3 Modi verfügbar:<br>
+        <span style="color:var(--gr)">🖥 Ollama</span> = 100% lokal &amp; gratis &nbsp;|&nbsp;
+        <span style="color:var(--bl)">🌐 OpenRouter</span> = kostenlose Cloud-Modelle &nbsp;|&nbsp;
+        <span style="color:var(--ac)">📖 Wissensbasis</span> = offline, sofort
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input class="rp-input" id="aiInput" placeholder="Frage zur Elektroplanung... (Enter = Senden)" style="flex:1" onkeydown="if(event.key==='Enter')sendAI()">
+      <button class="btn ba" onclick="sendAI()" style="background:var(--pu);border-color:var(--pu);min-width:70px">Senden ↑</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px">
+      <button class="btn bg" onclick="document.getElementById('aiChat').innerHTML=''" style="font-size:10px">🗑 Chat leeren</button>
+      <span style="font-size:9px;color:var(--tx3);align-self:center" id="aiStatus">Modus: Ollama (lokal)</span>
     </div>
   </div>
 </div>
@@ -4689,72 +4742,230 @@ function exportXML() {
 }
 
 // ═══════════════════════════════════════════════════
-//  KI ASSISTENT (Gemini)
+//  KI ASSISTENT — 3 Modi: Ollama / OpenRouter / Offline
 // ═══════════════════════════════════════════════════
+let aiMode = 'local'; // 'local' | 'openrouter' | 'offline'
+
 function showAI() {
   document.getElementById('aiModal').classList.remove('hid');
 }
 
-async function sendAI() {
+function setAIMode(mode) {
+  aiMode = mode;
+  ['local','openrouter','offline'].forEach(m => {
+    const btn = document.getElementById('ai-tab-' + m);
+    const cfg = document.getElementById('ai-cfg-' + m);
+    if (btn) btn.className = m === mode ? 'btn ba' : 'btn bg';
+    btn.style.flex = '1'; btn.style.fontSize = '11px'; btn.style.padding = '6px';
+    if (cfg) cfg.style.display = m === mode ? 'block' : 'none';
+  });
+  const labels = { local:'Modus: Ollama (lokal)', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
+  const statusEl = document.getElementById('aiStatus');
+  if (statusEl) statusEl.textContent = labels[mode] || '';
+}
+
+function sendAI() {
   const input = document.getElementById('aiInput');
-  const chat = document.getElementById('aiChat');
-  const key = document.getElementById('geminiKey').value.trim();
-  const msg = input.value.trim();
+  const msg = (input.value || '').trim();
   if (!msg) return;
-  if (!key) {
-    chat.innerHTML += `<div style="background:rgba(248,81,73,.15);border:1px solid var(--rd);border-radius:6px;padding:8px;font-size:11px;color:var(--rd)">
-      ⚠️ Bitte zuerst einen <strong>Gemini API-Key</strong> eingeben. Kostenlos holen unter: 
-      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--bl)">aistudio.google.com</a>
-    </div>`;
-    chat.scrollTop = chat.scrollHeight;
-    return;
-  }
-
-  // Add user message
-  chat.innerHTML += `<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:8px;font-size:11px;text-align:right">
-    <strong style="color:var(--ac)">👤 Du</strong><br>${esc(msg)}</div>`;
   input.value = '';
-  
-  // Loading indicator
-  const loadId = 'ai-load-' + Date.now();
-  chat.innerHTML += `<div id="${loadId}" style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx3)">
-    <strong style="color:var(--pu)">🤖 KI denkt nach...</strong><br><span>⏳</span></div>`;
+  if (aiMode === 'offline') { askOffline(msg); return; }
+  if (aiMode === 'local') { sendOllama(msg); return; }
+  if (aiMode === 'openrouter') { sendOpenRouter(msg); return; }
+}
+
+// ── Chat UI helpers ──
+function aiAddMsg(role, text, color) {
+  const chat = document.getElementById('aiChat');
+  if (!chat) return;
+  const isUser = role === 'user';
+  const msgColor = color || (isUser ? 'var(--ac)' : 'var(--pu)');
+  const bg = isUser ? 'rgba(245,166,35,.12)' : 'var(--sf2)';
+  const border = isUser ? 'rgba(245,166,35,.3)' : 'var(--bd)';
+  const div = document.createElement('div');
+  div.style.cssText = 'background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;padding:9px 11px;font-size:11px;line-height:1.6';
+  div.innerHTML = '<strong style="color:' + msgColor + '">' + (isUser ? '👤 Du' : '🤖 KI') + '</strong><br><div style="margin-top:3px;white-space:pre-wrap">' + esc(text) + '</div>';
+  chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
+  return div;
+}
 
-  // Context from current project
-  const ctx2 = `Du bist ein erfahrener Elektroingenieur und Planungsassistent. Du hilfst bei DIN 18015 Elektroplanung, Schaltplanung, Kabelberechnungen und deutschen Normen. 
-Aktuelles Projekt: "${document.getElementById('projName').value}", ${state.symbols.length} Symbole, ${state.wires.length} Leitungen platziert.
-Antworte immer auf Deutsch, präzise und praxisbezogen.`;
+function aiAddLoading(label) {
+  const chat = document.getElementById('aiChat');
+  const div = document.createElement('div');
+  div.style.cssText = 'background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:9px 11px;font-size:11px;color:var(--tx3)';
+  div.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> ' + esc(label);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
 
+// ── OLLAMA (lokal) ──
+async function testOllama() {
+  const url = document.getElementById('ollamaUrl').value.trim();
+  const loader = aiAddLoading('Verbinde mit Ollama...');
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+    const r = await fetch(url + '/api/tags');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    loader.remove();
+    const models = (d.models || []).map(function(m) { return m.name; }).join(', ') || '(keine)';
+    aiAddMsg('assistant', '✅ Ollama verbunden!\nVerfügbare Modelle: ' + models + '\n\nTipp: Falls dein Modell fehlt, führe aus:\nollama pull llama3', 'var(--gr)');
+    // Update model dropdown suggestions
+    if (d.models && d.models.length > 0) {
+      document.getElementById('ollamaModel').value = d.models[0].name;
+    }
+  } catch(e) {
+    loader.remove();
+    aiAddMsg('assistant', '❌ Ollama nicht erreichbar: ' + e.message + '\n\nLösung:\n1. ollama.com herunterladen & installieren\n2. Terminal öffnen: ollama run llama3\n3. Nochmal testen\n\nCORS-Problem? Starte Ollama mit:\nOLLAMA_ORIGINS="*" ollama serve', 'var(--rd)');
+  }
+}
+
+async function sendOllama(msg) {
+  const url = document.getElementById('ollamaUrl').value.trim();
+  const model = document.getElementById('ollamaModel').value.trim() || 'llama3';
+  aiAddMsg('user', msg, 'var(--ac)');
+  const loader = aiAddLoading('Ollama denkt nach (' + model + ')...');
+  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur. Beantworte Fragen zur Elektroinstallation auf Deutsch, präzise und praxisbezogen. Projektkontext: ' + document.getElementById('projName').value + ', ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen.';
+  try {
+    const r = await fetch(url + '/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: model, prompt: systemPrompt + '\n\nFrage: ' + msg, stream: false })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    loader.remove();
+    aiAddMsg('assistant', d.response || 'Keine Antwort.', 'var(--gr)');
+  } catch(e) {
+    loader.remove();
+    aiAddMsg('assistant', '❌ Fehler: ' + e.message + '\n\nOllama läuft? URL korrekt? Modell verfügbar?\n→ Testen-Button klicken für Diagnose.', 'var(--rd)');
+  }
+}
+
+// ── OPENROUTER (kostenlose Cloud-Modelle) ──
+async function sendOpenRouter(msg) {
+  const key = document.getElementById('openrouterKey').value.trim();
+  const model = document.getElementById('openrouterModel').value;
+  if (!key) {
+    aiAddMsg('assistant', '🔑 Bitte zuerst deinen OpenRouter API-Key eingeben.\n\nKostenlos holen unter: openrouter.ai/keys\n→ Account erstellen → "Create Key" → Key einfügen\n\nModelle mit 🆓 sind völlig kostenlos nutzbar!', 'var(--yl)');
+    return;
+  }
+  aiAddMsg('user', msg, 'var(--ac)');
+  const loader = aiAddLoading('OpenRouter (' + model.split('/').pop() + ')...');
+  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur und DIN-18015-Experte. Antworte immer auf Deutsch, fachlich korrekt und praxisnah. Aktueller Projektkontext: "' + document.getElementById('projName').value + '", ' + state.symbols.length + ' Elemente, ' + state.wires.length + ' Leitungen geplant.';
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key,
+        'HTTP-Referer': 'https://elektro-planer.app',
+        'X-Title': 'Elektro-Grundriss-Planer'
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: ctx2 }] },
-        contents: [{ role: 'user', parts: [{ text: msg }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: msg }
+        ],
+        max_tokens: 800
       })
     });
-    
-    const data = await response.json();
-    const candidates = data.candidates;
-    const aiMsg = (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0]) ? candidates[0].content.parts[0].text : 'Keine Antwort erhalten.';
-    const err = data.error ? data.error.message : null;
-    
-    document.getElementById(loadId)?.remove();
-    chat.innerHTML += `<div style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:10px;font-size:11px">
-      <strong style="color:var(--pu)">🤖 KI-Assistent</strong><br>
-      <div style="margin-top:4px;line-height:1.6;white-space:pre-wrap">${esc(err||aiMsg)}</div></div>`;
-    
-    if (err) setStatus('❌ Gemini Fehler: ' + err.substring(0,60));
+    if (!r.ok) {
+      const errData = await r.json().catch(function() { return {}; });
+      throw new Error((errData.error && errData.error.message) || 'HTTP ' + r.status);
+    }
+    const d = await r.json();
+    const answer = d.choices && d.choices[0] && d.choices[0].message ? d.choices[0].message.content : 'Keine Antwort.';
+    loader.remove();
+    aiAddMsg('assistant', answer, 'var(--bl)');
   } catch(e) {
-    document.getElementById(loadId)?.remove();
-    chat.innerHTML += `<div style="background:rgba(248,81,73,.15);border-radius:6px;padding:8px;font-size:11px;color:var(--rd)">
-      ❌ Verbindungsfehler: ${esc(e.message)}</div>`;
+    loader.remove();
+    aiAddMsg('assistant', '❌ OpenRouter Fehler: ' + e.message + '\n\nLösung:\n• API-Key korrekt eingegeben?\n• openrouter.ai/keys — neuen Key erstellen\n• Gratis-Modell gewählt (🆓 in der Liste)?', 'var(--rd)');
   }
-  chat.scrollTop = chat.scrollHeight;
 }
+
+// ── OFFLINE WISSENSBASIS ──
+function askOffline(msg) {
+  const inp = document.getElementById('aiInput');
+  if (inp && !msg) { msg = inp.value.trim(); inp.value = ''; }
+  if (!msg) return;
+  aiAddMsg('user', msg, 'var(--ac)');
+  const answer = lookupElektroWissen(msg);
+  setTimeout(function() {
+    aiAddMsg('assistant', answer, 'var(--ac)');
+  }, 150);
+}
+
+function lookupElektroWissen(q) {
+  q = q.toLowerCase();
+
+  // Steckdosen
+  if (q.includes('steckdose') && (q.includes('raum') || q.includes('wieviel') || q.includes('wie viel') || q.includes('anzahl'))) {
+    return 'Empfohlene Steckdosenanzahl nach DIN 18015-2:\n\n• Wohnzimmer: mind. 6–8 Steckdosen\n• Schlafzimmer: mind. 4–6 Steckdosen\n• Küche: mind. 6 (davon 2–3 über Arbeitsfläche)\n• Kinderzimmer: mind. 4–6\n• Bad: mind. 2 (FI-geschützt, mind. 0,6m vom Wasser)\n• Flur: mind. 2\n• Keller/Garage: mind. 2–4\n\nFaustregel: Pro 4m² Wandfläche 1 Steckdose.\nAlle Steckdosen in Feuchträumen: FI-Schutzschalter 30mA!';
+  }
+
+  // Kabelquerschnitt
+  if (q.includes('querschnitt') || q.includes('kabelquerschnitt') || (q.includes('kabel') && q.includes('berechn'))) {
+    return 'Kabelquerschnitte nach DIN VDE 0100:\n\n• 1,5 mm² — Beleuchtung, max. 16A LS\n• 2,5 mm² — Steckdosen, max. 16–20A LS\n• 4,0 mm² — Herd-Vorbereitung, Küchengeräte\n• 6,0 mm² — Herd/Backofen (3-phasig), Wallbox bis 11kW\n• 10,0 mm² — Wallbox 22kW, große Verbraucher\n• 16,0 mm² — Hausanschluss, Wärmepumpe\n\nFaustregel: I (Ampere) = P (Watt) ÷ 230V\nBeispiel: 2000W Wasserkocher = 8,7A → 1,5mm² reicht\n\nImmer Leitungsschutzschalter passend zum Querschnitt!';
+  }
+
+  // NYY-J
+  if (q.includes('nyy') || q.includes('erdkabel')) {
+    return 'NYY-J — Starkstrom-Erdkabel:\n\n• N = Normkabel\n• Y = PVC-Isolierung\n• Y = PVC-Mantel\n• J = mit Schutzleiter (PE, grün-gelb)\n\nVerwendung:\n• Erdverlegung (direkt im Boden)\n• Feuchte Räume, Keller, außen\n• Verbindung Haus → Garage/Gartenhaus\n• UV-beständig, druckfest\n\nVerlegetiefe: mind. 60cm (Garten), 80cm (Fahrweg)\nMit Schutzrohr unter Wegen und Einfahrten!\n\nUnterschied zu NYM-J:\n• NYM-J = für Inneninstallation (Wand, Decke)\n• NYY-J = für Außen- und Erdverlegung';
+  }
+
+  // Wechselschaltung
+  if (q.includes('wechselschal') || (q.includes('schalter') && q.includes('zwei'))) {
+    return 'Wechselschaltung — Licht von 2 Stellen schalten:\n\nBenötigt:\n• 2× Wechselschalter (3-polig: L, 1, 2)\n• 3-adriges Kabel zwischen den Schaltern\n\nSchaltung:\n• Phase (L) → Schalter 1 (Klemme L)\n• Schalter 1 (Klemme 1) → Schalter 2 (Klemme 1)\n• Schalter 1 (Klemme 2) → Schalter 2 (Klemme 2)\n• Schalter 2 (Klemme L) → Leuchte\n• N und PE durchgehend\n\nFür 3 oder mehr Schaltstellen:\n→ Kreuzschaltung (zusätzlicher Kreuzschalter in der Mitte)\n\nKabel: NYM-J 3×1,5mm² zwischen den Schaltern';
+  }
+
+  // KNX
+  if (q.includes('knx') || q.includes('tknx') || q.includes('bus')) {
+    return 'KNX Bus-System — Grundlagen:\n\nTopologie:\n• Linienstruktur (maximal 64 Teilnehmer pro Linie)\n• Bis zu 15 Linien pro Bereich\n• Bis zu 15 Bereiche im System\n• Maximale Teilnehmer: 57.375\n\nKabel: YCYM 2×2×0,8mm² (grün, Buslinie)\nSpannung: 24V DC (sichert Kleinspannung)\nMax. Kabellänge: 1000m pro Linie\n\nKomponenten:\n• Netzteil 160/320/640mA\n• Linienkoppler (zwischen Linien)\n• Bereichskoppler (zwischen Bereichen)\n• IP-Router (KNX ↔ Ethernet/Cloud)\n\nDIN EN 50090 / EN 13321-1\nProgrammierung mit ETS-Software';
+  }
+
+  // FI Schutzschalter
+  if (q.includes('fi') || q.includes('fehlerstrom') || q.includes('rcd')) {
+    return 'FI-Schutzschalter (RCD) — DIN VDE 0100-410:\n\nTypen:\n• Typ AC: Wechselfehlerströme (Standard, Haushalte)\n• Typ A: AC + pulsierend DC (Waschmaschine, Wallbox)\n• Typ B: alle Fehlerströme (drehzahlgeregelte Geräte)\n\nAuslösestrom:\n• 30mA — Personenschutz (Pflicht bei Steckdosen)\n• 100/300mA — Brandschutz\n• 500mA — Maschinenschutz\n\nPflichtbereiche (DIN 18015):\n• Alle Steckdosen im Haushaltsbereich\n• Feuchträume (Bad, Küche)\n• Außenanlagen\n• Kinderzimmer\n\nEmpfehlung: Alle Stromkreise mit FI absichern!\n2-poliger FI für Einphasen, 4-polig für Drehstrom';
+  }
+
+  // Herd/Backofen
+  if ((q.includes('herd') || q.includes('backofen') || q.includes('ceran')) && (q.includes('kabel') || q.includes('anschluss') || q.includes('leitung'))) {
+    return 'Herd-/Ceranfeld Anschluss:\n\nStandard-Kochherd (Einbaugerät):\n• Anschluss: 3-phasig (L1+L2+L3+N+PE)\n• Kabel: NYM-J 5×2,5mm² oder 5×4mm²\n• Absicherung: 3× 16A LS (C-Charakteristik)\n• Steckdose: CEE 16A 5-polig (rot) ODER fest\n• Dose-Typ: meist 3-phasige Herdanschlussdose\n\nEinphasiger Backofen bis 3,5kW:\n• Kabel: NYM-J 3×2,5mm²\n• Absicherung: 1× 16A\n\nInduktionskochfeld bis 7,4kW:\n• NYM-J 5×2,5mm², 3×16A\n\nBei Erstinstallation: Herdanschlussdose AP oder UP\nmit 5-poliger Verbindung (L1, L2, L3, N, PE)';
+  }
+
+  // Leitungsschutzschalter
+  if (q.includes('leitungsschutz') || q.includes('ls-schalter') || q.includes('sicherung') || q.includes('automat')) {
+    return 'Leitungsschutzschalter (LS) auswählen:\n\nCharakteristik:\n• B (3–5× In): Leitungsschutz, Haushalte, Beleuchtung\n• C (5–10× In): Motoren, Transformatoren, gemischte Last\n• D (10–20× In): hohe Anlaufströme, Schweißgeräte\n\nHausinstallation Standard:\n• Beleuchtung: B10A (1,5mm²)\n• Steckdosen: B16A (2,5mm²)\n• Herd: B16A 3-polig (2,5mm²)\n• Wallbox: C16A oder C32A (6mm² oder 10mm²)\n• Waschmaschine: B16A (2,5mm²)\n\nZuordnung Querschnitt → LS:\n• 1,5mm² → max. 16A\n• 2,5mm² → max. 20A (16A empfohlen)\n• 4mm² → max. 25A\n• 6mm² → max. 32A\n• 10mm² → max. 50A';
+  }
+
+  // Montagehöhen
+  if (q.includes('höhe') || q.includes('montagehöhe') || q.includes('montagehoehe')) {
+    return 'Montagehöhen nach DIN 18015-3 (Oberkante UK):\n\n• Steckdosen allgemein: 40cm (Standard)\n• Steckdosen Küche Arbeitsfläche: 110–115cm\n• Steckdosen außen/Bad: 40cm (FI-gesichert)\n• Schalter/Taster: 105cm\n• Jalousietaster: 105cm\n• Klingeltaster: 100cm (Außen)\n• Gegensprechanlage: 120–150cm\n• Thermostat/Raumregler: 150cm\n• Rauchmelderkabel: 250cm (Decke)\n• CO-Melder: 30cm (Boden)\n• TV-Antennenanschluss: 40cm oder 80cm\n• LAN-Dose: 40cm (Schreibtisch) oder 20cm (Boden)\n\nKindergerechte Steckdosen: 115cm empfohlen';
+  }
+
+  // Erdung
+  if (q.includes('erdung') || q.includes('potentialausgleich') || (q.includes('pe') && q.includes('leiter'))) {
+    return 'Erdung & Potentialausgleich:\n\nSchutzerdung (PE):\n• Grün-gelbe Leitung\n• Verbindet alle leitfähigen Gehäuse mit Erde\n• Pflicht bei allen Steckdosen und Geräten\n\nHauptpotentialausgleich (HPA):\n• Verbindet: Wasserrohre, Heizungsrohre, Gasleitungen\n• Anschluss: Haupterdungsschiene (HES) im Zählerschrank\n• Querschnitt: mind. 10mm² Cu oder 16mm² Al\n\nZusatzpotentialausgleich:\n• Pflicht in Bädern (DIN VDE 0100-701)\n• Alle leitfähigen Teile im 2,25m Radius verbinden\n• Badewanne, Dusche, Heizkörper, Wasserrohre\n\nBlitzschutz:\n• Äußerer Blitzschutz: Fangeinrichtung + Ableitung\n• Innerer Blitzschutz: Überspannungsschutz (Kat. B+C+D)';
+  }
+
+  // Zuleitung Garage Gartenhaus
+  if (q.includes('garage') || q.includes('gartenhaus') || (q.includes('außen') && q.includes('leitung'))) {
+    return 'Zuleitung zu Garage/Gartenhaus:\n\nKabel: NYY-J (Erdkabel)\nQuerschnitt je nach Last:\n• Beleuchtung + Steckdosen: NYY-J 3×2,5mm²\n• Mit Ladestation/Kompressor: NYY-J 5×2,5mm²\n• Wallbox bis 22kW: NYY-J 5×6mm² oder 5×10mm²\n\nVerlegung:\n• Mindesttiefe: 60cm im Garten\n• Unter Wegen/Einfahrten: 80cm + Schutzrohr\n• Rohrfarbe: Orange (Warnung)\n• Zusatzschutzrohr empfohlen (Wartung)\n\nAbsicherung:\n• FI-Schutzschalter Typ A 30mA (Pflicht!)\n• LS-Schalter passend zum Querschnitt\n\nBei Entfernungen > 50m: Spannungsfall prüfen!\nMindestspannung am Ende: 95% (U ≥ 218,5V)';
+  }
+
+  // Wallbox / Elektroauto
+  if (q.includes('wallbox') || q.includes('ladestation') || q.includes('elektroauto') || q.includes('ev')) {
+    return 'Wallbox / EV-Ladestation Installation:\n\n11kW-Wallbox (Standard):\n• Kabel: NYM-J oder NYY-J 5×2,5mm²\n• Absicherung: 3× 16A LS Typ C\n• FI: Typ B 30mA (Pflicht bei DC-Fehlerströmen)\n• Zähler: separater Zähler empfohlen (steuerliche Abrechnung)\n\n22kW-Wallbox:\n• Kabel: 5×6mm² oder 5×10mm²\n• Absicherung: 3× 32A LS Typ C\n• Genehmigung: Anmeldung beim Netzbetreiber ab 11kW Pflicht!\n\nDIN VDE 0100-722 beachten!\nTipp: Leerrohre für zukünftige Aufrüstung einziehen\n\nBei Tiefgarage/Mehrfamilienhaus:\n→ Lastmanagementsystem erforderlich';
+  }
+
+  // Default — generische Antwort
+  return 'Ich bin die Offline-Wissensbasis für Elektroplanung nach DIN 18015.\n\nIch kann helfen bei:\n• Kabelquerschnitte & Absicherung\n• Steckdosenanzahl pro Raum\n• NYY-J / NYM-J Leitungen erklären\n• Montagehöhen (DIN 18015-3)\n• Wechsel-/Kreuzschaltung\n• FI-Schutzschalter Typen\n• KNX Bus-System\n• Erdung & Potentialausgleich\n• Herd-/Wallbox-Anschluss\n• Zuleitung Garage/Gartenhaus\n\nStell deine Frage konkret — z.B.:\n"Welches Kabel für einen Herd?"\n"Wie viele Steckdosen im Wohnzimmer?"\n\nFür komplexere Fragen: Ollama oder OpenRouter Modus nutzen! 🤖';
+}
+
+
 
 // ═══════════════════════════════════════════════════
 //  HELPER: Update wire adern
