@@ -2399,6 +2399,9 @@ function setupEvents() {
     if (e.key==='Escape') {
       cancelLongPress();
       if (_wireActive) { _wireActive=false; _wirePts=[]; _wireSrcId=null; canvas.style.cursor='default'; octx.clearRect(0,0,overlay.width,overlay.height); setStatus('Abgebrochen'); }
+      if (draggingWire) { draggingWire=null; canvas.style.cursor='default'; render(); }
+      hoveredWirePt = null;
+      render();
     }
     if (e.key==='Delete'||e.key==='Backspace') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
@@ -2420,13 +2423,59 @@ function onMouseDown(e) {
   if (state.calibrating) { handleCalibrate(pt); return; }
   if (state.tool === 'wire') { handleWireClick(pt); return; }
   if (state.tool === 'measure') { handleMeasureClick(pt, e); return; }
-  // Select tool
+
+  // ── Priority 1: Wire point delete button ──
+  const delPt = hitTestWirePointDelete(pt.x, pt.y);
+  if (delPt) {
+    saveUndo();
+    const w = state.wires.find(w2 => w2.id === delPt.wireId);
+    if (w && w.points.length > 2) {
+      w.points.splice(delPt.ptIdx, 1);
+      recalcWireLength(w);
+      renderWireProps(w);
+    }
+    render(); return;
+  }
+
+  // ── Priority 2: Wire point drag ──
+  const wirePtHit = hitTestWirePoint(pt.x, pt.y);
+  if (wirePtHit) {
+    saveUndo();
+    draggingWire = { ...wirePtHit };
+    canvas.style.cursor = 'grabbing';
+    render(); return;
+  }
+
+  // ── Priority 3: Wire segment midpoint (add new point) ──
+  const midHit = hitTestWireMid(pt.x, pt.y);
+  if (midHit) {
+    saveUndo();
+    const w = state.wires.find(w2 => w2.id === midHit.wireId);
+    if (w) {
+      const newPt = { x: midHit.mx, y: midHit.my };
+      w.points.splice(midHit.segIdx + 1, 0, newPt);
+      // Immediately start dragging the new point
+      draggingWire = { wireId: w.id, ptIdx: midHit.segIdx + 1 };
+      canvas.style.cursor = 'grabbing';
+    }
+    render(); return;
+  }
+
+  // ── Priority 4: Symbol hit ──
   const hit = hitTest(pt.x, pt.y);
   if (hit) {
     selectSymbol(hit.id);
+    draggingWire = null;
     state.dragging = { id: hit.id, offX: pt.x - hit.x, offY: pt.y - hit.y };
+    // Right-click → start wire from symbol
+    if (e.button === 2 || e.ctrlKey) {
+      e.preventDefault();
+      state.dragging = null;
+      beginWireDraw(hit, pt);
+      return;
+    }
   } else {
-    // Check wire click
+    // ── Priority 5: Wire line click ──
     const wireHit = hitTestWire(pt.x, pt.y);
     if (wireHit) {
       selectedWireId = wireHit.id;
@@ -2435,16 +2484,9 @@ function onMouseDown(e) {
       render();
       return;
     }
+    // ── Priority 6: Pan ──
     selectedWireId = null;
-    // Check wire click
-    if (!_wireActive) {
-      const wh = hitTestWire(pt.x, pt.y);
-      if (wh) {
-        selectedWireId = wh.id; state.selectedId = null;
-        renderWireProps(wh); render(); return;
-      }
-    }
-    selectedWireId = null;
+    draggingWire = null;
     state.selectedId = null;
     state.panning = true;
     state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
@@ -2464,10 +2506,36 @@ function onMouseMove(e) {
     state.dragging = null;
     updateWireDraw(pt); return;
   }
+  // ── Wire point dragging ──
+  if (draggingWire) {
+    const wire = state.wires.find(w => w.id === draggingWire.wireId);
+    if (wire && draggingWire.ptIdx < wire.points.length) {
+      wire.points[draggingWire.ptIdx] = { x: pt.x, y: pt.y };
+      recalcWireLength(wire);
+      renderWireProps(wire);
+    }
+    render(); return;
+  }
   if (state.dragging) {
     cancelLongPress();
     const sym = state.symbols.find(s => s.id === state.dragging.id);
     if (sym) { sym.x = pt.x - state.dragging.offX; sym.y = pt.y - state.dragging.offY; render(); }
+    return;
+  }
+  // ── Wire point hover highlight ──
+  if (selectedWireId) {
+    const prev = hoveredWirePt;
+    hoveredWirePt = hitTestWirePoint(pt.x, pt.y);
+    const delHov = hitTestWirePointDelete(pt.x, pt.y);
+    const midHov = hitTestWireMid(pt.x, pt.y);
+    // Cursor
+    if (draggingWire) canvas.style.cursor = 'grabbing';
+    else if (hoveredWirePt) canvas.style.cursor = 'grab';
+    else if (delHov) canvas.style.cursor = 'pointer';
+    else if (midHov) canvas.style.cursor = 'copy';
+    else canvas.style.cursor = 'default';
+    const changed = JSON.stringify(prev) !== JSON.stringify(hoveredWirePt);
+    if (changed) render();
     return;
   }
   if (state.panning && state.panStart) {
@@ -2491,6 +2559,30 @@ function onMouseUp(e) {
     endWireDraw(pt);
     state.dragging = null; state.panning = false; state.panStart = null;
     return;
+  }
+  if (draggingWire) {
+    // Snap to nearby symbol endpoint
+    const pt = clientToCanvas(e.clientX, e.clientY);
+    const wire = state.wires.find(w => w.id === draggingWire.wireId);
+    if (wire) {
+      const isEndpoint = draggingWire.ptIdx === 0 || draggingWire.ptIdx === wire.points.length-1;
+      if (isEndpoint) {
+        const snap = hitTest(pt.x, pt.y);
+        if (snap) {
+          wire.points[draggingWire.ptIdx] = { x: snap.x, y: snap.y };
+          // Update srcId/dstId
+          if (draggingWire.ptIdx === 0) wire.srcId = snap.id;
+          else wire.dstId = snap.id;
+          recalcWireLength(wire);
+          setStatus('✅ Leitung an ' + (snap.label||'Symbol') + ' angedockt');
+        }
+      }
+      recalcWireLength(wire);
+      renderWireProps(wire);
+    }
+    draggingWire = null;
+    canvas.style.cursor = 'default';
+    render(); return;
   }
   if (state.dragging) { saveUndo(); state.dragging = null; }
   state.panning = false; state.panStart = null;
@@ -2527,6 +2619,24 @@ function onTouchStart(e) {
     const pt = clientToCanvas(t.clientX, t.clientY);
     if (state.calibrating) { handleCalibrate(pt); return; }
     if (state.tool === 'wire') { handleWireClick(pt); return; }
+    // Check wire point first (if wire selected)
+    const wirePtT = hitTestWirePoint(pt.x, pt.y);
+    if (wirePtT) {
+      saveUndo();
+      draggingWire = { ...wirePtT };
+      return;
+    }
+    // Check wire midpoint (add point)
+    const midT = hitTestWireMid(pt.x, pt.y);
+    if (midT) {
+      saveUndo();
+      const wm = state.wires.find(w=>w.id===midT.wireId);
+      if (wm) {
+        wm.points.splice(midT.segIdx+1, 0, { x:midT.mx, y:midT.my });
+        draggingWire = { wireId:wm.id, ptIdx:midT.segIdx+1 };
+      }
+      render(); return;
+    }
     const hit = hitTest(pt.x, pt.y);
     if (hit) {
       selectSymbol(hit.id);
@@ -2574,6 +2684,17 @@ function onTouchMoveCanvas(e) {
       updateWireDraw(pt);
       return;
     }
+    if (draggingWire) {
+      cancelLongPress();
+      state.dragging = null;
+      const wire = state.wires.find(w => w.id === draggingWire.wireId);
+      if (wire && draggingWire.ptIdx < wire.points.length) {
+        wire.points[draggingWire.ptIdx] = { x: pt.x, y: pt.y };
+        recalcWireLength(wire);
+        renderWireProps(wire);
+      }
+      render(); return;
+    }
     if (state.dragging) {
       cancelLongPress();
       const sym = state.symbols.find(s => s.id === state.dragging.id);
@@ -2594,6 +2715,27 @@ function onTouchEndCanvas(e) {
     state.dragging = null;
     state.panning = false; touchPanStart = null;
     return;
+  }
+  if (draggingWire) {
+    const t = e.changedTouches[0];
+    if (t) {
+      const pt = clientToCanvas(t.clientX, t.clientY);
+      const wire = state.wires.find(w => w.id === draggingWire.wireId);
+      if (wire) {
+        const isEndpt = draggingWire.ptIdx===0 || draggingWire.ptIdx===wire.points.length-1;
+        if (isEndpt) {
+          const snap = hitTest(pt.x, pt.y);
+          if (snap) {
+            wire.points[draggingWire.ptIdx] = { x:snap.x, y:snap.y };
+            if (draggingWire.ptIdx===0) wire.srcId=snap.id; else wire.dstId=snap.id;
+          }
+        }
+        recalcWireLength(wire);
+        renderWireProps(wire);
+      }
+    }
+    draggingWire = null;
+    render(); state.panning=false; touchPanStart=null; return;
   }
   if (state.dragging) { saveUndo(); state.dragging = null; }
   state.panning = false; touchPanStart = null;
@@ -2880,14 +3022,18 @@ function getWireWidth(wire) {
 
 
 let selectedWireId = null;
+let draggingWire = null;   // { wireId, ptIdx, offX, offY }
+let hoveredWirePt = null;  // { wireId, ptIdx } for hover highlight
+let addingMidPoint = null; // { wireId, segIdx, x, y } when clicking segment midpoint
 
 function drawWires() {
   for (const wire of state.wires) {
     const isSel = wire.id === selectedWireId;
     const col = isSel ? '#f5a623' : getWireColor(wire);
     const dash = isSel ? [] : getWireDash(wire);
-    const lw   = isSel ? 4 : getWireWidth(wire);
+    const lw   = isSel ? 3.5 : getWireWidth(wire);
 
+    // Draw wire line
     ctx.strokeStyle = col;
     ctx.lineWidth = lw / state.zoom;
     ctx.setLineDash(dash.map(d => d / state.zoom));
@@ -2897,23 +3043,153 @@ function drawWires() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Circuit label
-    const mid = wire.points[Math.floor(wire.points.length/2)];
+    // Labels at midpoint
+    const mid = wire.points[Math.floor(wire.points.length / 2)];
     ctx.fillStyle = col;
     ctx.font = `bold ${10/state.zoom}px IBM Plex Mono,monospace`;
-    if (wire.circuit) ctx.fillText(wire.circuit, mid.x+4/state.zoom, mid.y-4/state.zoom);
+    if (wire.circuit) ctx.fillText(wire.circuit, mid.x+4/state.zoom, mid.y-5/state.zoom);
     if (wire.laenge_m) {
       ctx.font = `${8/state.zoom}px IBM Plex Mono,monospace`;
-      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+7/state.zoom);
+      ctx.fillStyle = col;
+      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+6/state.zoom);
     }
-    // Verlegeart
     if (wire.verlegeart) {
+      const VLBL = {'UP':'UP','AP':'AP','HR':'Rohr','EZ':'Einz.','ER':'Erde','HD':'HD','FU':'FB','HW':'HW'};
       ctx.font = `${7/state.zoom}px IBM Plex Mono,monospace`;
       ctx.fillStyle = 'rgba(0,120,200,.85)';
-      const vl = {'UP':'UP','AP':'AP','HR':'Rohr','EZ':'Einz.','ER':'Erde','HD':'HD','FU':'FB','HW':'HW'}[wire.verlegeart]||wire.verlegeart;
-      ctx.fillText(vl+(wire.trasseHoehe?' '+wire.trasseHoehe+'cm':''), mid.x+4/state.zoom, mid.y+15/state.zoom);
+      ctx.fillText(
+        (VLBL[wire.verlegeart]||wire.verlegeart) + (wire.trasseHoehe?' '+wire.trasseHoehe+'cm':''),
+        mid.x+4/state.zoom, mid.y+14/state.zoom
+      );
+    }
+
+    // ── Draggable points on selected wire ──
+    if (isSel) {
+      const ptR = 7 / state.zoom;  // point radius
+
+      // Draw segment midpoint hints (click to add point)
+      for (let i = 0; i < wire.points.length - 1; i++) {
+        const a = wire.points[i], b = wire.points[i+1];
+        const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+        ctx.beginPath();
+        ctx.arc(mx, my, 4/state.zoom, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(245,166,35,0.3)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245,166,35,0.6)';
+        ctx.lineWidth = 1/state.zoom;
+        ctx.stroke();
+        // "+" text
+        ctx.fillStyle = 'rgba(245,166,35,0.8)';
+        ctx.font = `bold ${8/state.zoom}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('+', mx, my + 3/state.zoom);
+        ctx.textAlign = 'left';
+      }
+
+      // Draw draggable endpoint dots
+      wire.points.forEach((pt, pIdx) => {
+        const isHov = hoveredWirePt &&
+          hoveredWirePt.wireId === wire.id && hoveredWirePt.ptIdx === pIdx;
+        const isDrag = draggingWire &&
+          draggingWire.wireId === wire.id && draggingWire.ptIdx === pIdx;
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, ptR, 0, Math.PI*2);
+
+        if (isDrag) {
+          ctx.fillStyle = '#ff5722';
+          ctx.strokeStyle = 'white';
+        } else if (isHov) {
+          ctx.fillStyle = '#f5a623';
+          ctx.strokeStyle = 'white';
+        } else if (pIdx === 0 || pIdx === wire.points.length-1) {
+          // Endpoints: filled circle
+          ctx.fillStyle = '#f5a623';
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        } else {
+          // Middle points: lighter
+          ctx.fillStyle = 'rgba(245,166,35,0.7)';
+          ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        }
+        ctx.fill();
+        ctx.lineWidth = 1.5/state.zoom;
+        ctx.stroke();
+
+        // Point index label
+        ctx.fillStyle = 'white';
+        ctx.font = `bold ${7/state.zoom}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(pIdx+1, pt.x, pt.y + 2.5/state.zoom);
+        ctx.textAlign = 'left';
+
+        // Delete button for middle points (right of point)
+        if (pIdx > 0 && pIdx < wire.points.length-1 && isHov) {
+          ctx.beginPath();
+          ctx.arc(pt.x + 12/state.zoom, pt.y - 12/state.zoom, 5/state.zoom, 0, Math.PI*2);
+          ctx.fillStyle = '#e74c3c';
+          ctx.fill();
+          ctx.fillStyle = 'white';
+          ctx.font = `bold ${7/state.zoom}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('×', pt.x + 12/state.zoom, pt.y - 12/state.zoom + 2.5/state.zoom);
+          ctx.textAlign = 'left';
+        }
+      });
     }
   }
+}
+
+
+// Hit test for wire points (returns {wireId, ptIdx} or null)
+function hitTestWirePoint(x, y) {
+  if (!selectedWireId) return null;
+  const wire = state.wires.find(w => w.id === selectedWireId);
+  if (!wire) return null;
+  const R = 10 / state.zoom;
+  for (let i = 0; i < wire.points.length; i++) {
+    if (Math.hypot(x - wire.points[i].x, y - wire.points[i].y) < R) {
+      return { wireId: wire.id, ptIdx: i };
+    }
+  }
+  return null;
+}
+
+// Hit test for delete button on a wire point
+function hitTestWirePointDelete(x, y) {
+  if (!selectedWireId) return null;
+  const wire = state.wires.find(w => w.id === selectedWireId);
+  if (!wire) return null;
+  const R = 7 / state.zoom;
+  for (let i = 1; i < wire.points.length - 1; i++) {
+    const bx = wire.points[i].x + 12/state.zoom;
+    const by = wire.points[i].y - 12/state.zoom;
+    if (Math.hypot(x - bx, y - by) < R) return { wireId: wire.id, ptIdx: i };
+  }
+  return null;
+}
+
+// Hit test for segment midpoints (add point)
+function hitTestWireMid(x, y) {
+  if (!selectedWireId) return null;
+  const wire = state.wires.find(w => w.id === selectedWireId);
+  if (!wire) return null;
+  const R = 8 / state.zoom;
+  for (let i = 0; i < wire.points.length - 1; i++) {
+    const a = wire.points[i], b = wire.points[i+1];
+    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+    if (Math.hypot(x - mx, y - my) < R) return { wireId: wire.id, segIdx: i, mx, my };
+  }
+  return null;
+}
+
+// Recalculate wire length after point move
+function recalcWireLength(wire) {
+  if (!state.scale) return;
+  let total = 0;
+  for (let i = 1; i < wire.points.length; i++) {
+    total += Math.hypot(wire.points[i].x-wire.points[i-1].x, wire.points[i].y-wire.points[i-1].y);
+  }
+  wire.laenge_m = (total / state.scale).toFixed(2);
 }
 
 // Wire hit test
@@ -3148,12 +3424,56 @@ function renderWireProps(wire) {
         <span style="font-family:var(--mono);font-size:11px;color:var(--ac)">${wire.laenge_m||'—'}m</span></div>
 
       <div class="rp-divider"></div>
-      <div style="display:flex;gap:5px">
+
+      <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">✋ Punkte verschieben</div>
+      <div style="font-size:10px;color:var(--tx2);line-height:1.5;margin-bottom:6px">
+        <span style="color:var(--ac)">●</span> Auf gelben Punkt klicken+ziehen<br>
+        <span style="color:rgba(245,166,35,.4)">+</span> Mittelpunkt klicken = neuer Punkt<br>
+        <span style="color:var(--rd)">×</span> Rotes ×-Icon = Punkt löschen
+      </div>
+      <button class="btn bg" style="width:100%;font-size:10px;margin-bottom:4px" onclick="addMidpointToWire('${wire.id}')">+ Punkt in Mitte hinzufügen</button>
+
+      <div class="rp-divider"></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn bg" style="flex:1;font-size:10px" onclick="splitWireCircuit('${wire.id}')">✂ Neuer SK</button>
+        <button class="btn bg" style="flex:1;font-size:10px" onclick="duplicateWire('${wire.id}')">⎘ Kopieren</button>
         <button class="btn" style="flex:1;font-size:10px;background:var(--rd);color:white" onclick="deleteSelectedWire()">🗑 Löschen</button>
       </div>
     </div>
   `;
+}
+
+function addMidpointToWire(wireId) {
+  const wire = state.wires.find(w => w.id === wireId);
+  if (!wire || wire.points.length < 2) return;
+  saveUndo();
+  // Add midpoint to middle segment
+  const midIdx = Math.floor((wire.points.length - 1) / 2);
+  const a = wire.points[midIdx], b = wire.points[midIdx+1];
+  wire.points.splice(midIdx+1, 0, { x:(a.x+b.x)/2, y:(a.y+b.y)/2 });
+  recalcWireLength(wire);
+  render();
+  renderWireProps(wire);
+  setStatus('Mittelpunkt hinzugefügt — ziehen zum Verschieben');
+}
+
+function duplicateWire(wireId) {
+  const wire = state.wires.find(w => w.id === wireId);
+  if (!wire) return;
+  saveUndo();
+  const offset = 20;
+  const newWire = {
+    ...wire,
+    id: gid(),
+    points: wire.points.map(p => ({ x: p.x+offset, y: p.y+offset })),
+    circuit: autoCircuitName(),
+    srcId: null, dstId: null,
+  };
+  state.wires.push(newWire);
+  selectedWireId = newWire.id;
+  render();
+  renderWireProps(newWire);
+  setStatus('Leitung kopiert als ' + newWire.circuit);
 }
 
 function updWire(id, key, val) {
