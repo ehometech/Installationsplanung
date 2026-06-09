@@ -89,7 +89,16 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .rp-stat{font-family:var(--mono);font-size:10px;color:var(--tx2);display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--bd);}
 .rp-stat span{color:var(--ac);}
 
-/* SCALE BAR */
+/* ── KPI CARDS ── */
+.kpi-card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;}
+.kpi-val{font-size:26px;font-weight:700;font-family:var(--mono);color:var(--ac);}
+.kpi-lbl{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;}
+.kpi-sub{font-size:10px;color:var(--tx2);font-family:var(--mono);}
+/* ── ANALYSE BAR ── */
+.ana-bar-bg{background:var(--sf3);border-radius:3px;height:8px;overflow:hidden;margin:3px 0;}
+.ana-bar{height:8px;border-radius:3px;transition:width .3s;}
+
+
 .scale-bar{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.7);border-radius:4px;padding:4px 8px;font-family:var(--mono);font-size:10px;color:white;display:flex;align-items:center;gap:6px;z-index:50;}
 .scale-line{width:50px;height:3px;background:white;position:relative;}
 .scale-line::before,.scale-line::after{content:'';position:absolute;top:-3px;width:1px;height:9px;background:white;}
@@ -246,15 +255,20 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 <body>
 
 <header>
-  <div class="logo">⚡ Elektro<em>-</em>Grundriss <span class="badge">v1</span></div>
+  <div class="logo">⚡ Elektro<em>-</em>Grundriss <span class="badge">v2</span></div>
   <div class="hsp"></div>
-  <input id="projName" class="rp-input" style="width:160px;font-size:12px" value="Neues Projekt" placeholder="Projektname">
+  <input id="projName" class="rp-input" style="width:140px;font-size:12px" value="Neues Projekt" placeholder="Projektname">
+  <div class="vs"></div>
+  <button class="btn bg" onclick="showProjDataModal()" title="Kundendaten & Projektdetails">📋 Projektdaten</button>
   <div class="vs"></div>
   <button class="btn bg" onclick="saveProject()">💾 Speichern</button>
   <button class="btn bg" onclick="loadProject()">📂 Laden</button>
   <div class="vs"></div>
   <button class="btn bb" onclick="exportCSV()">⬇ CSV</button>
-  <button class="btn ba" onclick="exportPDF()">🖨 PDF</button>
+  <button class="btn ba" onclick="exportFloorplanPDF()">🖨 PDF</button>
+  <button class="btn bg" onclick="exportXML()" style="color:var(--gr);border-color:var(--gr)">⬇ XML</button>
+  <div class="vs"></div>
+  <button class="btn bg" onclick="showAI()" style="color:var(--pu);border-color:var(--pu)" title="KI-Assistent (Gemini)">🤖 KI</button>
 </header>
 
 
@@ -296,6 +310,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <div class="tab" onclick="switchTab('stromkreise')" id="tab-stromkreise">⚡ Stromkreise</div>
   <div class="tab" onclick="switchTab('stueckliste')" id="tab-stueckliste">📦 Stückliste</div>
   <div class="tab" onclick="switchTab('symbole')" id="tab-symbole">🖼 Symbole verwalten</div>
+  <div class="tab" onclick="showAI()" id="tab-ki" style="color:var(--pu)">🤖 KI-Assistent</div>
 </div>
 
 <div class="main">
@@ -325,14 +340,17 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="undoAction()" title="Rückgängig">↩</button>
       <button class="tool-btn" onclick="clearAll()" title="Alles löschen">🗑</button>
       <div class="vs"></div>
-      <select class="rp-sel" id="wireTypeSelect" onchange="setActiveWireType(this.value)" style="width:130px;font-size:10px" title="Leitungstyp">
-        <option value="strom">⚡ Strom NYM-J</option>
-        <option value="strom3">⚡ Drehstrom NYM-J 5</option>
+      <select class="rp-sel" id="wireTypeSelect" onchange="setActiveWireType(this.value)" style="width:160px;font-size:10px" title="Leitungstyp">
+        <option value="strom">⚡ Strom NYM-J 3-adrig</option>
+        <option value="strom3">⚡ Drehstrom NYM-J 5-adrig</option>
+        <option value="nyy">🟤 NYY-J Erdkabel 3-adrig</option>
+        <option value="nyy5">🟤 NYY-J Erdkabel 5-adrig</option>
+        <option value="erdung">🟡🟢 Erdungsleitung grün-gelb</option>
         <option value="erde">🌍 Erdkabel NYY-J</option>
         <option value="daten">💻 Datenkabel CAT6</option>
         <option value="sat">📡 SAT-Kabel Koax</option>
         <option value="telefon">📞 Telefonkabel</option>
-        <option value="bus">🔶 KNX/Bus</option>
+        <option value="bus">🔶 KNX/Bus-Kabel</option>
       </select>
       <div class="vs"></div>
       <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählt löschen (Entf)" style="color:var(--rd)">✂</button>
@@ -378,21 +396,29 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
   <!-- STÜCKLISTE VIEW (inside main) -->
   <div class="view" id="stView" style="display:none">
-    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="font-size:14px;font-weight:700">📦 Stückliste</h2>
+      <select class="rp-sel" id="stFilterSK" onchange="renderStueckliste()" style="width:160px;font-size:11px">
+        <option value="">Alle Stromkreise</option>
+      </select>
       <div class="hsp"></div>
-      <button class="btn bg" onclick="exportCSV()">⬇ CSV</button>
-      <button class="btn bg" onclick="printSt()">🖨 Drucken</button>
+      <button class="btn bg" onclick="exportCSV()">⬇ CSV (komplett)</button>
+      <button class="btn bg" onclick="exportFloorplanPDF()">🖨 PDF</button>
     </div>
+    <!-- KPI cards -->
+    <div id="stKPI" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px"></div>
+    <!-- Geräte-Tabelle -->
+    <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">🔌 Geräte</div>
     <table class="stbl">
-      <thead><tr><th>#</th><th>Symbol</th><th>Bezeichnung</th><th>Stromkreis</th><th>Phase</th><th>Kabellänge</th><th>Anz.</th></tr></thead>
+      <thead><tr><th>#</th><th>Symbol</th><th>Bezeichnung</th><th>Stromkreis</th><th>Phase</th><th>Montage</th><th>Höhe</th><th>Kabellänge</th><th>Anz.</th></tr></thead>
       <tbody id="stBody"></tbody>
     </table>
-    <div id="stWires"></div>
-    <div style="margin-top:16px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:14px">
-      <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Zusammenfassung</div>
-      <div id="stSummary" style="font-family:var(--mono);font-size:11px;color:var(--tx2)"></div>
-    </div>
+    <!-- Leitungen-Tabelle -->
+    <div id="stWires" style="margin-top:16px"></div>
+    <!-- Verlegungsanalyse -->
+    <div id="stAnalysis" style="margin-top:14px"></div>
+    <!-- Zusammenfassung -->
+    <div id="stSummary" style="margin-top:14px"></div>
   </div>
 
   <!-- RIGHT PROPERTIES PANEL -->
@@ -455,6 +481,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
                 <option>Haustechnik</option>
                 <option>Sicherheit</option>
                 <option>Leitungen</option>
+                <option>KNX / Smarthome</option>
                 <option>Sonstige</option>
               </select>
             </div>
@@ -481,6 +508,13 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
                 <option>NYM-J 5×1.5</option>
                 <option>NYM-J 5×2.5</option>
                 <option>NYM-J 5×6</option>
+                <option>NYY-J 3×2.5</option>
+                <option>NYY-J 3×6</option>
+                <option>NYY-J 5×2.5</option>
+                <option>NYY-J 5×6</option>
+                <option>NYY-J 5×10</option>
+                <option>H07V-K 1×6 grün-gelb (PE)</option>
+                <option>YCYM 2×2×0.8 (KNX)</option>
               </select>
             </div>
           </div>
@@ -665,7 +699,94 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   </div>
 </div>
 
-<!-- CALIBRATE MODAL -->
+<!-- PROJEKTDATEN MODAL -->
+<div class="modal-ov hid" id="projDataModal">
+  <div class="modal" style="width:500px;max-height:90vh">
+    <h3>📋 Projektdaten & Kundendaten</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px;border-bottom:1px solid var(--bd);padding-bottom:3px">👤 Kundendaten</div>
+        <div class="rp-row"><label class="rp-lbl">Kundenname</label><input class="rp-input" id="pd-kundenname" placeholder="Max Mustermann"></div>
+        <div class="rp-row"><label class="rp-lbl">Firma</label><input class="rp-input" id="pd-firma" placeholder="Firma GmbH"></div>
+        <div class="rp-row"><label class="rp-lbl">Telefon</label><input class="rp-input" id="pd-telefon" placeholder="+49 ..."></div>
+        <div class="rp-row"><label class="rp-lbl">E-Mail</label><input class="rp-input" id="pd-email" placeholder="email@beispiel.de"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px;border-bottom:1px solid var(--bd);padding-bottom:3px">📍 Projektadresse</div>
+        <div class="rp-row"><label class="rp-lbl">Straße & Nr.</label><input class="rp-input" id="pd-strasse" placeholder="Musterstraße 12"></div>
+        <div class="rp-row"><label class="rp-lbl">PLZ & Ort</label><input class="rp-input" id="pd-ort" placeholder="12345 Musterstadt"></div>
+        <div class="rp-row"><label class="rp-lbl">Etage / Wohnung</label><input class="rp-input" id="pd-etage" placeholder="EG / 3. OG / Wohnung 2"></div>
+        <div class="rp-row"><label class="rp-lbl">Gebäudetyp</label>
+          <select class="rp-sel" id="pd-gebaeude">
+            <option>Einfamilienhaus</option><option>Mehrfamilienhaus</option>
+            <option>Wohnung</option><option>Büro</option><option>Gewerbe</option><option>Industriehalle</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px;border-bottom:1px solid var(--bd);padding-bottom:3px">🏗 Auftragsdaten</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div class="rp-row"><label class="rp-lbl">Auftragsnummer</label><input class="rp-input" id="pd-auftragsnr" placeholder="AUF-2025-001"></div>
+        <div class="rp-row"><label class="rp-lbl">Auftraggeber</label><input class="rp-input" id="pd-auftraggeber" placeholder="Name des Auftraggebers"></div>
+        <div class="rp-row"><label class="rp-lbl">Planerstellt von</label><input class="rp-input" id="pd-planer" placeholder="Ing. Max Müller"></div>
+      </div>
+      <div>
+        <div class="rp-row"><label class="rp-lbl">Datum</label><input class="rp-input" id="pd-datum" type="date"></div>
+        <div class="rp-row"><label class="rp-lbl">Ausführungsdatum</label><input class="rp-input" id="pd-ausfuehrung" type="date"></div>
+        <div class="rp-row"><label class="rp-lbl">Gewerk</label>
+          <select class="rp-sel" id="pd-gewerk">
+            <option>Elektroinstallation</option><option>Schwachstrom</option><option>Netzwerk/EDV</option>
+            <option>KNX/Smarthome</option><option>Photovoltaik</option><option>Beleuchtungsplanung</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="rp-row" style="margin-top:8px"><label class="rp-lbl">Notizen / Bemerkungen</label>
+      <textarea class="rp-input" id="pd-notizen" rows="2" style="resize:vertical;font-family:var(--sans)" placeholder="Besonderheiten, Hinweise..."></textarea>
+    </div>
+    <div class="mft">
+      <button class="btn bg" onclick="document.getElementById('projDataModal').classList.add('hid')">Schließen</button>
+      <button class="btn ba" onclick="saveProjData()">✓ Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- KI-ASSISTENT MODAL -->
+<div class="modal-ov hid" id="aiModal">
+  <div class="modal" style="width:580px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h3 style="margin:0">🤖 KI-Assistent (Gemini)</h3>
+      <div style="flex:1"></div>
+      <input class="rp-input" id="geminiKey" placeholder="Gemini API Key (kostenlos)" style="width:200px;font-size:10px;font-family:var(--mono)" type="password">
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:10px;color:var(--bl);text-decoration:none">🔑 Kostenlos holen</a>
+    </div>
+    <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:12px;min-height:250px;max-height:380px;display:flex;flex-direction:column;gap:8px">
+      <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:12px;color:var(--tx2)">
+        <strong style="color:var(--pu)">🤖 KI-Assistent</strong><br>
+        Hallo! Ich helfe dir bei der Elektroplanung. Frage mich z.B.:<br>
+        • "Wie viele Steckdosen brauche ich pro Raum?"<br>
+        • "Welches Kabel für eine Herdanschluss?"<br>
+        • "Was bedeutet NYY-J Leitung?"<br>
+        • "KNX Bus Topologie erklären"<br>
+        • "Schaltplan für Wechselschaltung"
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input class="rp-input" id="aiInput" placeholder="Frage zur Elektroplanung..." style="flex:1" onkeydown="if(event.key==='Enter')sendAI()">
+      <button class="btn ba" onclick="sendAI()" style="background:var(--pu);border-color:var(--pu)">Senden</button>
+    </div>
+    <div style="font-size:9px;color:var(--tx3);margin-top:5px;text-align:center">
+      Powered by Google Gemini — kostenlos nutzbar mit eigenem API-Key
+    </div>
+    <div class="mft" style="margin-top:8px">
+      <button class="btn bg" onclick="document.getElementById('aiModal').classList.add('hid')">Schließen</button>
+      <button class="btn bg" onclick="document.getElementById('aiChat').innerHTML=''">🗑 Chat leeren</button>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal-ov hid" id="calModal">
   <div class="modal">
     <h3>📏 Maßstab kalibrieren</h3>
@@ -715,11 +836,129 @@ const SYMBOLS = {
     svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="2.5"/>`
   },
   leitung_3leiter: {
-    cat:'Leitungen', name:'Leitung 3 Leiter', abbr:'L3', color:'#555', circuits:false,
+    cat:'Leitungen', name:'Leitung 3 Leiter (NYM-J)', abbr:'L3', color:'#e74c3c', circuits:false,
     svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="2.5"/>
          <line x1="16" y1="15" x2="18" y2="25" stroke="currentColor" stroke-width="2"/>
          <line x1="20" y1="15" x2="22" y2="25" stroke="currentColor" stroke-width="2"/>
-         <line x1="24" y1="15" x2="26" y2="25" stroke="currentColor" stroke-width="2"/>`
+         <line x1="24" y1="15" x2="26" y2="25" stroke="currentColor" stroke-width="2"/>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">3A</text>`
+  },
+  leitung_5leiter: {
+    cat:'Leitungen', name:'Leitung 5 Leiter (NYM-J)', abbr:'L5', color:'#9b59b6', circuits:false,
+    svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="2.5"/>
+         <line x1="12" y1="15" x2="14" y2="25" stroke="currentColor" stroke-width="2"/>
+         <line x1="16" y1="15" x2="18" y2="25" stroke="currentColor" stroke-width="2"/>
+         <line x1="20" y1="15" x2="22" y2="25" stroke="currentColor" stroke-width="2"/>
+         <line x1="24" y1="15" x2="26" y2="25" stroke="currentColor" stroke-width="2"/>
+         <line x1="28" y1="15" x2="30" y2="25" stroke="currentColor" stroke-width="2"/>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">5A</text>`
+  },
+  leitung_nyy3: {
+    cat:'Leitungen', name:'NYY-J 3-adrig Erdkabel', abbr:'NYY3', color:'#795548', circuits:false,
+    svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="3.5"/>
+         <line x1="15" y1="14" x2="17" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="20" y1="14" x2="22" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="25" y1="14" x2="27" y2="26" stroke="currentColor" stroke-width="2"/>
+         <text x="20" y="9" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">NYY-J</text>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">3-adrig</text>`
+  },
+  leitung_nyy5: {
+    cat:'Leitungen', name:'NYY-J 5-adrig Erdkabel', abbr:'NYY5', color:'#4e342e', circuits:false,
+    svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="3.5"/>
+         <line x1="11" y1="14" x2="13" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="16" y1="14" x2="18" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="20" y1="14" x2="22" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="24" y1="14" x2="26" y2="26" stroke="currentColor" stroke-width="2"/>
+         <line x1="28" y1="14" x2="30" y2="26" stroke="currentColor" stroke-width="2"/>
+         <text x="20" y="9" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">NYY-J</text>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">5-adrig</text>`
+  },
+  erdungsleitung: {
+    cat:'Leitungen', name:'Erdungsleitung (grün-gelb)', abbr:'PE', color:'#27ae60', circuits:false,
+    svg:`<line x1="4" y1="18" x2="36" y2="18" stroke="#27ae60" stroke-width="3"/>
+         <line x1="4" y1="22" x2="36" y2="22" stroke="#f9a825" stroke-width="3"/>
+         <text x="20" y="10" font-family="monospace" font-size="7" text-anchor="middle" fill="#27ae60">PE</text>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="#795548">grün-gelb</text>`
+  },
+  erdungsschiene: {
+    cat:'Leitungen', name:'Erdungsschiene / PE-Klemme', abbr:'PE', color:'#27ae60', circuits:false,
+    svg:`<line x1="8" y1="26" x2="32" y2="26" stroke="currentColor" stroke-width="3"/>
+         <line x1="14" y1="14" x2="14" y2="26" stroke="#27ae60" stroke-width="2"/>
+         <line x1="20" y1="10" x2="20" y2="26" stroke="#27ae60" stroke-width="2"/>
+         <line x1="26" y1="14" x2="26" y2="26" stroke="#27ae60" stroke-width="2"/>
+         <path d="M17 30 L20 35 L23 30 Z" fill="currentColor"/>
+         <text x="20" y="9" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">⏚</text>`
+  },
+  abzweigdose: {
+    cat:'Verteiler & Technik', name:'Abzweigdose (AP)', abbr:'AD', color:'#e67e22', circuits:false,
+    svg:`<rect x="8" y="8" width="24" height="24" rx="3" fill="none" stroke="currentColor" stroke-width="2.5"/>
+         <line x1="20" y1="8" x2="20" y2="14" stroke="currentColor" stroke-width="2"/>
+         <line x1="20" y1="26" x2="20" y2="32" stroke="currentColor" stroke-width="2"/>
+         <line x1="8" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="2"/>
+         <line x1="26" y1="20" x2="32" y2="20" stroke="currentColor" stroke-width="2"/>
+         <circle cx="20" cy="20" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">AD AP</text>`
+  },
+  abzweigdose_up: {
+    cat:'Verteiler & Technik', name:'Abzweigdose (UP)', abbr:'AD-U', color:'#d35400', circuits:false,
+    svg:`<rect x="8" y="8" width="24" height="24" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4,2"/>
+         <line x1="20" y1="8" x2="20" y2="14" stroke="currentColor" stroke-width="2"/>
+         <line x1="20" y1="26" x2="20" y2="32" stroke="currentColor" stroke-width="2"/>
+         <line x1="8" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="2"/>
+         <line x1="26" y1="20" x2="32" y2="20" stroke="currentColor" stroke-width="2"/>
+         <circle cx="20" cy="20" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">AD UP</text>`
+  },
+  knx_taster: {
+    cat:'KNX / Smarthome', name:'KNX Taster', abbr:'KNX', color:'#ff5722', circuits:false,
+    svg:`<rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+         <rect x="10" y="10" width="20" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="22" font-family="monospace" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">KNX</text>
+         <circle cx="20" cy="28" r="2" fill="currentColor"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">Taster</text>`
+  },
+  knx_aktor: {
+    cat:'KNX / Smarthome', name:'KNX Schaltaktor', abbr:'KA', color:'#e64a19', circuits:false,
+    svg:`<rect x="5" y="5" width="30" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/>
+         <text x="20" y="17" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor" font-weight="bold">KNX</text>
+         <text x="20" y="26" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">AKTOR</text>
+         <line x1="10" y1="30" x2="30" y2="30" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">Schalt</text>`
+  },
+  knx_dimmaktor: {
+    cat:'KNX / Smarthome', name:'KNX Dimmaktor', abbr:'KD', color:'#bf360c', circuits:true, phase:'L1', nennstrom:16, kabel:'YCYM 2×2×0.8',
+    svg:`<rect x="5" y="5" width="30" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/>
+         <text x="20" y="17" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor" font-weight="bold">KNX</text>
+         <text x="20" y="26" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">DIMM</text>
+         <path d="M10 30 Q20 24 30 30" fill="none" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">Dimm</text>`
+  },
+  knx_jalousieaktor: {
+    cat:'KNX / Smarthome', name:'KNX Jalousieaktor', abbr:'KJ', color:'#e65100', circuits:false,
+    svg:`<rect x="5" y="5" width="30" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/>
+         <text x="20" y="15" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor" font-weight="bold">KNX</text>
+         <line x1="10" y1="20" x2="30" y2="20" stroke="currentColor" stroke-width="1.5"/>
+         <line x1="10" y1="24" x2="30" y2="24" stroke="currentColor" stroke-width="1.5"/>
+         <line x1="10" y1="28" x2="30" y2="28" stroke="currentColor" stroke-width="1.5"/>
+         <text x="20" y="38" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">Jalousie</text>`
+  },
+  knx_bus_linie: {
+    cat:'KNX / Smarthome', name:'KNX Bus-Linie (TKNX)', abbr:'BL', color:'#ff5722', circuits:false,
+    svg:`<line x1="4" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="2" stroke-dasharray="3,2"/>
+         <circle cx="10" cy="20" r="3" fill="currentColor"/>
+         <circle cx="20" cy="20" r="3" fill="currentColor"/>
+         <circle cx="30" cy="20" r="3" fill="currentColor"/>
+         <text x="20" y="10" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">TKNX</text>
+         <text x="20" y="34" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor">Bus</text>`
+  },
+  knx_ip_router: {
+    cat:'KNX / Smarthome', name:'KNX IP-Router', abbr:'KIP', color:'#dd2c00', circuits:false,
+    svg:`<rect x="7" y="10" width="26" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+         <text x="20" y="21" font-family="monospace" font-size="7" text-anchor="middle" fill="currentColor" font-weight="bold">KNX</text>
+         <text x="20" y="28" font-family="monospace" font-size="6" text-anchor="middle" fill="currentColor">IP-RTR</text>
+         <circle cx="10" cy="36" r="2" fill="currentColor"/>
+         <circle cx="20" cy="36" r="2" fill="currentColor"/>
+         <circle cx="30" cy="36" r="2" fill="currentColor"/>`
   },
   leitung_hohldecke: {
     cat:'Leitungen', name:'Leitung in Hohldecke', abbr:'LH', color:'#555', circuits:false,
@@ -1574,28 +1813,7 @@ function resetToBuiltin() {
 }
 
 // ── CUSTOM SYMBOL RENDERING IN CANVAS ──
-// Override getSymbolCanvas to handle custom image symbols
-const _origGetSymbolCanvas = getSymbolCanvas;
-function getSymbolCanvas(type, def, sz) {
-  if (def.imgData) {
-    // Image-based custom symbol
-    if (symCache[type]) return symCache[type];
-    const oc = new OffscreenCanvas(sz, sz);
-    const oc2 = oc.getContext('2d');
-    const img = new Image();
-    img.onload = () => {
-      oc2.clearRect(0,0,sz,sz);
-      // Draw with contain fit
-      const scale = Math.min(sz/img.width, sz/img.height);
-      const w2 = img.width*scale, h2 = img.height*scale;
-      oc2.drawImage(img, (sz-w2)/2, (sz-h2)/2, w2, h2);
-    };
-    img.src = def.imgData;
-    symCache[type] = oc;
-    return oc;
-  }
-  return _origGetSymbolCanvas(type, def, sz);
-}
+// Custom image symbols are handled directly in getSymbolCanvas below
 
 
 // ═══════════════════════════════════════════════════
@@ -2118,9 +2336,22 @@ function updateWireDraw(pt) {
   if (!_wireActive) return;
   // Snap to nearby symbol
   const near = hitTest(pt.x, pt.y);
-  const end = (near && near.id !== _wireSrcId) ? { x: near.x, y: near.y } : pt;
+  let endSnap = (near && near.id !== _wireSrcId) ? { x: near.x, y: near.y, label: near.label||'Symbol' } : null;
+  // Snap to wire endpoint
+  if (!endSnap) {
+    const eps = 20/state.zoom;
+    for (const w of state.wires) {
+      for (const wp of [w.points[0], w.points[w.points.length-1]]) {
+        if (Math.hypot(pt.x-wp.x, pt.y-wp.y) < eps) {
+          endSnap = { x: wp.x, y: wp.y, label: 'Leitung '+w.circuit };
+          break;
+        }
+      }
+    }
+  }
+  const end = endSnap ? { x: endSnap.x, y: endSnap.y } : pt;
   _wirePts = [_wirePts[0], buildRoute(_wirePts[0], end)[1], end];
-  renderSmartWirePreview(pt, near);
+  renderSmartWirePreview(pt, near, endSnap);
 }
 
 function endWireDraw(pt) {
@@ -2130,8 +2361,23 @@ function endWireDraw(pt) {
   cancelLongPress();
   octx.clearRect(0, 0, overlay.width, overlay.height);
 
+  // Snap to symbol or wire endpoint
   const near = hitTest(pt.x, pt.y);
-  const endPt = (near && near.id !== _wireSrcId) ? { x: near.x, y: near.y } : pt;
+  let endPt = (near && near.id !== _wireSrcId) ? { x: near.x, y: near.y } : pt;
+  
+  // Also snap to existing wire endpoints
+  if (!near) {
+    const eps = 20;
+    for (const w of state.wires) {
+      for (const wp of [w.points[0], w.points[w.points.length-1]]) {
+        if (Math.hypot(pt.x-wp.x, pt.y-wp.y) < eps) {
+          endPt = { x: wp.x, y: wp.y };
+          break;
+        }
+      }
+    }
+  }
+  
   const src = _wirePts[0];
 
   // Minimum distance check
@@ -2164,6 +2410,8 @@ function endWireDraw(pt) {
     laenge_m: calcWireLengthPts(pts),
     srcId: _wireSrcId,
     dstId: near?.id || null,
+    adern: WIRE_TYPES[_pendingWI.wireType||'strom']?.adern || 3,
+    adernLabel: WIRE_TYPES[_pendingWI.wireType||'strom']?.adernLabel || '',
   });
 
   const newIdx = state.wires.length - 1;
@@ -2176,9 +2424,23 @@ function endWireDraw(pt) {
 }
 
 function buildRoute(from, to) {
-  // L-shape: horizontal first, then vertical
+  // Smart L-shape: choose shorter segment first
+  const dx = Math.abs(to.x - from.x);
+  const dy = Math.abs(to.y - from.y);
+  // Always orthogonal: horizontal first, then vertical (L-shape)
   const mid = { x: to.x, y: from.y };
   return [from, mid, to];
+}
+
+function buildRouteOrtho(from, to, preferVertFirst) {
+  // Strictly orthogonal routing
+  if (preferVertFirst) {
+    const mid = { x: from.x, y: to.y };
+    return [from, mid, to];
+  } else {
+    const mid = { x: to.x, y: from.y };
+    return [from, mid, to];
+  }
 }
 
 function calcWireLengthPts(pts) {
@@ -2188,11 +2450,12 @@ function calcWireLengthPts(pts) {
   return (d / state.scale).toFixed(2);
 }
 
-function renderSmartWirePreview(pt, target) {
+function renderSmartWirePreview(pt, target, wireSnap) {
   octx.clearRect(0, 0, overlay.width, overlay.height);
   if (!_wireActive || !_wirePts.length) return;
   const src = _wirePts[0];
-  const endPt = (target && target.id !== _wireSrcId) ? { x:target.x, y:target.y } : pt;
+  const snapTarget = wireSnap || (target && target.id !== _wireSrcId ? target : null);
+  const endPt = snapTarget ? { x: snapTarget.x, y: snapTarget.y } : pt;
   const route = buildRoute(src, endPt);
 
   octx.save();
@@ -2210,9 +2473,9 @@ function renderSmartWirePreview(pt, target) {
   octx.setLineDash([]);
 
   // Target highlight
-  if (target && target.id !== _wireSrcId) {
+  if (snapTarget) {
     octx.beginPath();
-    octx.arc(target.x, target.y, 24/state.zoom, 0, Math.PI*2);
+    octx.arc(snapTarget.x, snapTarget.y, 24/state.zoom, 0, Math.PI*2);
     octx.strokeStyle = '#27ae60';
     octx.lineWidth = 3/state.zoom;
     octx.stroke();
@@ -2220,7 +2483,7 @@ function renderSmartWirePreview(pt, target) {
     octx.fillStyle = '#27ae60';
     octx.font = `bold ${11/state.zoom}px IBM Plex Sans,sans-serif`;
     octx.textAlign = 'center';
-    octx.fillText('Verbinden', target.x, target.y - 26/state.zoom);
+    octx.fillText('Verbinden', snapTarget.x, snapTarget.y - 26/state.zoom);
     octx.textAlign = 'left';
   }
 
@@ -2828,7 +3091,9 @@ function finishWire() {
     verlegeart: wt.verlegeart || 'UP',
     trasseHoehe: wt.trasseHoehe || 20,
     rohrTyp: wt.rohrTyp || '',
-    laenge_m: calcWireLength(state.wirePoints)
+    laenge_m: calcWireLength(state.wirePoints),
+    adern: WIRE_TYPES[wt.wireType||'strom']?.adern || 3,
+    adernLabel: WIRE_TYPES[wt.wireType||'strom']?.adernLabel || '',
   });
   state.wirePoints = [];
   render();
@@ -2945,10 +3210,42 @@ function render() {
   drawBackground();
   drawFloorplan();
   drawWires();
+  drawWireJunctions();
   drawCalPoints();
   drawSymbols();
   ctx.restore();
   updateScaleBar();
+}
+
+// Draw junction dots where wires connect to each other
+function drawWireJunctions() {
+  // Find points shared between wires (snapped connections)
+  const eps = 8; // tolerance in world coords
+  const drawn = new Set();
+  for (let i = 0; i < state.wires.length; i++) {
+    const wa = state.wires[i];
+    const aFirst = wa.points[0], aLast = wa.points[wa.points.length-1];
+    for (let j = i+1; j < state.wires.length; j++) {
+      const wb = state.wires[j];
+      for (const pa of [aFirst, aLast]) {
+        for (const pb of [...wb.points]) {
+          if (Math.hypot(pa.x-pb.x, pa.y-pb.y) < eps) {
+            const key = `${Math.round(pa.x)},${Math.round(pa.y)}`;
+            if (!drawn.has(key)) {
+              drawn.add(key);
+              ctx.beginPath();
+              ctx.arc(pa.x, pa.y, 5/state.zoom, 0, Math.PI*2);
+              ctx.fillStyle = '#f5a623';
+              ctx.fill();
+              ctx.strokeStyle = '#000';
+              ctx.lineWidth = 1/state.zoom;
+              ctx.stroke();
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 function drawBackground() {
@@ -2990,14 +3287,17 @@ function drawCalPoints() {
 
 // Wire types with colors and styles
 const WIRE_TYPES = {
-  strom:   { label:'Strom (NYM-J)',      color:'#e74c3c', dash:[],        width:2.5, kabel:'NYM-J 3×1.5' },
-  strom3:  { label:'Drehstrom (NYM-J 5)',color:'#9b59b6', dash:[],        width:2.5, kabel:'NYM-J 5×2.5' },
-  erde:    { label:'Erdkabel (NYY-J)',    color:'#795548', dash:[],        width:3,   kabel:'NYY-J 5×6' },
-  daten:   { label:'Datenkabel (CAT6)',   color:'#9c27b0', dash:[6,3],     width:2,   kabel:'CAT 6 U/UTP' },
-  sat:     { label:'SAT-Kabel (Koax)',    color:'#1565c0', dash:[8,3],     width:2,   kabel:'Koax RG-6' },
-  telefon: { label:'Telefonkabel',        color:'#607d8b', dash:[4,2],     width:1.8, kabel:'J-Y(St)Y 2×2×0.6' },
-  bus:     { label:'KNX/Bus-Kabel',       color:'#ff5722', dash:[3,2],     width:1.8, kabel:'YCYM 2×2×0.8' },
-  custom:  { label:'Benutzerdefiniert',   color:'#27ae60', dash:[],        width:2,   kabel:'—' },
+  strom:   { label:'Strom NYM-J 3-adrig',     color:'#e74c3c', dash:[],        width:2.5, kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig' },
+  strom3:  { label:'Drehstrom NYM-J 5-adrig',  color:'#9b59b6', dash:[],        width:2.5, kabel:'NYM-J 5×2.5',  adern:5, adernLabel:'5-adrig' },
+  nyy:     { label:'NYY-J 3-adrig Erdkabel',   color:'#6d4c41', dash:[],        width:3.5, kabel:'NYY-J 3×2.5',  adern:3, adernLabel:'NYY-J 3A' },
+  nyy5:    { label:'NYY-J 5-adrig Erdkabel',   color:'#4e342e', dash:[],        width:3.5, kabel:'NYY-J 5×6',    adern:5, adernLabel:'NYY-J 5A' },
+  erdung:  { label:'Erdungsleitung grün-gelb',  color:'#27ae60', dash:[],        width:2.5, kabel:'H07V-K 1×6 grün-gelb', adern:1, adernLabel:'PE grün-gelb', isErdung:true },
+  erde:    { label:'Erdkabel (NYY-J)',          color:'#795548', dash:[],        width:3,   kabel:'NYY-J 5×6',    adern:5, adernLabel:'Erdkabel' },
+  daten:   { label:'Datenkabel (CAT6)',         color:'#9c27b0', dash:[6,3],     width:2,   kabel:'CAT 6 U/UTP',  adern:8, adernLabel:'CAT6' },
+  sat:     { label:'SAT-Kabel (Koax)',          color:'#1565c0', dash:[8,3],     width:2,   kabel:'Koax RG-6',    adern:1, adernLabel:'Koax' },
+  telefon: { label:'Telefonkabel',             color:'#607d8b', dash:[4,2],     width:1.8, kabel:'J-Y(St)Y 2×2×0.6', adern:4, adernLabel:'Tel' },
+  bus:     { label:'KNX/Bus-Kabel',            color:'#ff5722', dash:[3,2],     width:1.8, kabel:'YCYM 2×2×0.8', adern:2, adernLabel:'TKNX' },
+  custom:  { label:'Benutzerdefiniert',        color:'#27ae60', dash:[],        width:2,   kabel:'—',             adern:0, adernLabel:'' },
 };
 
 const PHASE_COLORS = {
@@ -3029,19 +3329,73 @@ let addingMidPoint = null; // { wireId, segIdx, x, y } when clicking segment mid
 function drawWires() {
   for (const wire of state.wires) {
     const isSel = wire.id === selectedWireId;
+    const wt = WIRE_TYPES[wire.wireType] || WIRE_TYPES.strom;
     const col = isSel ? '#f5a623' : getWireColor(wire);
     const dash = isSel ? [] : getWireDash(wire);
     const lw   = isSel ? 3.5 : getWireWidth(wire);
 
-    // Draw wire line
-    ctx.strokeStyle = col;
-    ctx.lineWidth = lw / state.zoom;
-    ctx.setLineDash(dash.map(d => d / state.zoom));
-    ctx.beginPath();
-    ctx.moveTo(wire.points[0].x, wire.points[0].y);
-    for (let i = 1; i < wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.save();
+
+    // Special case: Erdungsleitung (grün-gelb doppelt gezeichnet)
+    if (!isSel && wt.isErdung) {
+      ctx.lineWidth = lw / state.zoom;
+      ctx.setLineDash([]);
+      // Grüne Linie
+      ctx.strokeStyle = '#27ae60';
+      ctx.beginPath();
+      ctx.moveTo(wire.points[0].x - 1.5/state.zoom, wire.points[0].y - 1.5/state.zoom);
+      for (let i = 1; i < wire.points.length; i++) ctx.lineTo(wire.points[i].x - 1.5/state.zoom, wire.points[i].y - 1.5/state.zoom);
+      ctx.stroke();
+      // Gelbe Linie
+      ctx.strokeStyle = '#f9a825';
+      ctx.beginPath();
+      ctx.moveTo(wire.points[0].x + 1.5/state.zoom, wire.points[0].y + 1.5/state.zoom);
+      for (let i = 1; i < wire.points.length; i++) ctx.lineTo(wire.points[i].x + 1.5/state.zoom, wire.points[i].y + 1.5/state.zoom);
+      ctx.stroke();
+    } else {
+      // Normal wire
+      ctx.strokeStyle = col;
+      ctx.lineWidth = lw / state.zoom;
+      ctx.setLineDash(dash.map(d => d / state.zoom));
+      ctx.beginPath();
+      ctx.moveTo(wire.points[0].x, wire.points[0].y);
+      for (let i = 1; i < wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw Ader-Striche (tick marks) along wire for 3/5-adrig
+    const adernN = wire.adern || wt.adern || 0;
+    if (adernN > 0 && adernN <= 5) {
+      // Draw tick marks perpendicular at multiple points
+      const pts = wire.points;
+      for (let si = 0; si < pts.length - 1; si++) {
+        const a = pts[si], b = pts[si+1];
+        const segLen = Math.hypot(b.x-a.x, b.y-a.y);
+        if (segLen < 20) continue;
+        const dx = (b.x-a.x)/segLen, dy = (b.y-a.y)/segLen;
+        const px = -dy, py = dx; // perpendicular
+        // Place ticks at 1/3 and 2/3 of segment
+        for (const frac of [0.35, 0.65]) {
+          const tx = a.x + dx*segLen*frac;
+          const ty = a.y + dy*segLen*frac;
+          const tickSize = 7/state.zoom;
+          const spacing = 3.5/state.zoom;
+          // center the group
+          const groupOffset = (adernN-1)*spacing/2;
+          for (let ti = 0; ti < adernN; ti++) {
+            const off = ti*spacing - groupOffset;
+            ctx.beginPath();
+            ctx.moveTo(tx + px*(tickSize) + dx*off, ty + py*(tickSize) + dy*off);
+            ctx.lineTo(tx - px*(tickSize) + dx*off, ty - py*(tickSize) + dy*off);
+            ctx.strokeStyle = isSel ? '#f5a623' : col;
+            ctx.lineWidth = 1.5/state.zoom;
+            ctx.setLineDash([]);
+            ctx.stroke();
+          }
+        }
+      }
+    }
 
     // Labels at midpoint
     const mid = wire.points[Math.floor(wire.points.length / 2)];
@@ -3053,19 +3407,28 @@ function drawWires() {
       ctx.fillStyle = col;
       ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+6/state.zoom);
     }
+    // Ader label
+    const adernLabel = wire.adernLabel || wt.adernLabel || '';
+    if (adernLabel) {
+      ctx.font = `bold ${8/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.fillStyle = wt.isErdung ? '#27ae60' : col;
+      ctx.fillText(adernLabel, mid.x+4/state.zoom, mid.y+16/state.zoom);
+    }
     if (wire.verlegeart) {
       const VLBL = {'UP':'UP','AP':'AP','HR':'Rohr','EZ':'Einz.','ER':'Erde','HD':'HD','FU':'FB','HW':'HW'};
       ctx.font = `${7/state.zoom}px IBM Plex Mono,monospace`;
       ctx.fillStyle = 'rgba(0,120,200,.85)';
       ctx.fillText(
         (VLBL[wire.verlegeart]||wire.verlegeart) + (wire.trasseHoehe?' '+wire.trasseHoehe+'cm':''),
-        mid.x+4/state.zoom, mid.y+14/state.zoom
+        mid.x+4/state.zoom, mid.y+24/state.zoom
       );
     }
 
+    ctx.restore();
+
     // ── Draggable points on selected wire ──
     if (isSel) {
-      const ptR = 7 / state.zoom;  // point radius
+      const ptR = 7 / state.zoom;
 
       // Draw segment midpoint hints (click to add point)
       for (let i = 0; i < wire.points.length - 1; i++) {
@@ -3103,11 +3466,9 @@ function drawWires() {
           ctx.fillStyle = '#f5a623';
           ctx.strokeStyle = 'white';
         } else if (pIdx === 0 || pIdx === wire.points.length-1) {
-          // Endpoints: filled circle
           ctx.fillStyle = '#f5a623';
           ctx.strokeStyle = 'rgba(0,0,0,0.3)';
         } else {
-          // Middle points: lighter
           ctx.fillStyle = 'rgba(245,166,35,0.7)';
           ctx.strokeStyle = 'rgba(0,0,0,0.2)';
         }
@@ -3115,14 +3476,12 @@ function drawWires() {
         ctx.lineWidth = 1.5/state.zoom;
         ctx.stroke();
 
-        // Point index label
         ctx.fillStyle = 'white';
         ctx.font = `bold ${7/state.zoom}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(pIdx+1, pt.x, pt.y + 2.5/state.zoom);
         ctx.textAlign = 'left';
 
-        // Delete button for middle points (right of point)
         if (pIdx > 0 && pIdx < wire.points.length-1 && isHov) {
           ctx.beginPath();
           ctx.arc(pt.x + 12/state.zoom, pt.y - 12/state.zoom, 5/state.zoom, 0, Math.PI*2);
@@ -3286,12 +3645,26 @@ function getSymbolCanvas(type, def, sz) {
   if (symCache[type]) return symCache[type];
   const oc = new OffscreenCanvas(sz, sz);
   const oc2 = oc.getContext('2d');
-  // Render SVG to canvas via Image
-  const blob = new Blob([`<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="color:${def.color}">${def.svg}</svg>`], {type:'image/svg+xml'});
-  const url = URL.createObjectURL(blob);
-  const img = new Image();
-  img.onload = () => { oc2.drawImage(img,0,0,sz,sz); URL.revokeObjectURL(url); };
-  img.src = url;
+
+  if (def.imgData) {
+    // Image-based custom symbol
+    const img = new Image();
+    img.onload = () => {
+      oc2.clearRect(0, 0, sz, sz);
+      const scale = Math.min(sz/img.width, sz/img.height);
+      const w2 = img.width*scale, h2 = img.height*scale;
+      oc2.drawImage(img, (sz-w2)/2, (sz-h2)/2, w2, h2);
+    };
+    img.src = def.imgData;
+  } else {
+    // SVG-based symbol
+    const blob = new Blob([`<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="color:${def.color}">${def.svg}</svg>`], {type:'image/svg+xml'});
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { oc2.drawImage(img,0,0,sz,sz); URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+
   symCache[type] = oc;
   return oc;
 }
@@ -3372,17 +3745,18 @@ function renderWireProps(wire) {
   if (!body) return;
   const col = getWireColor(wire);
   const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2'];
-  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 5×6','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8'];
+  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 3×2.5','NYY-J 3×6','NYY-J 5×2.5','NYY-J 5×6','NYY-J 5×10','H07V-K 1×6 grün-gelb','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8','NHXMH-J 3×1.5'];
   const verlegeArten = ['UP','AP','HR','EZ','ER','HD','FU','HW'];
   const verlegeNames = {'UP':'Unterputz','AP':'Aufputz','HR':'In Rohr','EZ':'Einziehen','ER':'Erdkabel','HD':'Hohldecke','FU':'Fußboden','HW':'Hohlwand'};
 
-  // Wire type options
   const wtOpts = Object.entries(WIRE_TYPES).map(([k,v]) =>
     `<option value="${k}" ${(wire.wireType||'strom')===k?'selected':''}>${v.label}</option>`
   ).join('');
   const phOpts = phases.map(p => `<option ${p===wire.phase?'selected':''}>${p}</option>`).join('');
   const kaOpts = kabels.map(k => `<option ${k===wire.kabel?'selected':''}>${k}</option>`).join('');
   const vlOpts = verlegeArten.map(v => `<option value="${v}" ${v===(wire.verlegeart||'UP')?'selected':''}>${v} — ${verlegeNames[v]||v}</option>`).join('');
+  const adernOpts = [['','Auto'],['3','3-adrig'],['5','5-adrig'],['1','1-adrig PE'],['2','2-adrig'],['4','4-adrig']].map(([v,l])=>
+    `<option value="${v}" ${String(wire.adern||'')===v?'selected':''}>${l}</option>`).join('');
 
   body.innerHTML = `
     <div class="pg">
@@ -3390,6 +3764,13 @@ function renderWireProps(wire) {
         <div style="width:20px;height:3px;background:${col};border-radius:2px"></div>
         Leitung ${esc(wire.circuit||'—')}
       </div>
+
+      <div class="rp-row"><label class="rp-lbl">Adern Anzahl</label>
+        <select class="rp-sel" onchange="updWireAdern('${wire.id}',this.value)">${adernOpts}</select></div>
+
+      <div class="rp-row"><label class="rp-lbl">Ader-Beschriftung</label>
+        <input class="rp-input" value="${esc(wire.adernLabel||WIRE_TYPES[wire.wireType||'strom']?.adernLabel||'')}" 
+          oninput="updWire('${wire.id}','adernLabel',this.value)" placeholder="z.B. 3-adrig, NYY-J 5A..."></div>
 
       <div class="rp-row"><label class="rp-lbl">Leitungstyp</label>
         <select class="rp-sel" onchange="updWire('${wire.id}','wireType',this.value)">${wtOpts}</select></div>
@@ -3650,109 +4031,184 @@ function renderStromkreise() {
 }
 
 // ═══════════════════════════════════════════════════
-//  STÜCKLISTE
+//  STÜCKLISTE — Enhanced v2
 // ═══════════════════════════════════════════════════
 function renderStueckliste() {
-  const body = document.getElementById('stBody');
-  // Group by type
-  const groups = {};
-  for (const s of state.symbols) {
-    const def = SYMBOLS[s.type]||{name:s.type, abbr:s.type};
-    const key = s.type + '_' + (s.circuit||'');
-    if (!groups[key]) groups[key] = { def, syms:[], type:s.type };
-    groups[key].syms.push(s);
-  }
-  let rows='', i=1, totalCable=0, totalCircuits=new Set();
-  // Build circuit → wire length map
+  const filterSK = document.getElementById('stFilterSK')?.value || '';
+
+  // ── Build data ──
   const circuitCableMap = {};
   for (const w of state.wires) {
-    const c = w.circuit;
-    if (c && w.laenge_m) {
-      circuitCableMap[c] = (circuitCableMap[c]||0) + parseFloat(w.laenge_m||0);
-    }
+    if (w.circuit && w.laenge_m) circuitCableMap[w.circuit] = (circuitCableMap[w.circuit]||0) + parseFloat(w.laenge_m||0);
   }
-
-  // Track symbols shown per circuit (to show cable once per circuit)
-  const circuitShown = {};
-
-  for (const [key, g] of Object.entries(groups)) {
-    for (const s of g.syms) {
-      const def=SYMBOLS[s.type]||{};
-      const ph=s.phase||'';
-      const phcol=ph.includes('L3')?'phase-l3':ph.startsWith('L2')?'phase-l2':'phase-l1';
-      if(s.circuit) totalCircuits.add(s.circuit);
-
-      // Cable length: from wires connected to this symbol
-      const symWires = state.wires.filter(w =>
-        w.srcId === s.id || w.dstId === s.id || w.circuit === s.circuit
-      );
-      const symCable = symWires.reduce((a,w) => a + parseFloat(w.laenge_m||0), 0);
-      const cableStr = symCable > 0 ? symCable.toFixed(1)+'m' :
-                       (s.circuit && circuitCableMap[s.circuit] ?
-                        circuitCableMap[s.circuit].toFixed(1)+'m' : '—');
-
-      // Installation info
-      const instInfo = [s.montage, s.hoehe!=null?s.hoehe+'cm':null].filter(Boolean).join('/');
-
-      rows+=`<tr>
-        <td class="mono">${i++}</td>
-        <td><svg viewBox="0 0 40 40" width="26" height="26" style="color:${def.color||'#666'};vertical-align:middle">${def.svg||''}</svg> <span style="font-size:10px">${def.abbr||s.type}</span></td>
-        <td>
-          <strong>${esc(s.label||def.name||'')}</strong>
-          ${instInfo?`<br><small style="color:#0077cc;font-family:var(--mono)">${instInfo}</small>`:''}
-          ${s.kommentar?`<br><small style="color:var(--tx3)">${esc(s.kommentar)}</small>`:''}
-        </td>
-        <td class="mono">${s.circuit||'—'}</td>
-        <td class="mono ${phcol}">${ph}</td>
-        <td class="mono" style="color:var(--ac)">${cableStr}</td>
-        <td class="mono">${s.count||1}</td>
-      </tr>`;
-    }
-  }
-  body.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Elemente platziert</td></tr>';
-
-  // Wire totals
+  const totalCircuits = new Set(state.symbols.map(s=>s.circuit).filter(Boolean));
   const wireTotal = state.wires.reduce((a,w)=>a+(parseFloat(w.laenge_m)||0),0);
-  const byKabel = {};
-  for (const w of state.wires) { byKabel[w.kabel]=(byKabel[w.kabel]||0)+(parseFloat(w.laenge_m)||0); }
-  const byType = {};
-  for (const s of state.symbols) { const n=SYMBOLS[s.type]?.name||s.type; byType[n]=(byType[n]||0)+(s.count||1); }
+  const verlegeArten_map = {}; // UP/AP/... → meters
+  for (const w of state.wires) {
+    const v = w.verlegeart||'—';
+    verlegeArten_map[v] = (verlegeArten_map[v]||0) + (parseFloat(w.laenge_m)||0);
+  }
+  const montageArten_map = {};
+  for (const s of state.symbols) {
+    const m = s.montage||'—';
+    montageArten_map[m] = (montageArten_map[m]||0) + (s.count||1);
+  }
 
+  // Update filter dropdown
+  const skSel = document.getElementById('stFilterSK');
+  if (skSel) {
+    const circuits = [...totalCircuits].sort();
+    const prev = skSel.value;
+    skSel.innerHTML = '<option value="">Alle Stromkreise</option>' +
+      circuits.map(c=>`<option value="${esc(c)}" ${c===prev?'selected':''}>${esc(c)}</option>`).join('');
+  }
 
-  // Add wires table below symbols
-  const wires_html = state.wires.length ? `
-    <div style="margin-top:16px;font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">⚡ Leitungen</div>
-    <table class="stbl">
-      <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabel</th><th>Verlegeart</th><th>Länge</th></tr></thead>
-      <tbody>
-        ${state.wires.map((w,wi) => `<tr>
-          <td class="mono">${wi+1}</td>
-          <td class="mono" style="color:var(--ac)">${w.circuit||'—'}</td>
-          <td style="font-size:10px">${(WIRE_TYPES[w.wireType]||{label:w.wireType||'Strom'}).label}</td>
-          <td class="mono">${w.phase||'L1'}</td>
-          <td style="font-size:10px;font-family:var(--mono)">${w.kabel||'—'}</td>
-          <td class="mono">${w.verlegeart||'—'}${w.trasseHoehe?' '+w.trasseHoehe+'cm':''}</td>
-          <td class="mono" style="color:var(--ac)">${w.laenge_m?w.laenge_m+'m':'—'}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>` : '';
-  document.getElementById('stWires').innerHTML = wires_html;
+  // ── Filter symbols/wires ──
+  const syms = filterSK ? state.symbols.filter(s=>s.circuit===filterSK) : state.symbols;
+  const wires = filterSK ? state.wires.filter(w=>w.circuit===filterSK) : state.wires;
+  const wireFilterTotal = wires.reduce((a,w)=>a+(parseFloat(w.laenge_m)||0),0);
 
-  document.getElementById('stSummary').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><div style="color:var(--tx3);font-size:9px;margin-bottom:4px">ELEMENTE GESAMT</div><div style="font-size:18px;color:var(--ac)">${state.symbols.length}</div></div>
-      <div><div style="color:var(--tx3);font-size:9px;margin-bottom:4px">STROMKREISE</div><div style="font-size:18px;color:var(--ac)">${totalCircuits.size}</div></div>
-      <div><div style="color:var(--tx3);font-size:9px;margin-bottom:4px">LEITUNGEN GESAMT</div><div style="font-size:18px;color:var(--bl)">${wireTotal>0?wireTotal.toFixed(1)+'m':'—'}</div></div>
-      <div><div style="color:var(--tx3);font-size:9px;margin-bottom:4px">KABELTYPEN</div><div style="font-size:18px;color:var(--bl)">${Object.keys(byKabel).length||'—'}</div></div>
-    </div>
-    ${Object.keys(byType).length?`<div style="margin-top:12px;border-top:1px solid var(--bd);padding-top:10px">
-      ${Object.entries(byType).map(([t,c])=>`<div class="rp-stat">${t}<span>${c}×</span></div>`).join('')}
-    </div>`:''}
-    ${Object.keys(byKabel).length?`<div style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px">
-      <div style="color:var(--tx3);font-size:9px;margin-bottom:4px">KABELLÄNGEN</div>
-      ${Object.entries(byKabel).map(([k,m])=>`<div class="rp-stat">${k}<span>${m.toFixed(1)}m</span></div>`).join('')}
-    </div>`:''}
-  `;
+  // ── KPI Cards ──
+  const kpiEl = document.getElementById('stKPI');
+  if (kpiEl) {
+    kpiEl.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-val">${syms.length}</div>
+        <div class="kpi-lbl">Geräte gesamt</div>
+        <div class="kpi-sub">${syms.reduce((a,s)=>a+(s.count||1),0)} Stück inkl. Anz.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:var(--bl)">${filterSK ? 1 : totalCircuits.size}</div>
+        <div class="kpi-lbl">Stromkreise (SK)</div>
+        <div class="kpi-sub">${wires.length} Leitungsabschnitte</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:var(--gr)">${wireFilterTotal>0?wireFilterTotal.toFixed(1):'—'}</div>
+        <div class="kpi-lbl">Kabellänge ∑ (m)</div>
+        <div class="kpi-sub">${Object.keys(filterSK?{}:verlegeArten_map).length||'—'} Verlegearten</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" style="color:var(--pu)">${Object.keys(verlegeArten_map).length||'—'}</div>
+        <div class="kpi-lbl">Verlegearten</div>
+        <div class="kpi-sub">${Object.keys(montageArten_map).length||'—'} Montagearten</div>
+      </div>
+    `;
+  }
+
+  // ── Geräte Tabelle ──
+  const body = document.getElementById('stBody');
+  let rows = '', i = 1;
+  const byType = {}, byKabel = {};
+
+  for (const s of syms) {
+    const def = SYMBOLS[s.type]||{};
+    const ph = s.phase||'';
+    const phcol = ph.includes('L3')?'phase-l3':ph.startsWith('L2')?'phase-l2':'phase-l1';
+    const symWires = wires.filter(w => w.srcId===s.id||w.dstId===s.id||w.circuit===s.circuit);
+    const symCable = symWires.reduce((a,w)=>a+parseFloat(w.laenge_m||0),0);
+    const cableStr = symCable>0 ? symCable.toFixed(1)+'m' : (s.circuit&&circuitCableMap[s.circuit]?circuitCableMap[s.circuit].toFixed(1)+'m':'—');
+    const n = def.name||s.type;
+    byType[n] = (byType[n]||0) + (s.count||1);
+
+    rows += `<tr>
+      <td class="mono">${i++}</td>
+      <td><svg viewBox="0 0 40 40" width="26" height="26" style="color:${def.color||'#666'};vertical-align:middle">${def.svg||''}</svg> <span style="font-size:10px">${def.abbr||s.type}</span></td>
+      <td><strong>${esc(s.label||def.name||'')}</strong>${s.kommentar?`<br><small style="color:var(--tx3)">${esc(s.kommentar)}</small>`:''}</td>
+      <td class="mono">${esc(s.circuit||'—')}</td>
+      <td class="mono ${phcol}">${ph||'—'}</td>
+      <td class="mono" style="color:#0077cc">${s.montage||'—'}</td>
+      <td class="mono">${s.hoehe!=null?s.hoehe+'cm':'—'}</td>
+      <td class="mono" style="color:var(--ac)">${cableStr}</td>
+      <td class="mono">${s.count||1}</td>
+    </tr>`;
+  }
+  body.innerHTML = rows || '<tr><td colspan="9" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Elemente platziert</td></tr>';
+
+  // ── Leitungen Tabelle ──
+  for (const w of wires) { byKabel[w.kabel||'—'] = (byKabel[w.kabel||'—']||0) + parseFloat(w.laenge_m||0); }
+
+  const stWiresEl = document.getElementById('stWires');
+  if (stWiresEl && wires.length) {
+    const wireRows = wires.map((w,wi) => `<tr>
+      <td class="mono">${wi+1}</td>
+      <td class="mono" style="color:var(--ac)">${esc(w.circuit||'—')}</td>
+      <td style="font-size:10px">${esc((WIRE_TYPES[w.wireType]||{label:w.wireType||'Strom'}).label)}</td>
+      <td class="mono">${w.phase||'L1'}</td>
+      <td style="font-size:10px;font-family:var(--mono)">${esc(w.kabel||'—')}</td>
+      <td class="mono">${esc(w.adernLabel||'')}</td>
+      <td class="mono">${esc(w.verlegeart||'—')}${w.trasseHoehe?' '+w.trasseHoehe+'cm':''}</td>
+      <td class="mono" style="color:var(--ac)">${w.laenge_m?w.laenge_m+'m':'—'}</td>
+    </tr>`).join('');
+    stWiresEl.innerHTML = `
+      <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">⚡ Leitungen</div>
+      <table class="stbl">
+        <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Länge</th></tr></thead>
+        <tbody>${wireRows}</tbody>
+        <tfoot><tr style="font-weight:700;background:var(--sf)">
+          <td colspan="7" style="text-align:right;padding:6px 10px;font-size:10px;color:var(--tx2)">GESAMT</td>
+          <td class="mono" style="color:var(--gr);padding:6px 10px">${wireFilterTotal.toFixed(1)}m</td>
+        </tr></tfoot>
+      </table>`;
+  } else if (stWiresEl) {
+    stWiresEl.innerHTML = '';
+  }
+
+  // ── Analyse ──
+  const anaEl = document.getElementById('stAnalysis');
+  if (anaEl && (Object.keys(verlegeArten_map).length || Object.keys(montageArten_map).length)) {
+    const maxV = Math.max(...Object.values(verlegeArten_map), 0.01);
+    const maxM = Math.max(...Object.values(montageArten_map), 0.01);
+    const VLBL = {'UP':'Unterputz','AP':'Aufputz','HR':'In Rohr','EZ':'Einziehen','ER':'Erdkabel','HD':'Hohldecke','FU':'Fußboden','HW':'Hohlwand'};
+    const anaColors = ['#f5a623','#58a6ff','#3fb950','#bc8cff','#ff5722','#9c27b0','#27ae60','#e74c3c'];
+
+    const verlegeBars = Object.entries(verlegeArten_map).map(([k,m],ci) => `
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+          <span style="color:var(--tx)">${VLBL[k]||k}</span>
+          <span style="font-family:var(--mono);color:${anaColors[ci%8]}">${m.toFixed(1)}m &nbsp;${wireFilterTotal>0?(m/wireFilterTotal*100).toFixed(0)+'%':''}</span>
+        </div>
+        <div class="ana-bar-bg"><div class="ana-bar" style="width:${(m/maxV*100).toFixed(0)}%;background:${anaColors[ci%8]}"></div></div>
+      </div>`).join('');
+
+    const montageBars = Object.entries(montageArten_map).map(([k,c],ci) => `
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+          <span style="color:var(--tx)">${VLBL[k]||k}</span>
+          <span style="font-family:var(--mono);color:${anaColors[ci%8]}">${c} Stk. &nbsp;${syms.length>0?(c/syms.length*100).toFixed(0)+'%':''}</span>
+        </div>
+        <div class="ana-bar-bg"><div class="ana-bar" style="width:${(c/maxM*100).toFixed(0)}%;background:${anaColors[ci%8]}"></div></div>
+      </div>`).join('');
+
+    anaEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">📊 Leitungsverlegung</div>
+          ${verlegeBars||'<div style="color:var(--tx3);font-size:11px">Keine Leitungen</div>'}
+        </div>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">📊 Gerätmontage</div>
+          ${montageBars||'<div style="color:var(--tx3);font-size:11px">Keine Geräte</div>'}
+        </div>
+      </div>`;
+  } else if (anaEl) {
+    anaEl.innerHTML = '';
+  }
+
+  // ── Zusammenfassung ──
+  const sumEl = document.getElementById('stSummary');
+  if (sumEl) {
+    const typeRows = Object.entries(byType).map(([t,c])=>`<div class="rp-stat">${esc(t)}<span>${c}×</span></div>`).join('');
+    const kabelRows = Object.entries(byKabel).map(([k,m])=>`<div class="rp-stat">${esc(k)}<span>${m.toFixed(1)}m</span></div>`).join('');
+    sumEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${typeRows ? `<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geräte nach Typ</div>
+          <div style="font-family:var(--mono);font-size:11px">${typeRows}</div></div>` : ''}
+        ${kabelRows ? `<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Kabel nach Typ</div>
+          <div style="font-family:var(--mono);font-size:11px">${kabelRows}</div></div>` : ''}
+      </div>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -3940,138 +4396,379 @@ function loadFromFile(e) {
   };r.readAsText(f);e.target.value='';
 }
 function exportCSV() {
-  let csv='Nr;Symbol;Bezeichnung;Stromkreis;Phase;Nennstrom;Kabeltyp;Kabellänge(m);X(m);Y(m);Kommentar\n';
-  state.symbols.forEach((s,i)=>{
-    const def=SYMBOLS[s.type]||{name:s.type};
-    const xm=state.scale?(s.x/state.scale).toFixed(2):'';
-    const ym=state.scale?(s.y/state.scale).toFixed(2):'';
-    csv+=`${i+1};"${def.name||s.type}";"${s.label||''}";"${s.circuit||''}";"${s.phase||''}";"${s.nennstrom||''}";"${s.kabel||''}";"${s.cable_m||''}";"${xm}";"${ym}";"${s.kommentar||''}"\n`;
+  const pn = document.getElementById('projName').value || 'Elektroplan';
+  const pd = projData;
+  const sep = ';';
+  let csv = '';
+
+  // ── Header / Projektdaten ──
+  csv += `ELEKTRO-GRUNDRISS STÜCKLISTE${sep}${sep}${sep}${sep}\n`;
+  csv += `Projekt${sep}${esc(pn)}${sep}${sep}${sep}\n`;
+  csv += `Kunde${sep}${esc(pd.kundenname||'')}${sep}${esc(pd.firma||'')}${sep}${sep}\n`;
+  csv += `Adresse${sep}${esc(pd.strasse||'')}${sep}${esc(pd.ort||'')}${sep}${sep}\n`;
+  csv += `Auftraggeber${sep}${esc(pd.auftraggeber||'')}${sep}Auftrag-Nr${sep}${esc(pd.auftragsnr||'')}${sep}\n`;
+  csv += `Planer${sep}${esc(pd.planer||'')}${sep}Datum${sep}${pd.datum||''}${sep}\n`;
+  csv += `\n`;
+
+  // ── 1: Geräte ──
+  csv += `GERÄTE${sep}${sep}${sep}${sep}${sep}${sep}${sep}${sep}${sep}\n`;
+  csv += `Nr${sep}Symbol${sep}Bezeichnung${sep}Stromkreis${sep}Phase${sep}Nennstrom(A)${sep}Kabeltyp${sep}Montageart${sep}Höhe(cm)${sep}Kabellänge(m)${sep}Anzahl${sep}Kommentar\n`;
+  const circuitCableMap = {};
+  for (const w of state.wires) { if(w.circuit&&w.laenge_m) circuitCableMap[w.circuit]=(circuitCableMap[w.circuit]||0)+parseFloat(w.laenge_m||0); }
+  state.symbols.forEach((s,i) => {
+    const def = SYMBOLS[s.type]||{name:s.type};
+    const symWires = state.wires.filter(w=>w.srcId===s.id||w.dstId===s.id||w.circuit===s.circuit);
+    const symCable = symWires.reduce((a,w)=>a+parseFloat(w.laenge_m||0),0);
+    const cableM = symCable>0?symCable.toFixed(1):(s.circuit&&circuitCableMap[s.circuit]?circuitCableMap[s.circuit].toFixed(1):'');
+    csv += `${i+1}${sep}"${def.name||s.type}"${sep}"${s.label||''}"${sep}"${s.circuit||''}"${sep}"${s.phase||''}"${sep}${s.nennstrom||16}${sep}"${s.kabel||''}"${sep}"${s.montage||''}"${sep}${s.hoehe!=null?s.hoehe:''}${sep}${cableM}${sep}${s.count||1}${sep}"${s.kommentar||''}"\n`;
   });
-  // Wire section
-  csv+='\n\nLEITUNGEN\nNr;Stromkreis;Phase;Kabeltyp;Länge(m)\n';
-  state.wires.forEach((w,i)=>{
-    csv+=`${i+1};"${w.circuit||''}";"${w.phase||''}";"${w.kabel||''}";"${w.laenge_m||''}"\n`;
+
+  // ── 2: Leitungen ──
+  csv += `\nLEITUNGEN${sep}${sep}${sep}${sep}${sep}${sep}${sep}${sep}\n`;
+  csv += `Nr${sep}Stromkreis${sep}Leitungstyp${sep}Phase${sep}Kabeltyp${sep}Adern${sep}Beschriftung${sep}Verlegeart${sep}Trassenhöhe(cm)${sep}Länge(m)\n`;
+  let wireSum = 0;
+  state.wires.forEach((w,i) => {
+    const m = parseFloat(w.laenge_m||0); wireSum += m;
+    csv += `${i+1}${sep}"${w.circuit||''}"${sep}"${(WIRE_TYPES[w.wireType]||{label:w.wireType||''}).label}"${sep}"${w.phase||''}"${sep}"${w.kabel||''}"${sep}${w.adern||''}${sep}"${w.adernLabel||''}"${sep}"${w.verlegeart||''}"${sep}${w.trasseHoehe||''}${sep}${w.laenge_m||''}\n`;
   });
-  const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download=(document.getElementById('projName').value||'grundriss')+'_stueckliste.csv';a.click();
+  csv += `${sep}${sep}${sep}${sep}${sep}${sep}${sep}GESAMT${sep}${sep}${wireSum.toFixed(1)}\n`;
+
+  // ── 3: Verlegungsarten-Analyse ──
+  csv += `\nVERLEGUNGSARTEN-ANALYSE${sep}${sep}${sep}\n`;
+  csv += `Verlegeart${sep}Länge(m)${sep}Anteil(%)\n`;
+  const verlegeMap = {};
+  for (const w of state.wires) { const v=w.verlegeart||'—'; verlegeMap[v]=(verlegeMap[v]||0)+parseFloat(w.laenge_m||0); }
+  Object.entries(verlegeMap).forEach(([k,m]) => { csv += `"${k}"${sep}${m.toFixed(1)}${sep}${wireSum>0?(m/wireSum*100).toFixed(1):'—'}\n`; });
+  csv += `\nGERÄTMONTAGE${sep}${sep}\n`;
+  csv += `Montageart${sep}Stück${sep}Anteil(%)\n`;
+  const montageMap = {}; let totalSym = 0;
+  for (const s of state.symbols) { const m=s.montage||'—'; montageMap[m]=(montageMap[m]||0)+(s.count||1); totalSym+=(s.count||1); }
+  Object.entries(montageMap).forEach(([k,c]) => { csv += `"${k}"${sep}${c}${sep}${totalSym>0?(c/totalSym*100).toFixed(1):'—'}\n`; });
+
+  // ── 4: Kabel-Zusammenfassung ──
+  csv += `\nKABEL-ZUSAMMENFASSUNG${sep}${sep}\n`;
+  csv += `Kabeltyp${sep}Länge(m)\n`;
+  const byKabel = {};
+  for (const w of state.wires) { byKabel[w.kabel||'—']=(byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
+  Object.entries(byKabel).forEach(([k,m]) => { csv += `"${k}"${sep}${m.toFixed(1)}\n`; });
+
+  const b = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = (pn||'grundriss').replace(/\s+/g,'_') + '_stueckliste.csv';
+  a.click();
+  setStatus('✅ CSV exportiert — 4 Abschnitte: Geräte · Leitungen · Verlegung · Kabel');
 }
-function exportPDF() {
-  const pn=document.getElementById('projName').value;
+// ═══════════════════════════════════════════════════
+//  PROJEKTDATEN
+// ═══════════════════════════════════════════════════
+let projData = {};
+
+function showProjDataModal() {
+  // Pre-fill
+  document.getElementById('pd-kundenname').value = projData.kundenname||'';
+  document.getElementById('pd-firma').value = projData.firma||'';
+  document.getElementById('pd-telefon').value = projData.telefon||'';
+  document.getElementById('pd-email').value = projData.email||'';
+  document.getElementById('pd-strasse').value = projData.strasse||'';
+  document.getElementById('pd-ort').value = projData.ort||'';
+  document.getElementById('pd-etage').value = projData.etage||'';
+  document.getElementById('pd-gebaeude').value = projData.gebaeude||'Einfamilienhaus';
+  document.getElementById('pd-auftragsnr').value = projData.auftragsnr||'';
+  document.getElementById('pd-auftraggeber').value = projData.auftraggeber||'';
+  document.getElementById('pd-planer').value = projData.planer||'';
+  document.getElementById('pd-datum').value = projData.datum||new Date().toISOString().split('T')[0];
+  document.getElementById('pd-ausfuehrung').value = projData.ausfuehrung||'';
+  document.getElementById('pd-gewerk').value = projData.gewerk||'Elektroinstallation';
+  document.getElementById('pd-notizen').value = projData.notizen||'';
+  document.getElementById('projDataModal').classList.remove('hid');
+}
+
+function saveProjData() {
+  projData = {
+    kundenname: document.getElementById('pd-kundenname').value,
+    firma: document.getElementById('pd-firma').value,
+    telefon: document.getElementById('pd-telefon').value,
+    email: document.getElementById('pd-email').value,
+    strasse: document.getElementById('pd-strasse').value,
+    ort: document.getElementById('pd-ort').value,
+    etage: document.getElementById('pd-etage').value,
+    gebaeude: document.getElementById('pd-gebaeude').value,
+    auftragsnr: document.getElementById('pd-auftragsnr').value,
+    auftraggeber: document.getElementById('pd-auftraggeber').value,
+    planer: document.getElementById('pd-planer').value,
+    datum: document.getElementById('pd-datum').value,
+    ausfuehrung: document.getElementById('pd-ausfuehrung').value,
+    gewerk: document.getElementById('pd-gewerk').value,
+    notizen: document.getElementById('pd-notizen').value,
+  };
+  document.getElementById('projDataModal').classList.add('hid');
+  setStatus('✅ Projektdaten gespeichert');
+}
+
+// ═══════════════════════════════════════════════════
+//  PDF EXPORT mit Grundriss + Projektdaten
+// ═══════════════════════════════════════════════════
+function exportFloorplanPDF() {
+  const pn = document.getElementById('projName').value;
+  const pd = projData;
+  
+  // Export canvas as image
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = canvas.width;
+  exportCanvas.height = canvas.height;
+  const ectx = exportCanvas.getContext('2d');
+  // White background
+  ectx.fillStyle = 'white';
+  ectx.fillRect(0,0,exportCanvas.width, exportCanvas.height);
+  ectx.drawImage(canvas, 0, 0);
+  const imgData = exportCanvas.toDataURL('image/png');
+
   renderStueckliste();
   setTimeout(()=>{
-    const tbl=document.getElementById('stBody')?.parentElement?.outerHTML||'';
-    const w=window.open('','_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>${pn} — Stückliste</title>
-    <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:5px 8px;}th{background:#f0f0f0;}
-  /* ── SYMBOL MANAGER ── */
-  .sym-mgr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-bottom:12px; }
-  .sym-mgr-card {
-    background:var(--sf2); border:1px solid var(--bd); border-radius:6px;
-    padding:8px 6px; display:flex; flex-direction:column; align-items:center; gap:5px;
-    position:relative; cursor:default;
-  }
-  .sym-mgr-card:hover { border-color:var(--bd2); }
-  .sym-mgr-card img, .sym-mgr-card svg { width:40px; height:40px; object-fit:contain; }
-  .sym-mgr-card .sm-name { font-size:9px; color:var(--tx2); text-align:center; line-height:1.3; }
-  .sym-mgr-card .sm-abbr { font-family:var(--mono); font-size:8px; color:var(--ac); font-weight:700; }
-  .sym-mgr-card .sm-del {
-    position:absolute; top:3px; right:3px; width:16px; height:16px;
-    background:var(--rd); border:none; border-radius:3px; cursor:pointer;
-    color:white; font-size:9px; display:flex; align-items:center; justify-content:center;
-    opacity:0; transition:opacity .15s;
-  }
-  .sym-mgr-card:hover .sm-del { opacity:1; }
-  .sym-mgr-card .sm-edit {
-    position:absolute; top:3px; left:3px; width:16px; height:16px;
-    background:var(--bl); border:none; border-radius:3px; cursor:pointer;
-    color:white; font-size:9px; display:flex; align-items:center; justify-content:center;
-    opacity:0; transition:opacity .15s;
-  }
-  .sym-mgr-card:hover .sm-edit { opacity:1; }
-  .upload-sym-zone {
-    border:2px dashed var(--bd2); border-radius:8px; padding:20px;
-    text-align:center; cursor:pointer; transition:all .2s;
-    background:var(--sf2);
-  }
-  .upload-sym-zone:hover, .upload-sym-zone.drag-over { border-color:var(--ac); background:rgba(245,166,35,.05); }
-  .sym-edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-  .cat-section { margin-bottom:16px; }
-  .cat-section-hdr {
-    font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
-    letter-spacing:.7px; padding:6px 0 4px; border-bottom:1px solid var(--bd);
-    margin-bottom:8px; display:flex; align-items:center; gap:8px;
-  }
-  .cat-badge { background:rgba(245,166,35,.15); border:1px solid rgba(245,166,35,.3);
-    border-radius:10px; font-size:9px; padding:1px 7px; color:var(--ac); font-family:var(--mono); }
-
-
-  /* ── FIREBASE LOGIN ── */
-  .fb-login-bar {
-    background: var(--sf); border-bottom: 1px solid var(--bd);
-    padding: 5px 14px; display: flex; align-items: center; gap: 10px;
-    flex-shrink: 0; font-size: 11px;
-  }
-  .fb-user { display:flex; align-items:center; gap:7px; color:var(--tx2); }
-  .fb-user img { width:22px; height:22px; border-radius:50%; border:1px solid var(--bd2); }
-  .fb-user strong { color:var(--tx); font-size:11px; }
-  .fb-status { font-family:var(--mono); font-size:10px; }
-  .fb-dot { width:6px; height:6px; border-radius:50%; display:inline-block; margin-right:4px; }
-  .fb-dot.online { background:var(--gr); }
-  .fb-dot.offline { background:var(--rd); }
-  .fb-dot.syncing { background:var(--yl); animation: fbpulse .8s infinite; }
-  @keyframes fbpulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .proj-list-item {
-    background:var(--sf2); border:1px solid var(--bd); border-radius:6px;
-    padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:all .15s;
-    display:flex; align-items:center; gap:12px;
-  }
-  .proj-list-item:hover { border-color:var(--ac); }
-  .proj-list-item .pi-icon { font-size:22px; }
-  .proj-list-item .pi-name { font-size:13px; font-weight:600; }
-  .proj-list-item .pi-meta { font-size:10px; color:var(--tx3); font-family:var(--mono); }
-  .proj-list-item .pi-del { margin-left:auto; width:26px; height:26px; background:transparent;
-    border:1px solid transparent; border-radius:4px; cursor:pointer; color:var(--tx3); font-size:14px;
-    display:flex; align-items:center; justify-content:center; transition:all .15s; }
-  .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
-
-
-  .type-sat_dose .ico, .type-sat_dose_2 .ico, .type-koax_dose .ico,
-  .type-multimedia_dose .ico, .type-hdmi_dose .ico
-    { background:rgba(21,101,192,.2); color:#1565c0; font-family:var(--mono); font-weight:700; font-size:7px; }
-  .type-lan_dose .ico, .type-lan_dose_doppelt .ico, .type-telefon_dose .ico
-    { background:rgba(106,27,154,.2); color:#6a1b9a; font-family:var(--mono); font-weight:700; font-size:8px; }
-
-
-  /* ── INSTALLATION MODAL ── */
-  .inst-modal { width:460px; max-width:96vw; }
-  .inst-sec { margin-bottom:13px; }
-  .inst-sec-ttl { font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
-    letter-spacing:.7px; margin-bottom:7px; padding-bottom:3px; border-bottom:1px solid var(--bd); }
-  .inst-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-  .inst-card { background:var(--sf2); border:2px solid var(--bd); border-radius:6px;
-    padding:7px 9px; cursor:pointer; transition:all .15s;
-    display:flex; align-items:center; gap:7px; font-size:11px; }
-  .inst-card:hover { border-color:var(--ac); color:var(--ac); }
-  .inst-card.selected { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
-  .inst-card .ic-i { font-size:17px; flex-shrink:0; width:22px; text-align:center; }
-  .inst-card .ic-n { font-weight:600; font-size:11px; line-height:1.2; }
-  .inst-card .ic-s { font-size:9px; color:var(--tx3); }
-  .inst-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
-  .inst-row label { font-size:10px; color:var(--tx2); min-width:110px; flex-shrink:0; }
-  .inst-hint { font-size:9px; color:var(--tx3); margin-top:3px; line-height:1.4; }
-  .wire-info { background:var(--sf2); border:1px solid var(--bd); border-radius:5px;
-    padding:7px 10px; margin-bottom:10px; font-size:11px; color:var(--tx2); }
-  .wire-info strong { color:var(--tx); }
-
-</style>
-    
-</head><body><h2>${pn} — Stückliste Elektroinstallation</h2><p>Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>${tbl}
-    <script>window.print();window.close();<\/script></body></html>`);
+    const tbl = document.getElementById('stBody')?.parentElement?.outerHTML||'';
+    const w = window.open('','_blank');
+    const heute = new Date().toLocaleDateString('de-DE');
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+    <title>${pn} — Elektroplan</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0}
+      .page{padding:20mm 15mm;min-height:297mm;}
+      .header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:14px;display:flex;gap:20px}
+      .hdr-logo{font-size:18px;font-weight:700;color:#f5a623}
+      .hdr-info{flex:1}
+      .hdr-info h1{font-size:16px;margin:0 0 4px}
+      .hdr-info p{font-size:11px;color:#555;margin:0}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;border:1px solid #ddd;border-radius:4px;padding:10px}
+      .info-sec h3{font-size:10px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px}
+      .info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:3px 0;font-size:10px}
+      .info-row strong{color:#333}
+      .plan-img{width:100%;border:1px solid #ccc;border-radius:4px;margin-bottom:14px}
+      table{width:100%;border-collapse:collapse;font-size:10px}
+      th{background:#f5a623;color:white;padding:5px 8px;text-align:left}
+      td{border:1px solid #ddd;padding:4px 7px}
+      tr:nth-child(even)td{background:#fafafa}
+      .footer{border-top:1px solid #ddd;margin-top:16px;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}
+      @media print{.page{padding:10mm}}
+    </style>
+    </head><body>
+    <div class="page">
+      <div class="header">
+        <div class="hdr-logo">⚡ Elektroplan</div>
+        <div class="hdr-info">
+          <h1>${pn}</h1>
+          <p>Gewerk: ${pd.gewerk||'Elektroinstallation'} &nbsp;|&nbsp; Erstellt: ${heute} &nbsp;|&nbsp; Auftrag: ${pd.auftragsnr||'—'}</p>
+        </div>
+      </div>
+      <div class="info-grid">
+        <div class="info-sec">
+          <h3>👤 Kundendaten</h3>
+          <div class="info-row"><span>Name:</span><strong>${pd.kundenname||'—'}</strong></div>
+          <div class="info-row"><span>Firma:</span><strong>${pd.firma||'—'}</strong></div>
+          <div class="info-row"><span>Telefon:</span><strong>${pd.telefon||'—'}</strong></div>
+          <div class="info-row"><span>E-Mail:</span><strong>${pd.email||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>📍 Projektadresse</h3>
+          <div class="info-row"><span>Straße:</span><strong>${pd.strasse||'—'}</strong></div>
+          <div class="info-row"><span>Ort:</span><strong>${pd.ort||'—'}</strong></div>
+          <div class="info-row"><span>Etage:</span><strong>${pd.etage||'—'}</strong></div>
+          <div class="info-row"><span>Gebäudetyp:</span><strong>${pd.gebaeude||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>🏗 Auftragsdaten</h3>
+          <div class="info-row"><span>Auftragsnummer:</span><strong>${pd.auftragsnr||'—'}</strong></div>
+          <div class="info-row"><span>Auftraggeber:</span><strong>${pd.auftraggeber||'—'}</strong></div>
+          <div class="info-row"><span>Erstellt von:</span><strong>${pd.planer||'—'}</strong></div>
+          <div class="info-row"><span>Ausführung:</span><strong>${pd.ausfuehrung||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>📝 Notizen</h3>
+          <div style="font-size:10px;color:#555;line-height:1.4">${(pd.notizen||'Keine Bemerkungen').replace(/\n/g,'<br>')}</div>
+        </div>
+      </div>
+      <h3 style="font-size:12px;margin:0 0 6px;color:#555">Grundrissplan</h3>
+      <img src="${imgData}" class="plan-img">
+      <h3 style="font-size:12px;margin:14px 0 6px;color:#555">📦 Stückliste Elektroinstallation</h3>
+      ${tbl}
+      <div class="footer">
+        <span>⚡ Elektro-Grundriss Planer — Anvolt GmbH</span>
+        <span>Dokument: ${pn} &nbsp;|&nbsp; Seite 1</span>
+        <span>Erstellt: ${heute}</span>
+      </div>
+    </div>
+    <\x73cript>window.print();<\/script>
+    </body></html>`);
     w.document.close();
-  },100);
+  },200);
 }
-function printSt() { exportPDF(); }
+
+// ═══════════════════════════════════════════════════
+//  XML EXPORT
+// ═══════════════════════════════════════════════════
+function exportXML() {
+  const pn = document.getElementById('projName').value;
+  const pd = projData;
+  const heute = new Date().toISOString();
+  
+  const escX = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ElektroGrundriss xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.0" erstellt="${heute}">
+  <Projekt>
+    <Name>${escX(pn)}</Name>
+    <Auftragsnummer>${escX(pd.auftragsnr)}</Auftragsnummer>
+    <Auftraggeber>${escX(pd.auftraggeber)}</Auftraggeber>
+    <Planer>${escX(pd.planer)}</Planer>
+    <Datum>${escX(pd.datum)}</Datum>
+    <Ausfuehrungsdatum>${escX(pd.ausfuehrung)}</Ausfuehrungsdatum>
+    <Gewerk>${escX(pd.gewerk)}</Gewerk>
+  </Projekt>
+  <Kundendaten>
+    <Kundenname>${escX(pd.kundenname)}</Kundenname>
+    <Firma>${escX(pd.firma)}</Firma>
+    <Telefon>${escX(pd.telefon)}</Telefon>
+    <Email>${escX(pd.email)}</Email>
+  </Kundendaten>
+  <Projektadresse>
+    <Strasse>${escX(pd.strasse)}</Strasse>
+    <OrtPLZ>${escX(pd.ort)}</OrtPLZ>
+    <Etage>${escX(pd.etage)}</Etage>
+    <Gebaeudetyp>${escX(pd.gebaeude)}</Gebaeudetyp>
+  </Projektadresse>
+  <Massstab>${state.scale ? (1/state.scale*100).toFixed(2)+'cm_pro_px' : 'nicht_kalibriert'}</Massstab>
+  <Symbole count="${state.symbols.length}">
+`;
+  for (const s of state.symbols) {
+    const def = SYMBOLS[s.type]||{};
+    xml += `    <Symbol id="${escX(s.id)}" typ="${escX(s.type)}" kategorie="${escX(def.cat||'')}">
+      <Bezeichnung>${escX(s.label)}</Bezeichnung>
+      <Position x="${Math.round(s.x)}" y="${Math.round(s.y)}"/>
+      ${state.scale ? `<PositionReal x="${(s.x/state.scale).toFixed(3)}m" y="${(s.y/state.scale).toFixed(3)}m"/>` : ''}
+      <Drehung>${s.rotation||0}</Drehung>
+      <Stromkreis>${escX(s.circuit)}</Stromkreis>
+      <Phase>${escX(s.phase)}</Phase>
+      <Nennstrom>${s.nennstrom||16}</Nennstrom>
+      <Kabeltyp>${escX(s.kabel)}</Kabeltyp>
+      <Montageart>${escX(s.montage)}</Montageart>
+      <MontagehoeheCM>${s.hoehe||0}</MontagehoeheCM>
+      <Anzahl>${s.count||1}</Anzahl>
+      <Kommentar>${escX(s.kommentar)}</Kommentar>
+    </Symbol>
+`;
+  }
+  xml += `  </Symbole>
+  <Leitungen count="${state.wires.length}">
+`;
+  for (const w of state.wires) {
+    const pts = w.points.map(p => `<Punkt x="${Math.round(p.x)}" y="${Math.round(p.y)}"/>`).join('');
+    xml += `    <Leitung id="${escX(w.id)}" typ="${escX(w.wireType)}">
+      <Stromkreis>${escX(w.circuit)}</Stromkreis>
+      <Phase>${escX(w.phase)}</Phase>
+      <Kabeltyp>${escX(w.kabel)}</Kabeltyp>
+      <Adernzahl>${w.adern||''}</Adernzahl>
+      <Beschriftung>${escX(w.adernLabel)}</Beschriftung>
+      <LaengeM>${w.laenge_m||0}</LaengeM>
+      <Verlegeart>${escX(w.verlegeart)}</Verlegeart>
+      <TrassehoeheCM>${w.trasseHoehe||0}</TrassehoeheCM>
+      <Punkte count="${w.points.length}">${pts}</Punkte>
+      <Von>${escX(w.srcId)}</Von>
+      <Nach>${escX(w.dstId)}</Nach>
+    </Leitung>
+`;
+  }
+  xml += `  </Leitungen>
+</ElektroGrundriss>`;
+
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (pn||'elektroplan').replace(/\s+/g,'_') + '_' + new Date().toISOString().split('T')[0] + '.xml';
+  a.click();
+  setStatus('✅ XML exportiert: ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen');
+}
+
+// ═══════════════════════════════════════════════════
+//  KI ASSISTENT (Gemini)
+// ═══════════════════════════════════════════════════
+function showAI() {
+  document.getElementById('aiModal').classList.remove('hid');
+}
+
+async function sendAI() {
+  const input = document.getElementById('aiInput');
+  const chat = document.getElementById('aiChat');
+  const key = document.getElementById('geminiKey').value.trim();
+  const msg = input.value.trim();
+  if (!msg) return;
+  if (!key) {
+    chat.innerHTML += `<div style="background:rgba(248,81,73,.15);border:1px solid var(--rd);border-radius:6px;padding:8px;font-size:11px;color:var(--rd)">
+      ⚠️ Bitte zuerst einen <strong>Gemini API-Key</strong> eingeben. Kostenlos holen unter: 
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--bl)">aistudio.google.com</a>
+    </div>`;
+    chat.scrollTop = chat.scrollHeight;
+    return;
+  }
+
+  // Add user message
+  chat.innerHTML += `<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:8px;font-size:11px;text-align:right">
+    <strong style="color:var(--ac)">👤 Du</strong><br>${esc(msg)}</div>`;
+  input.value = '';
+  
+  // Loading indicator
+  const loadId = 'ai-load-' + Date.now();
+  chat.innerHTML += `<div id="${loadId}" style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx3)">
+    <strong style="color:var(--pu)">🤖 KI denkt nach...</strong><br><span>⏳</span></div>`;
+  chat.scrollTop = chat.scrollHeight;
+
+  // Context from current project
+  const ctx2 = `Du bist ein erfahrener Elektroingenieur und Planungsassistent. Du hilfst bei DIN 18015 Elektroplanung, Schaltplanung, Kabelberechnungen und deutschen Normen. 
+Aktuelles Projekt: "${document.getElementById('projName').value}", ${state.symbols.length} Symbole, ${state.wires.length} Leitungen platziert.
+Antworte immer auf Deutsch, präzise und praxisbezogen.`;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: ctx2 }] },
+        contents: [{ role: 'user', parts: [{ text: msg }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+      })
+    });
+    
+    const data = await response.json();
+    const candidates = data.candidates;
+    const aiMsg = (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0]) ? candidates[0].content.parts[0].text : 'Keine Antwort erhalten.';
+    const err = data.error ? data.error.message : null;
+    
+    document.getElementById(loadId)?.remove();
+    chat.innerHTML += `<div style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:10px;font-size:11px">
+      <strong style="color:var(--pu)">🤖 KI-Assistent</strong><br>
+      <div style="margin-top:4px;line-height:1.6;white-space:pre-wrap">${esc(err||aiMsg)}</div></div>`;
+    
+    if (err) setStatus('❌ Gemini Fehler: ' + err.substring(0,60));
+  } catch(e) {
+    document.getElementById(loadId)?.remove();
+    chat.innerHTML += `<div style="background:rgba(248,81,73,.15);border-radius:6px;padding:8px;font-size:11px;color:var(--rd)">
+      ❌ Verbindungsfehler: ${esc(e.message)}</div>`;
+  }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════
+//  HELPER: Update wire adern
+// ═══════════════════════════════════════════════════
+function updWireAdern(id, val) {
+  const wire = state.wires.find(w => w.id === id);
+  if (!wire) return;
+  wire.adern = val ? parseInt(val) : null;
+  const wt = WIRE_TYPES[wire.wireType] || WIRE_TYPES.strom;
+  if (!wire.adernLabel) wire.adernLabel = wt.adernLabel || '';
+  render();
+  renderWireProps(wire);
+}
+function printSt() { exportFloorplanPDF(); }
 
 // ═══════════════════════════════════════════════════
 //  HELPERS
