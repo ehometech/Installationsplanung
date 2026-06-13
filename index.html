@@ -2562,7 +2562,7 @@ window.addEventListener('load', () => {
   resizeCanvas();
   loadCustomSymbols();
   buildPalette();
-  initFirebase();
+  setTimeout(initFirebase, 200);
   setupEvents();
   initSymUploadZone();
   render();
