@@ -251,7 +251,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -2562,7 +2561,7 @@ window.addEventListener('load', () => {
   resizeCanvas();
   loadCustomSymbols();
   buildPalette();
-  setTimeout(initFirebase, 200);
+  initFirebase();
   setupEvents();
   initSymUploadZone();
   render();
@@ -4297,52 +4296,68 @@ function setTool(t) {
 function loadFloorplan(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const isPDF = file.type==='application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  if (isPDF) {
+
+  // ── PDF via PDF.js ──
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
     if (typeof pdfjsLib === 'undefined') {
-      setStatus('PDF.js lädt noch, bitte kurz warten...','var(--yl)');
-      setTimeout(()=>{ if(typeof pdfjsLib!=='undefined') loadFloorplan(e); },1500);
+      setStatus('PDF.js nicht verfuegbar — bitte Seite neu laden');
       return;
     }
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const url=URL.createObjectURL(file);
-    setStatus('📄 PDF wird gerendert...');
-    pdfjsLib.getDocument(url).promise.then(pdf=>{
-      pdf.getPage(1).then(page=>{
-        const vp=page.getViewport({scale:3.0});
-        const oc=document.createElement('canvas');
-        oc.width=vp.width; oc.height=vp.height;
-        page.render({canvasContext:oc.getContext('2d'),viewport:vp}).promise.then(()=>{
-          URL.revokeObjectURL(url);
-          const img=new Image();
-          img.onload=()=>{
-            state.bgImage=img;
-            state.pan={x:0,y:0};
-            state.zoom=Math.min(canvas.width/img.width,canvas.height/img.height)*0.95;
-            document.getElementById('uploadZone').style.display='none';
+    const url = URL.createObjectURL(file);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    setStatus('PDF wird geladen...');
+    pdfjsLib.getDocument(url).promise.then(function(pdf) {
+      pdf.getPage(1).then(function(page) {
+        const viewport = page.getViewport({ scale: 2.0 });
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = viewport.width;
+        offCanvas.height = viewport.height;
+        const ctx2 = offCanvas.getContext('2d');
+        page.render({ canvasContext: ctx2, viewport }).promise.then(function() {
+          const img = new Image();
+          img.onload = function() {
+            state.floorplan = { img, w: img.width, h: img.height };
+            document.getElementById('uploadZone').style.display = 'none';
+            const scaleX = canvas.width / img.width * 0.9;
+            const scaleY = canvas.height / img.height * 0.9;
+            state.zoom = Math.min(scaleX, scaleY);
+            state.pan.x = (canvas.width - img.width * state.zoom) / 2;
+            state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+            document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
             render();
-            setStatus('✅ PDF geladen: '+file.name+' ('+pdf.numPages+' Seiten)');
+            setStatus('PDF geladen (' + pdf.numPages + ' Seiten) — Bitte Massstab kalibrieren!');
+            URL.revokeObjectURL(url);
           };
-          img.src=oc.toDataURL('image/png');
+          img.src = offCanvas.toDataURL('image/png');
         });
       });
-    }).catch(err=>{ setStatus('❌ PDF Fehler: '+err.message,'var(--rd)'); URL.revokeObjectURL(url); });
-  } else {
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const img=new Image();
-      img.onload=()=>{
-        state.bgImage=img;
-        state.pan={x:0,y:0};
-        state.zoom=Math.min(canvas.width/img.width,canvas.height/img.height)*0.95;
-        document.getElementById('uploadZone').style.display='none';
-        render();
-        setStatus('✅ Grundriss geladen: '+file.name);
-      };
-      img.src=ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    }).catch(function(err) {
+      setStatus('PDF Fehler: ' + err.message);
+      URL.revokeObjectURL(url);
+    });
+    return;
   }
+
+  // ── Bild (PNG / JPG) ──
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = new Image();
+    img.onload = function() {
+      state.floorplan = { img, w: img.width, h: img.height };
+      document.getElementById('uploadZone').style.display = 'none';
+      const scaleX = canvas.width / img.width * 0.9;
+      const scaleY = canvas.height / img.height * 0.9;
+      state.zoom = Math.min(scaleX, scaleY);
+      state.pan.x = (canvas.width - img.width * state.zoom) / 2;
+      state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
+      render();
+      setStatus('Grundriss geladen: ' + img.width + 'x' + img.height + 'px — Bitte Massstab kalibrieren!');
+    };
+    img.onerror = function() { setStatus('Bild konnte nicht geladen werden'); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 
