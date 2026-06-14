@@ -5200,149 +5200,138 @@ function saveProjData() {
 function exportFloorplanPDF() {
   const pn = document.getElementById('projName').value;
   const pd = projData;
-  
-  // Export canvas as image
+
+  // Grundriss als Bild exportieren
   const exportCanvas = document.createElement('canvas');
   exportCanvas.width = canvas.width;
   exportCanvas.height = canvas.height;
   const ectx = exportCanvas.getContext('2d');
-  // White background
   ectx.fillStyle = 'white';
   ectx.fillRect(0,0,exportCanvas.width, exportCanvas.height);
   ectx.drawImage(canvas, 0, 0);
   const imgData = exportCanvas.toDataURL('image/png');
 
-  // Stückliste rendern damit byType/byKabel aktuell ist
   renderStueckliste();
-  setTimeout(()=>{
-    // Daten berechnen
+  setTimeout(function() {
+    // Zusammenfassungs-Daten
     const _symsAll = state.symbols;
     const _wiresAll = state.wires;
     const _byType={}, _byKabel={};
-    for(const s of _symsAll){ const n=SYMBOLS[s.type]?.name||s.type; _byType[n]=(_byType[n]||0)+(s.count||1); }
-    for(const s of _symsAll){ if(s.kabelLaenge&&parseFloat(s.kabelLaenge)>0){const k=s.kabel||'NYM-J 3×1.5';_byKabel[k]=(_byKabel[k]||0)+parseFloat(s.kabelLaenge);} }
-    for(const w of _wiresAll){ _byKabel[w.kabel||'—']=(_byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
-    const _wTotal = _wiresAll.reduce((a,w)=>a+parseFloat(w.laenge_m||0),0);
-    const sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
-    const summaryHTML = renderSummaryHTML(sd, true); // forPrint=true → helle Farben
-
-    const tbl = document.getElementById('stBody')?.parentElement?.outerHTML||'';
-    const w = window.open('','_blank');
-    const heute = new Date().toLocaleDateString('de-DE');
-    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-    <title>${pn} — Elektroplan</title>
-    <style>
-      *{box-sizing:border-box}
-      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#222}
-      .page{padding:14mm 12mm;}
-      .header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:12px;display:flex;gap:20px;align-items:flex-start}
-      .hdr-logo{font-size:18px;font-weight:700;color:#f5a623;white-space:nowrap}
-      .hdr-info{flex:1}
-      .hdr-info h1{font-size:16px;margin:0 0 3px;color:#222}
-      .hdr-info p{font-size:10px;color:#555;margin:0}
-      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px;padding:10px}
-      .info-sec h3{font-size:9px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px;letter-spacing:.5px}
-      .info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:2px 0;font-size:9px}
-      .info-row strong{color:#222}
-      .plan-img{width:100%;border:1px solid #ccc;border-radius:3px;margin-bottom:12px;page-break-after:always}
-      .pg-break{page-break-before:always}
-      table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
-      th{background:#f5a623;color:white;padding:4px 7px;text-align:left;font-size:9px}
-      td{border:1px solid #e0e0e0;padding:3px 7px}
-      tr:nth-child(even) td{background:#fafafa}
-      tfoot td{background:#f8f8f8;font-weight:700;border-top:2px solid #ccc}
-      h3.sec{font-size:11px;font-weight:700;color:#f5a623;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #f5a623}
-      .footer{border-top:1px solid #ddd;margin-top:12px;padding-top:6px;font-size:8px;color:#999;display:flex;justify-content:space-between}
-      @media print{
-        .page{padding:8mm}
-        .pg-break{page-break-before:always}
+    for(var si=0;si<_symsAll.length;si++){
+      var s=_symsAll[si], n=SYMBOLS[s.type]&&SYMBOLS[s.type].name||s.type;
+      _byType[n]=(_byType[n]||0)+(s.count||1);
+    }
+    for(var si2=0;si2<_symsAll.length;si2++){
+      var s2=_symsAll[si2];
+      if(s2.kabelLaenge&&parseFloat(s2.kabelLaenge)>0){
+        var k2=s2.kabel||'NYM-J 3x1.5';
+        _byKabel[k2]=(_byKabel[k2]||0)+parseFloat(s2.kabelLaenge);
       }
-    </style>
-    </head><body>
-    <div class="page">
-      <div class="header">
-        <div class="hdr-logo">⚡ Elektroplan</div>
-        <div class="hdr-info">
-          <h1>${pn}</h1>
-          <p>Gewerk: ${pd.gewerk||'Elektroinstallation'} &nbsp;|&nbsp; Erstellt: ${heute} &nbsp;|&nbsp; Auftrag: ${pd.auftragsnr||'—'}</p>
-        </div>
-      </div>
+    }
+    for(var wi=0;wi<_wiresAll.length;wi++){
+      var w2=_wiresAll[wi];
+      _byKabel[w2.kabel||'—']=(_byKabel[w2.kabel||'—']||0)+parseFloat(w2.laenge_m||0);
+    }
+    var _wTotal = _wiresAll.reduce(function(a,w){return a+parseFloat(w.laenge_m||0);},0);
+    var sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
+    var summaryHTML = renderSummaryHTML(sd, true);
 
-      <!-- Projektdaten -->
-      <div class="info-grid">
-        <div class="info-sec">
-          <h3>👤 Kundendaten</h3>
-          <div class="info-row"><span>Name:</span><strong>${pd.kundenname||'—'}</strong></div>
-          <div class="info-row"><span>Firma:</span><strong>${pd.firma||'—'}</strong></div>
-          <div class="info-row"><span>Telefon:</span><strong>${pd.telefon||'—'}</strong></div>
-          <div class="info-row"><span>E-Mail:</span><strong>${pd.email||'—'}</strong></div>
-        </div>
-        <div class="info-sec">
-          <h3>📍 Projektadresse</h3>
-          <div class="info-row"><span>Straße:</span><strong>${pd.strasse||'—'}</strong></div>
-          <div class="info-row"><span>Ort:</span><strong>${pd.ort||'—'}</strong></div>
-          <div class="info-row"><span>Etage:</span><strong>${pd.etage||'—'}</strong></div>
-          <div class="info-row"><span>Gebäudetyp:</span><strong>${pd.gebaeude||'—'}</strong></div>
-        </div>
-        <div class="info-sec">
-          <h3>🏗 Auftragsdaten</h3>
-          <div class="info-row"><span>Auftragsnummer:</span><strong>${pd.auftragsnr||'—'}</strong></div>
-          <div class="info-row"><span>Auftraggeber:</span><strong>${pd.auftraggeber||'—'}</strong></div>
-          <div class="info-row"><span>Erstellt von:</span><strong>${pd.planer||'—'}</strong></div>
-          <div class="info-row"><span>Ausführung:</span><strong>${pd.ausfuehrung||'—'}</strong></div>
-        </div>
-        <div class="info-sec">
-          <h3>📝 Notizen</h3>
-          <div style="font-size:9px;color:#555;line-height:1.5">${(pd.notizen||'—').replace(/\n/g,'<br>')}</div>
-        </div>
-      </div>
+    var tbl = (document.getElementById('stBody')&&document.getElementById('stBody').parentElement&&document.getElementById('stBody').parentElement.outerHTML)||'';
+    var heute = new Date().toLocaleDateString('de-DE');
 
-      <!-- Grundrissplan -->
-      <h3 class="sec">Grundrissplan</h3>
-      <img src="${imgData}" class="plan-img">
+    // Leitungszeilen
+    var wireRows = _wiresAll.map(function(ww,wi2){
+      return '<tr>'
+        +'<td>'+(wi2+1)+'</td>'
+        +'<td style="font-family:monospace">'+(ww.circuit||'—')+'</td>'
+        +'<td>'+((WIRE_TYPES[ww.wireType]&&WIRE_TYPES[ww.wireType].label)||ww.wireType||'Strom')+'</td>'
+        +'<td style="font-family:monospace">'+(ww.phase||'L1')+'</td>'
+        +'<td style="font-family:monospace">'+(ww.kabel||'—')+'</td>'
+        +'<td>'+(ww.adernLabel||'')+'</td>'
+        +'<td>'+(ww.verlegeart||'—')+(ww.trasseHoehe?' '+ww.trasseHoehe+'cm':'')+'</td>'
+        +'<td style="font-family:monospace;font-weight:700">'+(ww.laenge_m?ww.laenge_m+'m':'—')+'</td>'
+        +'</tr>';
+    }).join('');
 
-      <!-- Geräte-Stückliste -->
-      <div class="pg-break">
-        <h3 class="sec">📦 Stückliste — Geräte</h3>
-        ${tbl}
+    var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
+      +'<title>'+pn+' — Elektroplan</title>'
+      +'<style>'
+      +'*{box-sizing:border-box}'
+      +'body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#222}'
+      +'.page{padding:14mm 12mm}'
+      +'.header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:12px;display:flex;gap:20px;align-items:flex-start}'
+      +'.hdr-logo{font-size:18px;font-weight:700;color:#f5a623;white-space:nowrap}'
+      +'.hdr-info{flex:1}'
+      +'.hdr-info h1{font-size:16px;margin:0 0 3px;color:#222}'
+      +'.hdr-info p{font-size:10px;color:#555;margin:0}'
+      +'.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px;padding:10px}'
+      +'.info-sec h3{font-size:9px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px}'
+      +'.info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:2px 0;font-size:9px}'
+      +'.info-row strong{color:#222}'
+      +'.plan-img{width:100%;border:1px solid #ccc;border-radius:3px;margin-bottom:12px}'
+      +'.pg-break{page-break-before:always;padding-top:14mm}'
+      +'table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}'
+      +'th{background:#f5a623;color:white;padding:4px 7px;text-align:left;font-size:9px}'
+      +'td{border:1px solid #e0e0e0;padding:3px 7px}'
+      +'tr:nth-child(even) td{background:#fafafa}'
+      +'tfoot td{background:#f8f8f8;font-weight:700;border-top:2px solid #ccc}'
+      +'h3.sec{font-size:11px;font-weight:700;color:#f5a623;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #f5a623}'
+      +'.footer{border-top:1px solid #ddd;margin-top:12px;padding-top:6px;font-size:8px;color:#999;display:flex;justify-content:space-between}'
+      +'@media print{.page{padding:8mm}.pg-break{page-break-before:always}}'
+      +'</style></head><body>'
+      +'<div class="page">'
+      +'<div class="header">'
+      +'<div class="hdr-logo">&#9889; Elektroplan</div>'
+      +'<div class="hdr-info"><h1>'+pn+'</h1>'
+      +'<p>Gewerk: '+(pd.gewerk||'Elektroinstallation')+' &nbsp;|&nbsp; Erstellt: '+heute+' &nbsp;|&nbsp; Auftrag: '+(pd.auftragsnr||'—')+'</p>'
+      +'</div></div>'
+      +'<div class="info-grid">'
+      +'<div class="info-sec"><h3>Kundendaten</h3>'
+      +'<div class="info-row"><span>Name:</span><strong>'+(pd.kundenname||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Firma:</span><strong>'+(pd.firma||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Telefon:</span><strong>'+(pd.telefon||'—')+'</strong></div>'
+      +'<div class="info-row"><span>E-Mail:</span><strong>'+(pd.email||'—')+'</strong></div>'
+      +'</div>'
+      +'<div class="info-sec"><h3>Projektadresse</h3>'
+      +'<div class="info-row"><span>Strasse:</span><strong>'+(pd.strasse||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Ort:</span><strong>'+(pd.ort||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Etage:</span><strong>'+(pd.etage||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Gebaeudetyp:</span><strong>'+(pd.gebaeude||'—')+'</strong></div>'
+      +'</div>'
+      +'<div class="info-sec"><h3>Auftragsdaten</h3>'
+      +'<div class="info-row"><span>Auftragsnummer:</span><strong>'+(pd.auftragsnr||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Auftraggeber:</span><strong>'+(pd.auftraggeber||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Erstellt von:</span><strong>'+(pd.planer||'—')+'</strong></div>'
+      +'<div class="info-row"><span>Ausfuehrung:</span><strong>'+(pd.ausfuehrung||'—')+'</strong></div>'
+      +'</div>'
+      +'<div class="info-sec"><h3>Notizen</h3>'
+      +'<div style="font-size:9px;color:#555;line-height:1.5">'+(pd.notizen||'—').replace(/\n/g,'<br>')+'</div>'
+      +'</div></div>'
+      +'<h3 class="sec">Grundrissplan</h3>'
+      +'<img src="'+imgData+'" class="plan-img">'
+      +'<div class="pg-break">'
+      +'<h3 class="sec">Stueckliste — Geraete</h3>'
+      +tbl
+      +'<h3 class="sec" style="margin-top:14px">Leitungsverzeichnis</h3>'
+      +'<table><thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Laenge</th></tr></thead>'
+      +'<tbody>'+wireRows+'</tbody>'
+      +'<tfoot><tr><td colspan="7" style="text-align:right">GESAMT LEITUNGEN</td>'
+      +'<td style="font-family:monospace;color:#27ae60">'+_wTotal.toFixed(1)+'m</td></tr></tfoot></table>'
+      +'<h3 class="sec" style="margin-top:14px">Zusammenfassung &amp; Kabelmengen</h3>'
+      +summaryHTML
+      +'</div>'
+      +'<div class="footer">'
+      +'<span>&#9889; Elektro-Grundriss Planer — Anvolt GmbH</span>'
+      +'<span>'+pn+' &nbsp;|&nbsp; Erstellt: '+heute+'</span>'
+      +'<span>Seite 1</span>'
+      +'</div></div>'
+      +'<script>window.print();<\/script>'
+      +'</body></html>';
 
-        <!-- Leitungen -->
-        <h3 class="sec" style="margin-top:14px">⚡ Leitungsverzeichnis</h3>
-        <table>
-          <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Länge</th></tr></thead>
-          <tbody>
-            ${_wiresAll.map((ww,wi)=>`<tr>
-              <td>${wi+1}</td>
-              <td style="font-family:monospace">${ww.circuit||'—'}</td>
-              <td>${(WIRE_TYPES[ww.wireType]||{label:ww.wireType||'Strom'}).label}</td>
-              <td style="font-family:monospace">${ww.phase||'L1'}</td>
-              <td style="font-family:monospace">${ww.kabel||'—'}</td>
-              <td>${ww.adernLabel||''}</td>
-              <td>${ww.verlegeart||'—'}${ww.trasseHoehe?' '+ww.trasseHoehe+'cm':''}</td>
-              <td style="font-family:monospace;font-weight:700">${ww.laenge_m?ww.laenge_m+'m':'—'}</td>
-            </tr>`).join('')}
-          </tbody>
-          <tfoot><tr>
-            <td colspan="7" style="text-align:right">GESAMT LEITUNGEN</td>
-            <td style="font-family:monospace;color:#27ae60">${_wTotal.toFixed(1)} m</td>
-          </tr></tfoot>
-        </table>
-
-        <!-- Zusammenfassung -->
-        <h3 class="sec" style="margin-top:14px">📊 Zusammenfassung &amp; Kabelmengen</h3>
-        ${summaryHTML}
-      </div>
-
-      <div class="footer">
-        <span>⚡ Elektro-Grundriss Planer — Anvolt GmbH</span>
-        <span>${pn} &nbsp;|&nbsp; Erstellt: ${heute}</span>
-        <span>Seite 1</span>
-      </div>
-    </div>
-    <\x73cript>window.print();<\/script>
-    </body></html>\`);
+    var w = window.open('','_blank');
+    w.document.write(html);
     w.document.close();
-  },200);
+  }, 200);
 }
 
 // ═══════════════════════════════════════════════════
