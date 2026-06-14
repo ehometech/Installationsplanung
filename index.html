@@ -142,30 +142,59 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .mft{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
 
 /* ── BELEUCHTUNGSVERTEILUNG MODAL ── */
-.lv-modal { width:560px; max-width:96vw; }
-.lv-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.lv-modal { width:480px; max-width:96vw; }
 .lv-card {
   background:var(--sf2); border:2px solid var(--bd); border-radius:6px;
-  padding:9px 10px; cursor:pointer; transition:all .15s;
+  padding:8px 10px; cursor:pointer; transition:all .15s;
   display:flex; align-items:center; gap:8px; font-size:11px;
 }
 .lv-card:hover { border-color:var(--ac); color:var(--ac); }
-.lv-card.sel { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
-.lv-card .lv-ico { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
+.lv-card.sel  { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
+.lv-card .lv-ico { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
 .lv-sec { margin-bottom:12px; }
 .lv-sec-ttl { font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
   letter-spacing:.7px; margin-bottom:7px; padding-bottom:3px; border-bottom:1px solid var(--bd); }
-.lv-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:11px; color:var(--tx2); }
-.lv-row label { min-width:130px; }
-.lv-row input, .lv-row select { background:var(--sf2); border:1px solid var(--bd); color:var(--tx);
-  font-family:var(--sans); font-size:11px; padding:4px 7px; border-radius:3px; outline:none; }
-.lv-row input:focus, .lv-row select:focus { border-color:var(--ac); }
-#lvPreviewCanvas { background:#f0f2f5; border:1px solid var(--bd2); border-radius:4px;
-  display:block; width:100%; margin-top:8px; cursor:crosshair; }
-.lv-hint { font-size:9px; color:var(--tx3); font-family:var(--mono); margin-top:4px; }
-.lv-result { background:rgba(63,185,80,.08); border:1px solid rgba(63,185,80,.25);
-  border-radius:4px; padding:8px 10px; font-size:10px; font-family:var(--mono);
-  color:var(--gr); margin-top:8px; line-height:1.7; }
+.lv-field { margin-bottom:7px; }
+.lv-field label { display:block; font-size:10px; color:var(--tx2); margin-bottom:3px; }
+.lv-field input, .lv-field select {
+  background:var(--sf2); border:1px solid var(--bd); color:var(--tx);
+  font-family:var(--sans); font-size:11px; padding:5px 8px; border-radius:3px;
+  outline:none; width:100%;
+}
+.lv-field input:focus, .lv-field select:focus { border-color:var(--ac); }
+.lv-step-indicator {
+  display:flex; gap:0; margin-bottom:14px;
+}
+.lv-step {
+  flex:1; text-align:center; padding:6px 4px; font-size:10px; font-weight:600;
+  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3);
+  transition:all .2s;
+}
+.lv-step:first-child { border-radius:4px 0 0 4px; }
+.lv-step:last-child  { border-radius:0 4px 4px 0; }
+.lv-step.done  { background:rgba(63,185,80,.15); border-color:#3fb950; color:#3fb950; }
+.lv-step.act   { background:rgba(245,166,35,.18); border-color:var(--ac); color:var(--ac); }
+.lv-pts-display {
+  display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;
+}
+.lv-pt-badge {
+  font-family:var(--mono); font-size:9px; padding:3px 8px; border-radius:10px;
+  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3);
+}
+.lv-pt-badge.set { background:rgba(245,166,35,.15); border-color:var(--ac); color:var(--ac); }
+.lv-canvas-hint {
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  background:rgba(245,166,35,.92); color:#000; font-weight:700;
+  font-size:12px; padding:8px 18px; border-radius:20px; z-index:50;
+  pointer-events:none; white-space:nowrap; display:none;
+}
+.lv-overlay-panel {
+  position:absolute; bottom:16px; right:16px; z-index:60;
+  background:var(--sf); border:1px solid var(--bd2); border-radius:8px;
+  padding:14px 16px; width:240px; box-shadow:0 4px 20px rgba(0,0,0,.5);
+  display:none;
+}
+.lv-overlay-panel h4 { font-size:12px; font-weight:700; color:var(--ac); margin-bottom:10px; }
 
 /* Touch drag ghost */
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);}
@@ -421,6 +450,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <span id="scaleBarLabel">—</span>
       </div>
       <div class="calibrate-hint hid" id="calHint">📏 Klicke zwei Punkte für eine bekannte Distanz</div>
+      <div class="lv-canvas-hint" id="lvCanvasHint">📍 Klicke Punkt 1 (Ecke oben links)</div>
     </div>
   </div>
 
@@ -912,63 +942,80 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 <!-- BELEUCHTUNGSVERTEILUNG MODAL -->
 <div class="modal-ov hid" id="lvModal">
   <div class="modal lv-modal">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span style="font-size:20px">💡</span>
-      <h3 style="margin:0">Beleuchtung platzieren &amp; verteilen</h3>
+      <h3 style="margin:0;font-size:14px">Beleuchtung verteilen</h3>
       <div style="flex:1"></div>
-      <button class="btn bg" onclick="closeLVModal()" style="font-size:11px">✕</button>
+      <button class="btn bg" onclick="lvAbort()" style="font-size:11px;padding:4px 9px">✕</button>
     </div>
 
-    <!-- Schritt 1: Symbolwahl -->
-    <div class="lv-sec">
-      <div class="lv-sec-ttl">① Leuchtmitteltyp wählen</div>
-      <div class="lv-grid" id="lvSymGrid"></div>
+    <!-- Fortschritt -->
+    <div class="lv-step-indicator" id="lvStepBar">
+      <div class="lv-step act" id="lvStep1">① Leuchtmittel</div>
+      <div class="lv-step" id="lvStep2">② Raum klicken</div>
+      <div class="lv-step" id="lvStep3">③ Einstellungen</div>
     </div>
 
-    <!-- Schritt 2: Raumdefinition & Anzahl -->
-    <div class="lv-sec">
-      <div class="lv-sec-ttl">② Raum &amp; Verteilung</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
-          <label>Anzahl Lampen</label>
-          <input type="number" id="lvAnzahl" value="4" min="1" max="24" style="width:80px" oninput="lvUpdate()">
+    <!-- SCHRITT 1: Leuchtmitteltyp -->
+    <div id="lvPane1">
+      <div class="lv-sec-ttl">Leuchtmitteltyp wählen</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px" id="lvSymGrid"></div>
+      <div class="lv-field">
+        <label>Stromkreis</label>
+        <input type="text" id="lvCircuit" value="F01.1" style="width:120px">
+      </div>
+      <button class="btn ba" style="width:100%;margin-top:6px" onclick="lvGoStep2()">Weiter — Raum klicken →</button>
+    </div>
+
+    <!-- SCHRITT 2: Hinweis (Punkte werden direkt auf dem Grundriss gesetzt) -->
+    <div id="lvPane2" style="display:none">
+      <div class="lv-sec-ttl">3 Eckpunkte des Raums auf dem Grundriss klicken</div>
+      <div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--tx2)">
+        <div style="color:var(--ac);font-weight:700;margin-bottom:6px">📍 Jetzt auf dem Grundriss klicken:</div>
+        <div><span style="color:var(--ac)">Punkt 1</span> — Ecke oben links</div>
+        <div><span style="color:var(--ac)">Punkt 2</span> — Ecke oben rechts <em style="color:var(--tx3)">(Breite)</em></div>
+        <div><span style="color:var(--ac)">Punkt 3</span> — Ecke unten links <em style="color:var(--tx3)">(Tiefe)</em></div>
+      </div>
+      <div class="lv-pts-display">
+        <span class="lv-pt-badge" id="lvBadge1">P1 —</span>
+        <span class="lv-pt-badge" id="lvBadge2">P2 —</span>
+        <span class="lv-pt-badge" id="lvBadge3">P3 —</span>
+      </div>
+      <button class="btn bg" style="width:100%;margin-top:4px" onclick="lvClearPts()">↺ Punkte löschen</button>
+    </div>
+
+    <!-- SCHRITT 3: Anzahl + Reihen -->
+    <div id="lvPane3" style="display:none">
+      <div class="lv-sec-ttl">Anzahl &amp; Reihen einstellen</div>
+
+      <!-- Raumvorschau Mini -->
+      <canvas id="lvMiniCanvas" width="430" height="160"
+        style="background:#f5f6f8;border:1px solid var(--bd2);border-radius:4px;width:100%;display:block;margin-bottom:8px"></canvas>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div class="lv-field">
+          <label>Anzahl Lampen gesamt</label>
+          <input type="number" id="lvAnzahl" value="4" min="1" max="48" oninput="lvCalcAndDraw()">
         </div>
-        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
-          <label>Stromkreis</label>
-          <input type="text" id="lvCircuit" value="F01.1" style="width:100px" oninput="lvUpdate()">
+        <div class="lv-field">
+          <label>Anzahl Reihen</label>
+          <input type="number" id="lvReihen" value="2" min="1" max="12" oninput="lvCalcAndDraw()">
         </div>
-        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
-          <label>Verteilungsart</label>
-          <select id="lvModus" onchange="lvUpdate()" style="width:160px">
-            <option value="center">⊙ Einzeln zentriert (1 Lampe)</option>
-            <option value="raster" selected>⊞ Raster (gleichmäßig)</option>
-            <option value="reihe">═ Reihe (1 Reihe mittig)</option>
-            <option value="rand">□ Rand (entlang Wände)</option>
-            <option value="manuell">✏ Manuell (Raum klicken)</option>
-          </select>
-        </div>
-        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
-          <label>Abstand zur Wand (cm)</label>
-          <input type="number" id="lvWandAbstand" value="50" min="0" max="200" step="10" style="width:80px" oninput="lvUpdate()">
-        </div>
+      </div>
+
+      <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:4px;padding:8px;font-family:var(--mono);font-size:10px;color:var(--tx2);line-height:1.7;margin-bottom:10px" id="lvInfo">—</div>
+
+      <div style="display:flex;gap:6px">
+        <button class="btn bg" onclick="lvGoStep2()" style="font-size:11px">← Zurück</button>
+        <button class="btn bg" onclick="lvClearPts()" style="font-size:11px">↺ Punkte neu</button>
+        <button class="btn ba" style="flex:1" id="lvPlaceBtn" onclick="lvPlace()">✓ Platzieren</button>
       </div>
     </div>
 
-    <!-- Schritt 3: Raumvorschau -->
-    <div class="lv-sec">
-      <div class="lv-sec-ttl">③ Raum definieren — zwei Ecken klicken</div>
-      <canvas id="lvPreviewCanvas" height="200"></canvas>
-      <div class="lv-hint" id="lvHint">Klicke zwei Ecken des Raums im Vorschau-Canvas (oben links → unten rechts)</div>
-      <div class="lv-result hid" id="lvResult"></div>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn bg" style="flex:1" onclick="lvReset()">↺ Zurücksetzen</button>
-      <button class="btn bg" onclick="closeLVModal()">Abbrechen</button>
-      <button class="btn ba" id="lvPlaceBtn" onclick="lvPlace()" disabled style="flex:1">✓ Platzieren</button>
-    </div>
   </div>
 </div>
+
 
 <input type="file" id="fileIn" accept=".json" style="display:none" onchange="loadFromFile(event)">
 
@@ -2847,6 +2894,10 @@ function clientToCanvas(cx, cy) {
 // Mouse
 function onMouseDown(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
+  // Beleuchtungsverteilung: Raumpunkte setzen
+  if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
+    if (lvHandleCanvasClick(pt)) return;
+  }
   if (state.calibrating) { handleCalibrate(pt); return; }
   if (state.tool === 'wire') { handleWireClick(pt); return; }
   if (state.tool === 'measure') { handleMeasureClick(pt, e); return; }
@@ -3044,6 +3095,10 @@ function onTouchStart(e) {
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     const pt = clientToCanvas(t.clientX, t.clientY);
+    // Beleuchtungsverteilung: Touch
+    if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
+      if (lvHandleCanvasClick(pt)) return;
+    }
     if (state.calibrating) { handleCalibrate(pt); return; }
     if (state.tool === 'wire') { handleWireClick(pt); return; }
     // Check wire point first (if wire selected)
@@ -3425,6 +3480,8 @@ function render() {
   drawWireJunctions();
   drawCalPoints();
   drawSymbols();
+  // Beleuchtungsverteilung Overlay (3-Punkte)
+  if (typeof lvDrawOverlay === 'function') lvDrawOverlay();
   ctx.restore();
   updateScaleBar();
 }
@@ -5289,419 +5346,452 @@ function setStatus(msg,col) {
 }
 
 // ═══════════════════════════════════════════════════
-//  BELEUCHTUNGSVERTEILUNG — Raum zentrieren & verteilen
+//  BELEUCHTUNGSVERTEILUNG — 3-Punkte Raum + Raster
 // ═══════════════════════════════════════════════════
 
-// Beleuchtungs-Symboltypen
 const LV_SYMBOL_TYPES = [
-  { key:'deckenleuchte',   label:'Deckenleuchte',   icon:'💡' },
-  { key:'einbaustrahler',  label:'Einbaustrahler',   icon:'⚡' },
-  { key:'wandleuchte',     label:'Wandleuchte',      icon:'🔆' },
-  { key:'led_streifen',    label:'LED-Streifen',     icon:'〰' },
-  { key:'notleuchte',      label:'Notleuchte',       icon:'🟢' },
-  { key:'aussenleuchte',   label:'Außenleuchte',     icon:'🌕' },
+  { key:'deckenleuchte',  label:'Deckenleuchte',  icon:'💡' },
+  { key:'einbaustrahler', label:'Einbaustrahler',  icon:'🔆' },
+  { key:'wandleuchte',    label:'Wandleuchte',     icon:'🌟' },
+  { key:'led_streifen',   label:'LED-Streifen',    icon:'〰' },
+  { key:'notleuchte',     label:'Notleuchte',      icon:'🟢' },
+  { key:'aussenleuchte',  label:'Außenleuchte',    icon:'🌕' },
 ];
 
-// State für das Modal
+// ── State ──
 let _lv = {
-  symKey:      'deckenleuchte',
-  modus:       'raster',
-  anzahl:      4,
-  wandAbstand: 50,    // cm (für Raum → px-Umrechnung)
-  circuit:     'F01.1',
-  roomPts:     [],    // 2 Ecken auf Preview-Canvas [{ cx, cy }]
-  positions:   [],    // berechnete Lampen-Positionen im Vorschau-Canvas
-  roomRect:    null,  // { x1, y1, x2, y2 } Vorschau-Canvas-Koordinaten
-  manualPts:   [],    // für Modus 'manuell'
-  previewW:    0,
-  previewH:    0,
+  step:     1,          // 1=Symbolwahl  2=Punkte klicken  3=Einstellungen
+  symKey:  'deckenleuchte',
+  circuit: 'F01.1',
+  pts:      [],         // Weltkoords der 3 Ecken  [{x,y}, {x,y}, {x,y}]
+  anzahl:   4,
+  reihen:   2,
+  positions:[],         // berechnete Welt-Positionen [{x,y}]
+  active:   false,      // true = Canvas-Klick-Listener aktiv
 };
 
+// ── Schritt-Steuerung ──
+
 function openLVModal() {
-  // Fülle Symbol-Grid
+  _lv.step     = 1;
+  _lv.pts      = [];
+  _lv.positions= [];
+  _lv.active   = false;
+  lvHideHint();
+  lvRenderSymGrid();
+  lvUpdateStepBar();
+  lvShowPane(1);
+  document.getElementById('lvCircuit').value = _lv.circuit;
+  document.getElementById('lvModal').classList.remove('hid');
+}
+
+function closeLVModal() {
+  document.getElementById('lvModal').classList.add('hid');
+  lvAbort();
+}
+
+function lvAbort() {
+  _lv.active = false;
+  _lv.pts    = [];
+  lvHideHint();
+  document.getElementById('lvModal').classList.add('hid');
+  render(); // clear any overlay dots
+}
+
+function lvShowPane(n) {
+  [1,2,3].forEach(i => {
+    const p = document.getElementById('lvPane'+i);
+    if (p) p.style.display = i===n ? 'block' : 'none';
+  });
+}
+
+function lvUpdateStepBar() {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('lvStep'+i);
+    if (!el) return;
+    el.className = 'lv-step';
+    if (i < _lv.step)  el.classList.add('done');
+    if (i === _lv.step) el.classList.add('act');
+  });
+}
+
+// ── Schritt 1: Symbolwahl ──
+
+function lvRenderSymGrid() {
   const grid = document.getElementById('lvSymGrid');
   if (!grid) return;
   grid.innerHTML = LV_SYMBOL_TYPES.map(s =>
     `<div class="lv-card${s.key===_lv.symKey?' sel':''}" onclick="lvSelSym('${s.key}',this)">
       <span class="lv-ico">${s.icon}</span>
       <div>
-        <div style="font-weight:600">${s.label}</div>
-        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono)">NYM-J 3×1,5 / LS 10A</div>
+        <div style="font-weight:600;font-size:11px">${s.label}</div>
+        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono)">NYM-J 3×1,5 / 10A</div>
       </div>
     </div>`
   ).join('');
-  // Felder vorbelegen
-  document.getElementById('lvAnzahl').value   = _lv.anzahl;
-  document.getElementById('lvCircuit').value  = _lv.circuit;
-  document.getElementById('lvModus').value    = _lv.modus;
-  document.getElementById('lvWandAbstand').value = _lv.wandAbstand;
-  // Reset Raum
-  lvReset(false);
-  document.getElementById('lvModal').classList.remove('hid');
-  // Canvas initialisieren
-  requestAnimationFrame(lvInitCanvas);
-}
-
-function closeLVModal() {
-  document.getElementById('lvModal').classList.add('hid');
 }
 
 function lvSelSym(key, el) {
   _lv.symKey = key;
-  document.querySelectorAll('.lv-card').forEach(c => c.classList.remove('sel'));
+  document.querySelectorAll('#lvSymGrid .lv-card').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-  lvUpdate();
 }
 
-function lvReset(redraw=true) {
-  _lv.roomPts   = [];
-  _lv.positions = [];
-  _lv.roomRect  = null;
-  _lv.manualPts = [];
-  document.getElementById('lvHint').textContent   = 'Klicke zwei Ecken des Raums im Vorschau-Canvas';
-  document.getElementById('lvResult').classList.add('hid');
-  document.getElementById('lvPlaceBtn').disabled   = true;
-  if (redraw) lvDrawPreview();
+function lvGoStep2() {
+  _lv.circuit = document.getElementById('lvCircuit').value || 'F01.1';
+  _lv.step    = 2;
+  _lv.pts     = [];
+  lvUpdateStepBar();
+  lvShowPane(2);
+  lvUpdateBadges();
+  // Modal schließen, Klick-Modus starten
+  document.getElementById('lvModal').classList.add('hid');
+  _lv.active = true;
+  lvShowHint('📍 Punkt 1 klicken — Ecke oben links');
 }
 
-function lvInitCanvas() {
-  const cv = document.getElementById('lvPreviewCanvas');
-  if (!cv) return;
-  const W = cv.parentElement.clientWidth - 2;
-  cv.width  = W;
-  cv.height = Math.max(180, Math.round(W * 0.42));
-  _lv.previewW = cv.width;
-  _lv.previewH = cv.height;
-  lvDrawPreview();
-  cv.onmousedown = lvCanvasClick;
-  cv.ontouchstart = (e) => { e.preventDefault(); const r=cv.getBoundingClientRect(),t=e.touches[0]; lvCanvasClick({offsetX:t.clientX-r.left,offsetY:t.clientY-r.top}); };
-}
+// ── Schritt 2: 3 Punkte auf Grundriss klicken ──
+// (wird in onMouseDown / onTouchStart aufgerufen wenn _lv.active)
 
-function lvCanvasClick(e) {
-  const modus = document.getElementById('lvModus').value;
-  if (modus === 'manuell') {
-    _lv.manualPts.push({ cx: e.offsetX, cy: e.offsetY });
-    _lv.anzahl = _lv.manualPts.length;
+function lvHandleCanvasClick(worldPt) {
+  if (!_lv.active) return false;
+  if (_lv.pts.length >= 3) return false;
+
+  _lv.pts.push({ x: worldPt.x, y: worldPt.y });
+  lvUpdateBadges();
+
+  const n = _lv.pts.length;
+  if (n === 1) lvShowHint('📍 Punkt 2 klicken — Ecke oben rechts (Breite)');
+  if (n === 2) lvShowHint('📍 Punkt 3 klicken — Ecke unten links (Tiefe)');
+  if (n === 3) {
+    // Alle 3 Punkte gesetzt → Schritt 3
+    _lv.active = false;
+    lvHideHint();
+    lvCalcAndDraw();
+    _lv.step = 3;
+    lvUpdateStepBar();
+    lvShowPane(3);
+    // Schritt 3 öffnen
     document.getElementById('lvAnzahl').value = _lv.anzahl;
-    lvUpdate();
-    return;
+    document.getElementById('lvReihen').value  = _lv.reihen;
+    document.getElementById('lvModal').classList.remove('hid');
+    requestAnimationFrame(() => lvCalcAndDraw());
   }
-  if (_lv.roomPts.length >= 2) {
-    _lv.roomPts = [];
-    _lv.positions = [];
-  }
-  _lv.roomPts.push({ cx: e.offsetX, cy: e.offsetY });
-  if (_lv.roomPts.length === 2) {
-    lvBuildRoomRect();
-    lvUpdate();
-    document.getElementById('lvHint').textContent = '✅ Raum definiert — Verteilung berechnet';
-  } else {
-    document.getElementById('lvHint').textContent = 'Klicke jetzt die gegenüberliegende Ecke…';
-    lvDrawPreview();
+  render(); // Dots zeichnen
+  return true; // Event verbraucht
+}
+
+function lvUpdateBadges() {
+  const labels = ['P1 oben-links','P2 oben-rechts','P3 unten-links'];
+  [0,1,2].forEach(i => {
+    const el = document.getElementById('lvBadge'+(i+1));
+    if (!el) return;
+    if (_lv.pts[i]) {
+      el.textContent = labels[i] + ' ✓';
+      el.className   = 'lv-pt-badge set';
+    } else {
+      el.textContent = labels[i];
+      el.className   = 'lv-pt-badge';
+    }
+  });
+  // Öffne Modal wieder wenn bereits Punkte gesetzt (nach Zurück)
+  if (_lv.pts.length < 3) {
+    document.getElementById('lvModal').classList.remove('hid');
+    lvShowPane(2);
   }
 }
 
-function lvBuildRoomRect() {
-  const [a, b] = _lv.roomPts;
-  _lv.roomRect = {
-    x1: Math.min(a.cx, b.cx),
-    y1: Math.min(a.cy, b.cy),
-    x2: Math.max(a.cx, b.cx),
-    y2: Math.max(a.cy, b.cy),
-  };
+function lvClearPts() {
+  _lv.pts      = [];
+  _lv.positions= [];
+  _lv.step     = 2;
+  _lv.active   = true;
+  lvUpdateBadges();
+  lvUpdateStepBar();
+  lvShowPane(2);
+  document.getElementById('lvModal').classList.add('hid');
+  lvShowHint('📍 Punkt 1 klicken — Ecke oben links');
+  render();
 }
 
-function lvUpdate() {
-  _lv.anzahl      = parseInt(document.getElementById('lvAnzahl').value)     || 1;
-  _lv.circuit     = document.getElementById('lvCircuit').value              || 'F01.1';
-  _lv.modus       = document.getElementById('lvModus').value;
-  _lv.wandAbstand = parseInt(document.getElementById('lvWandAbstand').value) || 0;
+// ── Schritt 3: Berechnung & Mini-Vorschau ──
 
-  if (_lv.modus === 'manuell') {
-    _lv.positions = _lv.manualPts.map(p => ({ cx: p.cx, cy: p.cy }));
-  } else if (_lv.roomRect) {
-    _lv.positions = lvCalcPositions(_lv.roomRect, _lv.anzahl, _lv.modus, _lv.wandAbstand);
-  } else {
-    _lv.positions = [];
-  }
+function lvCalcAndDraw() {
+  _lv.anzahl = Math.max(1, parseInt(document.getElementById('lvAnzahl').value)||4);
+  _lv.reihen = Math.max(1, parseInt(document.getElementById('lvReihen').value)||2);
 
-  const canPlace = _lv.positions.length > 0;
-  document.getElementById('lvPlaceBtn').disabled = !canPlace;
+  if (_lv.pts.length < 3) return;
 
-  if (canPlace) {
-    const r = _lv.roomRect;
-    const W = r ? (r.x2 - r.x1) : 0;
-    const H = r ? (r.y2 - r.y1) : 0;
-    const ratio = _lv.previewW > 0 ? (W / _lv.previewW) : 1;
-    let info = '';
-    if (state.scale && r) {
-      const wM = (W / _lv.previewW * (_lv.previewW / state.scale)).toFixed(1);
-      const hM = (H / _lv.previewH * (_lv.previewH / state.scale)).toFixed(1);
-      info = `Raum: ca. ${wM}m × ${hM}m\n`;
+  // Raumvektoren aus den 3 Punkten
+  const O  = _lv.pts[0]; // Ursprung
+  const vX = { x: _lv.pts[1].x - O.x, y: _lv.pts[1].y - O.y }; // Breitenvektor
+  const vY = { x: _lv.pts[2].x - O.x, y: _lv.pts[2].y - O.y }; // Tiefenvektor
+
+  const reihen = _lv.reihen;
+  const gesamt = _lv.anzahl;
+  // Lampen pro Reihe (letzte Reihe bekommt Rest)
+  const proReihe = Math.ceil(gesamt / reihen);
+
+  _lv.positions = [];
+  let placed = 0;
+
+  for (let r = 0; r < reihen && placed < gesamt; r++) {
+    const inThisRow = Math.min(proReihe, gesamt - placed);
+    // Reihen-Y-Position: gleichmäßig zwischen 0 und 1 (im Raumkoord-System)
+    const tY = reihen > 1 ? (r + 0.5) / reihen : 0.5;
+    for (let c = 0; c < inThisRow; c++) {
+      // Spalten-X-Position
+      const tX = inThisRow > 1 ? (c + 0.5) / inThisRow : 0.5;
+      _lv.positions.push({
+        x: O.x + tX * vX.x + tY * vY.x,
+        y: O.y + tX * vX.y + tY * vY.y,
+      });
+      placed++;
     }
-    info += `${_lv.positions.length} Leuchten · Modus: ${_lv.modus}\nSymbol: ${LV_SYMBOL_TYPES.find(s=>s.key===_lv.symKey)?.label||_lv.symKey}\nStromkreis: ${_lv.circuit} · NYM-J 3×1,5 / LS 10A`;
-    const resEl = document.getElementById('lvResult');
-    resEl.textContent = info;
-    resEl.classList.remove('hid');
   }
 
-  lvDrawPreview();
+  lvUpdateInfo();
+  lvDrawMini();
 }
 
-function lvCalcPositions(r, anzahl, modus, wandAbstand) {
-  const W = r.x2 - r.x1;
-  const H = r.y2 - r.y1;
-  // wandAbstand in % des Raums (Preview-px haben keinen Maßstab → prozentual)
-  const wandPx = Math.min(wandAbstand / 500 * Math.min(W, H), Math.min(W,H)*0.25);
-  const iW = W - 2 * wandPx;
-  const iH = H - 2 * wandPx;
-  const ox = r.x1 + wandPx;
-  const oy = r.y1 + wandPx;
-  const positions = [];
+function lvUpdateInfo() {
+  const el = document.getElementById('lvInfo');
+  if (!el) return;
+  const reihen  = _lv.reihen;
+  const gesamt  = _lv.anzahl;
+  const proR    = Math.ceil(gesamt / reihen);
+  const symName = LV_SYMBOL_TYPES.find(s=>s.key===_lv.symKey)?.label || _lv.symKey;
 
-  switch(modus) {
-    case 'center': {
-      // Einzelne Lampe exakt in der Mitte
-      positions.push({ cx: r.x1 + W/2, cy: r.y1 + H/2 });
-      break;
-    }
-    case 'raster': {
-      // Gleichmäßiges Raster: optimale Zeilen/Spalten
-      if (anzahl === 1) { positions.push({ cx: r.x1+W/2, cy: r.y1+H/2 }); break; }
-      let cols = Math.round(Math.sqrt(anzahl * W / H));
-      cols = Math.max(1, Math.min(cols, anzahl));
-      let rows = Math.ceil(anzahl / cols);
-      // Abgleich: wenn zu viele Zellen → cols--
-      while (cols * rows > anzahl + cols - 1 && cols > 1) cols--;
-      rows = Math.ceil(anzahl / cols);
-      const stepX = cols > 1 ? iW / (cols - 1) : 0;
-      const stepY = rows > 1 ? iH / (rows - 1) : 0;
-      let count = 0;
-      for (let row = 0; row < rows && count < anzahl; row++) {
-        const lampsInRow = Math.min(cols, anzahl - count);
-        const rowStepX   = lampsInRow > 1 ? iW / (lampsInRow - 1) : 0;
-        const rowOffsetX  = lampsInRow > 1 ? 0 : iW / 2;
-        for (let col = 0; col < lampsInRow && count < anzahl; col++) {
-          positions.push({
-            cx: ox + (lampsInRow > 1 ? col * rowStepX : iW/2),
-            cy: oy + (rows > 1 ? row * (iH/(rows-1)) : iH/2)
-          });
-          count++;
-        }
-      }
-      break;
-    }
-    case 'reihe': {
-      // Einzelne Reihe, mittig horizontal, gleichmäßig verteilt
-      if (anzahl === 1) { positions.push({ cx: r.x1+W/2, cy: r.y1+H/2 }); break; }
-      for (let i = 0; i < anzahl; i++) {
-        positions.push({
-          cx: ox + (anzahl > 1 ? i * iW/(anzahl-1) : iW/2),
-          cy: r.y1 + H/2
-        });
-      }
-      break;
-    }
-    case 'rand': {
-      // Entlang der Wände verteilt (Rahmen)
-      if (anzahl === 0) break;
-      const perimeter = 2 * (iW + iH);
-      const step = perimeter / anzahl;
-      for (let i = 0; i < anzahl; i++) {
-        const d = i * step;
-        let cx, cy;
-        if (d < iW) {
-          cx = ox + d; cy = oy;
-        } else if (d < iW + iH) {
-          cx = ox + iW; cy = oy + (d - iW);
-        } else if (d < 2*iW + iH) {
-          cx = ox + iW - (d - iW - iH); cy = oy + iH;
-        } else {
-          cx = ox; cy = oy + iH - (d - 2*iW - iH);
-        }
-        positions.push({ cx, cy });
-      }
-      break;
-    }
+  // Raumgröße berechnen wenn Maßstab vorhanden
+  let raumInfo = '';
+  if (state.scale && _lv.pts.length === 3) {
+    const O=_lv.pts[0], P1=_lv.pts[1], P2=_lv.pts[2];
+    const breite = (Math.hypot(P1.x-O.x, P1.y-O.y) / state.scale).toFixed(1);
+    const tiefe  = (Math.hypot(P2.x-O.x, P2.y-O.y) / state.scale).toFixed(1);
+    raumInfo = `Raum: ${breite}m × ${tiefe}m\n`;
   }
-  return positions;
+
+  el.textContent =
+    raumInfo +
+    `Symbol: ${symName}\n` +
+    `Gesamt: ${gesamt} Leuchten · ${reihen} Reihe(n) · ca. ${proR}/Reihe\n` +
+    `Stromkreis: ${_lv.circuit} · NYM-J 3×1,5 / LS 10A B`;
 }
 
-function lvDrawPreview() {
-  const cv = document.getElementById('lvPreviewCanvas');
-  if (!cv) return;
-  const ctx2 = cv.getContext('2d');
+function lvDrawMini() {
+  const cv = document.getElementById('lvMiniCanvas');
+  if (!cv || _lv.pts.length < 3) return;
+  // Breite an Container anpassen
+  const containerW = cv.parentElement?.clientWidth || 430;
+  if (cv.width !== containerW) { cv.width = containerW; }
   const W = cv.width, H = cv.height;
-  ctx2.clearRect(0, 0, W, H);
+  const ctx2 = cv.getContext('2d');
+  ctx2.clearRect(0,0,W,H);
 
-  // Hintergrund (Raumgrundriss-Feeling)
-  ctx2.fillStyle = '#f5f6f8';
-  ctx2.fillRect(0, 0, W, H);
+  // Koordinaten: alle Punkte + Positionen auf Mini-Canvas skalieren
+  const O  = _lv.pts[0];
+  const P1 = _lv.pts[1];
+  const P2 = _lv.pts[2];
+  // Vierter Eckpunkt (für vollständiges Rechteck)
+  const P3 = { x: P1.x + P2.x - O.x, y: P1.y + P2.y - O.y };
 
-  // Subtile Gitterlinien
-  ctx2.strokeStyle = 'rgba(0,0,0,.06)';
-  ctx2.lineWidth   = 1;
-  const gs = 20;
-  for (let x=0; x<W; x+=gs) { ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,H); ctx2.stroke(); }
-  for (let y=0; y<H; y+=gs) { ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(W,y); ctx2.stroke(); }
+  const allX = [O.x, P1.x, P2.x, P3.x, ..._lv.positions.map(p=>p.x)];
+  const allY = [O.y, P1.y, P2.y, P3.y, ..._lv.positions.map(p=>p.y)];
+  const minX = Math.min(...allX), maxX = Math.max(...allX);
+  const minY = Math.min(...allY), maxY = Math.max(...allY);
 
-  // Raum-Rechteck zeichnen
-  if (_lv.roomRect) {
-    const r = _lv.roomRect;
-    // Raum-Fläche
-    ctx2.fillStyle = 'rgba(255,255,255,.9)';
-    ctx2.fillRect(r.x1, r.y1, r.x2-r.x1, r.y2-r.y1);
-    // Wandlinien
-    ctx2.strokeStyle = '#334';
-    ctx2.lineWidth   = 2.5;
-    ctx2.strokeRect(r.x1, r.y1, r.x2-r.x1, r.y2-r.y1);
-    // Wandabstand-Hilfslinien
-    if (_lv.wandAbstand > 0 && _lv.modus !== 'center') {
-      const wa = Math.min(_lv.wandAbstand / 500 * Math.min(r.x2-r.x1, r.y2-r.y1), Math.min(r.x2-r.x1,r.y2-r.y1)*0.25);
-      if (wa > 4) {
-        ctx2.strokeStyle = 'rgba(245,166,35,.35)';
-        ctx2.lineWidth   = 1;
-        ctx2.setLineDash([4,3]);
-        ctx2.strokeRect(r.x1+wa, r.y1+wa, r.x2-r.x1-2*wa, r.y2-r.y1-2*wa);
-        ctx2.setLineDash([]);
-      }
-    }
-    // Maß-Label
-    ctx2.fillStyle   = '#888';
-    ctx2.font        = '9px IBM Plex Mono,monospace';
-    ctx2.textAlign   = 'center';
-    ctx2.fillText('← Breite →', r.x1+(r.x2-r.x1)/2, r.y2+12);
+  const pad = 20;
+  const scX = (W - pad*2) / Math.max(1, maxX - minX);
+  const scY = (H - pad*2) / Math.max(1, maxY - minY);
+  const sc  = Math.min(scX, scY);
+  const offX = pad + ((W-pad*2) - (maxX-minX)*sc) / 2;
+  const offY = pad + ((H-pad*2) - (maxY-minY)*sc) / 2;
+
+  const tx = wx => offX + (wx - minX) * sc;
+  const ty = wy => offY + (wy - minY) * sc;
+
+  // Hintergrund
+  ctx2.fillStyle = '#f0f2f5';
+  ctx2.fillRect(0,0,W,H);
+
+  // Raumfläche (Parallelogramm → als Polygon)
+  ctx2.beginPath();
+  ctx2.moveTo(tx(O.x),  ty(O.y));
+  ctx2.lineTo(tx(P1.x), ty(P1.y));
+  ctx2.lineTo(tx(P3.x), ty(P3.y));
+  ctx2.lineTo(tx(P2.x), ty(P2.y));
+  ctx2.closePath();
+  ctx2.fillStyle   = 'rgba(255,255,255,.92)';
+  ctx2.fill();
+  ctx2.strokeStyle = '#334';
+  ctx2.lineWidth   = 2;
+  ctx2.stroke();
+
+  // Maß-Labels an den Seiten
+  if (state.scale) {
+    const bm = (Math.hypot(P1.x-O.x,P1.y-O.y)/state.scale).toFixed(1);
+    const tm = (Math.hypot(P2.x-O.x,P2.y-O.y)/state.scale).toFixed(1);
+    ctx2.font      = '9px IBM Plex Mono,monospace';
+    ctx2.fillStyle = '#888';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(bm+'m', (tx(O.x)+tx(P1.x))/2, Math.min(ty(O.y),ty(P1.y))-6);
     ctx2.save();
-    ctx2.translate(r.x1-10, r.y1+(r.y2-r.y1)/2);
+    ctx2.translate((tx(O.x)+tx(P2.x))/2-12, (ty(O.y)+ty(P2.y))/2);
     ctx2.rotate(-Math.PI/2);
-    ctx2.fillText('Tiefe', 0, 0);
+    ctx2.fillText(tm+'m', 0, 0);
     ctx2.restore();
     ctx2.textAlign = 'left';
-  } else if (_lv.roomPts.length === 1) {
-    // Erster Punkt gesetzt
-    const p = _lv.roomPts[0];
-    ctx2.beginPath();
-    ctx2.arc(p.cx, p.cy, 6, 0, Math.PI*2);
-    ctx2.fillStyle = '#f5a623';
-    ctx2.fill();
   }
 
-  // Lampen-Positionen zeichnen
-  _lv.positions.forEach((pos, idx) => {
-    const R = 11;
-    // Licht-Aura
-    const grad = ctx2.createRadialGradient(pos.cx, pos.cy, 0, pos.cx, pos.cy, R*2.2);
-    grad.addColorStop(0,   'rgba(255,230,80,.55)');
-    grad.addColorStop(0.5, 'rgba(255,200,40,.18)');
-    grad.addColorStop(1,   'rgba(255,200,0,0)');
+  // 3 Eckpunkte markieren
+  [[O,'P1'],[P1,'P2'],[P2,'P3']].forEach(([p,lbl]) => {
     ctx2.beginPath();
-    ctx2.arc(pos.cx, pos.cy, R*2.2, 0, Math.PI*2);
-    ctx2.fillStyle = grad;
-    ctx2.fill();
-    // Symbol-Kreis
-    ctx2.beginPath();
-    ctx2.arc(pos.cx, pos.cy, R, 0, Math.PI*2);
-    ctx2.fillStyle   = '#fff';
-    ctx2.strokeStyle = '#f5a623';
-    ctx2.lineWidth   = 2;
-    ctx2.fill(); ctx2.stroke();
-    // Kreuz (Leuchten-Symbol nach DIN)
-    ctx2.strokeStyle = '#f5a623';
+    ctx2.arc(tx(p.x), ty(p.y), 5, 0, Math.PI*2);
+    ctx2.fillStyle   = '#f5a623';
+    ctx2.strokeStyle = '#fff';
     ctx2.lineWidth   = 1.5;
-    ctx2.beginPath(); ctx2.moveTo(pos.cx-6, pos.cy); ctx2.lineTo(pos.cx+6, pos.cy); ctx2.stroke();
-    ctx2.beginPath(); ctx2.moveTo(pos.cx, pos.cy-6); ctx2.lineTo(pos.cx, pos.cy+6); ctx2.stroke();
-    // Nummer
-    ctx2.fillStyle   = '#333';
-    ctx2.font        = 'bold 8px IBM Plex Mono,monospace';
-    ctx2.textAlign   = 'center';
-    ctx2.fillText(idx+1, pos.cx, pos.cy+R+10);
-    ctx2.textAlign   = 'left';
+    ctx2.fill(); ctx2.stroke();
+    ctx2.fillStyle = '#f5a623';
+    ctx2.font      = 'bold 8px IBM Plex Mono,monospace';
+    ctx2.fillText(lbl, tx(p.x)+6, ty(p.y)-4);
   });
 
-  // Anleitung wenn leer
-  if (_lv.roomPts.length === 0 && _lv.positions.length === 0) {
-    ctx2.fillStyle = 'rgba(0,0,0,.25)';
-    ctx2.font      = '13px IBM Plex Sans,sans-serif';
-    ctx2.textAlign = 'center';
-    ctx2.fillText('Klicke hier zwei Ecken des Raums', W/2, H/2 - 10);
-    ctx2.font      = '11px IBM Plex Mono,monospace';
-    ctx2.fillStyle = 'rgba(245,166,35,.7)';
-    ctx2.fillText('Ecke 1 → Ecke 2 (diagonal gegenüber)', W/2, H/2 + 12);
-    ctx2.textAlign = 'left';
+  // Lampen-Positionen
+  _lv.positions.forEach((pos, idx) => {
+    const px = tx(pos.x), py = ty(pos.y);
+    const R  = 9;
+    // Lichtaura
+    const grad = ctx2.createRadialGradient(px,py,0,px,py,R*2);
+    grad.addColorStop(0,   'rgba(255,230,80,.6)');
+    grad.addColorStop(1,   'rgba(255,200,0,0)');
+    ctx2.beginPath(); ctx2.arc(px,py,R*2,0,Math.PI*2);
+    ctx2.fillStyle=grad; ctx2.fill();
+    // Symbol
+    ctx2.beginPath(); ctx2.arc(px,py,R,0,Math.PI*2);
+    ctx2.fillStyle='#fff'; ctx2.strokeStyle='#f5a623'; ctx2.lineWidth=1.8;
+    ctx2.fill(); ctx2.stroke();
+    // Kreuz
+    ctx2.strokeStyle='#f5a623'; ctx2.lineWidth=1.5;
+    ctx2.beginPath(); ctx2.moveTo(px-5,py); ctx2.lineTo(px+5,py); ctx2.stroke();
+    ctx2.beginPath(); ctx2.moveTo(px,py-5); ctx2.lineTo(px,py+5); ctx2.stroke();
+    // Nummer
+    ctx2.fillStyle='#333'; ctx2.font='bold 7px IBM Plex Mono,monospace';
+    ctx2.textAlign='center';
+    ctx2.fillText(idx+1, px, py+R+8);
+    ctx2.textAlign='left';
+  });
+}
+
+// ── Canvas-Hint anzeigen ──
+function lvShowHint(msg) {
+  const el = document.getElementById('lvCanvasHint');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function lvHideHint() {
+  const el = document.getElementById('lvCanvasHint');
+  if (el) el.style.display = 'none';
+}
+
+// ── Overlay-Dots auf Hauptcanvas zeichnen ──
+// (wird von render() aufgerufen)
+function lvDrawOverlay() {
+  if (!_lv.active && _lv.pts.length === 0) return;
+  const R = 8 / state.zoom;
+  _lv.pts.forEach((p, i) => {
+    ctx.save();
+    // Leuchtring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, R*1.8, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(245,166,35,.2)';
+    ctx.fill();
+    // Punkt
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, R, 0, Math.PI*2);
+    ctx.fillStyle   = '#f5a623';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth   = 2/state.zoom;
+    ctx.fill(); ctx.stroke();
+    // Label
+    ctx.font      = `bold ${10/state.zoom}px IBM Plex Mono,monospace`;
+    ctx.fillStyle = '#f5a623';
+    ctx.fillText('P'+(i+1), p.x + R*1.3, p.y - R*0.5);
+    // Linie zwischen Punkten
+    if (i > 0) {
+      ctx.strokeStyle = 'rgba(245,166,35,.5)';
+      ctx.lineWidth   = 1.5/state.zoom;
+      ctx.setLineDash([4/state.zoom, 3/state.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(_lv.pts[i-1].x, _lv.pts[i-1].y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  });
+  // Raumrahmen wenn 3 Punkte gesetzt
+  if (_lv.pts.length === 3) {
+    const O=_lv.pts[0], P1=_lv.pts[1], P2=_lv.pts[2];
+    const P3={ x:P1.x+P2.x-O.x, y:P1.y+P2.y-O.y };
+    ctx.save();
+    ctx.strokeStyle='rgba(245,166,35,.4)';
+    ctx.lineWidth=1.5/state.zoom;
+    ctx.setLineDash([5/state.zoom,3/state.zoom]);
+    ctx.beginPath();
+    ctx.moveTo(O.x,O.y); ctx.lineTo(P1.x,P1.y);
+    ctx.lineTo(P3.x,P3.y); ctx.lineTo(P2.x,P2.y);
+    ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 }
 
+// ── Platzieren ──
+
 function lvPlace() {
-  if (!_lv.positions.length) return;
-
-  // Koordinaten aus Preview-Canvas auf Haupt-Canvas umrechnen
-  const cv = document.getElementById('lvPreviewCanvas');
-  const W  = cv.width, H = cv.height;
-
-  // Bestimme den sichtbaren Canvas-Bereich im Weltkoordinatensystem
-  const visX1 = -state.pan.x / state.zoom;
-  const visY1 = -state.pan.y / state.zoom;
-  const visW   = canvas.width  / state.zoom;
-  const visH   = canvas.height / state.zoom;
-
-  // Preview-Canvas → Hauptcanvas-Weltkoords
-  const mapX = (cx) => visX1 + (cx / W) * visW;
-  const mapY = (cy) => visY1 + (cy / H) * visH;
-
+  if (_lv.positions.length === 0) { setStatus('Bitte zuerst Anzahl/Reihen eingeben'); return; }
   saveUndo();
 
-  const circuit  = _lv.circuit || 'F01.1';
-  const placed   = [];
+  const circuit = _lv.circuit || 'F01.1';
+  const placed  = [];
+  const symDef  = SYMBOLS[_lv.symKey];
+  const autoK   = autoKabelConfig(_lv.symKey);
 
   _lv.positions.forEach((pos, idx) => {
-    const wx = mapX(pos.cx);
-    const wy = mapY(pos.cy);
-
-    const sym = SYMBOLS[_lv.symKey];
-    if (!sym) return;
-
-    const autoK = autoKabelConfig(_lv.symKey);
     const s = {
       id:           gid(),
       type:         _lv.symKey,
-      x:            wx,
-      y:            wy,
+      x:            pos.x,
+      y:            pos.y,
       rotation:     0,
-      label:        (sym.name || _lv.symKey) + ' ' + (idx + 1),
+      label:        (symDef?.name || _lv.symKey) + ' ' + (idx+1),
       circuit:      circuit,
-      phase:        sym.phase   || 'L1',
-      nennstrom:    autoK?.nennstrom || sym.nennstrom || 10,
-      kabel:        autoK?.kabel     || sym.kabel     || 'NYM-J 3×1.5',
+      phase:        symDef?.phase   || 'L1',
+      nennstrom:    autoK?.nennstrom || symDef?.nennstrom || 10,
+      kabel:        autoK?.kabel     || symDef?.kabel     || 'NYM-J 3×1.5',
       kabelHinweis: autoK?.kabelHinweis || 'NYM-J 3×1,5 / LS 10A B',
       lsKurve:      'B',
       kabelPosition:'unten',
       kabelLaenge:  '',
-      kommentar:    'Verteilung: ' + _lv.modus,
+      kommentar:    `${_lv.reihen} Reihe(n), ${_lv.anzahl} Leuchten gesamt`,
       count:        1,
     };
     state.symbols.push(s);
     placed.push(s);
   });
 
-  // Upload-Zone ausblenden
   if (state.symbols.length > 0) {
     const uz = document.getElementById('uploadZone');
     if (uz) uz.style.display = 'none';
   }
 
-  render();
-  closeLVModal();
-
-  const modusLabel = {
-    center: 'zentriert', raster: 'Raster', reihe: 'Reihe', rand: 'Rand', manuell: 'manuell'
-  };
-  setStatus(`✅ ${placed.length} Leuchten platziert (${modusLabel[_lv.modus]||_lv.modus}) · Stromkreis ${circuit}`);
-
-  // Reset für nächsten Einsatz
-  _lv.roomPts   = [];
+  // Reset
+  _lv.pts       = [];
   _lv.positions = [];
-  _lv.roomRect  = null;
-  _lv.manualPts = [];
+  _lv.active    = false;
+  lvHideHint();
+  document.getElementById('lvModal').classList.add('hid');
+  render();
+  setStatus(`✅ ${placed.length} Leuchten platziert · ${_lv.reihen} Reihe(n) · Stromkreis ${circuit}`);
 }
 
 
