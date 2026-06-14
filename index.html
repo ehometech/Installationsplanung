@@ -141,19 +141,20 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .modal h3{font-size:14px;margin-bottom:14px;}
 .mft{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
 
-/* ── BELEUCHTUNGSVERTEILUNG MODAL ── */
-.lv-modal { width:480px; max-width:96vw; }
+/* ── BELEUCHTUNGSVERTEILUNG — Overlay-Panel ── */
+.lv-modal { width:340px; max-width:96vw; }
 .lv-card {
   background:var(--sf2); border:2px solid var(--bd); border-radius:6px;
-  padding:8px 10px; cursor:pointer; transition:all .15s;
-  display:flex; align-items:center; gap:8px; font-size:11px;
+  padding:7px 9px; cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; gap:7px; font-size:11px;
 }
 .lv-card:hover { border-color:var(--ac); color:var(--ac); }
-.lv-card.sel  { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
-.lv-card .lv-ico { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
-.lv-sec { margin-bottom:12px; }
-.lv-sec-ttl { font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
-  letter-spacing:.7px; margin-bottom:7px; padding-bottom:3px; border-bottom:1px solid var(--bd); }
+.lv-card.sel   { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
+.lv-card .lv-ico { font-size:18px; width:22px; text-align:center; flex-shrink:0; }
+.lv-sec-ttl {
+  font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
+  letter-spacing:.7px; margin-bottom:7px; padding-bottom:3px; border-bottom:1px solid var(--bd);
+}
 .lv-field { margin-bottom:7px; }
 .lv-field label { display:block; font-size:10px; color:var(--tx2); margin-bottom:3px; }
 .lv-field input, .lv-field select {
@@ -161,40 +162,41 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   font-family:var(--sans); font-size:11px; padding:5px 8px; border-radius:3px;
   outline:none; width:100%;
 }
-.lv-field input:focus, .lv-field select:focus { border-color:var(--ac); }
-.lv-step-indicator {
-  display:flex; gap:0; margin-bottom:14px;
+.lv-field input:focus { border-color:var(--ac); }
+/* Overlay-Panel über dem Canvas (kein modal-ov Backdrop) */
+#lvOverlayPanel {
+  position:absolute; top:12px; right:12px; z-index:120;
+  background:var(--sf); border:1px solid var(--bd2); border-radius:8px;
+  padding:14px 16px; width:280px;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);
+  display:none; /* shown via JS */
 }
+#lvOverlayPanel h4 { font-size:13px; font-weight:700; color:var(--ac); margin-bottom:8px; display:flex; align-items:center; gap:7px; }
+/* Zeichenmodus Hinweis-Banner */
+#lvDrawBanner {
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  background:rgba(245,166,35,.95); color:#000; font-weight:700;
+  font-size:12px; padding:9px 22px; border-radius:24px; z-index:130;
+  pointer-events:none; white-space:nowrap; display:none;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);
+}
+/* Zeichenmodus-Cursor für canvas-wrap */
+#canvas-wrap.lv-draw-mode { cursor:crosshair !important; }
+#canvas-wrap.lv-draw-mode #main-canvas { cursor:crosshair !important; }
+/* Mini-Vorschau Canvas im Panel */
+#lvMiniCanvas {
+  background:#1a1f2e; border:1px solid var(--bd2); border-radius:4px;
+  display:block; width:100%; margin-bottom:8px;
+}
+.lv-step-indicator { display:flex; gap:0; margin-bottom:10px; }
 .lv-step {
-  flex:1; text-align:center; padding:6px 4px; font-size:10px; font-weight:600;
-  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3);
-  transition:all .2s;
+  flex:1; text-align:center; padding:5px 3px; font-size:9px; font-weight:600;
+  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3); transition:all .2s;
 }
 .lv-step:first-child { border-radius:4px 0 0 4px; }
 .lv-step:last-child  { border-radius:0 4px 4px 0; }
-.lv-step.done  { background:rgba(63,185,80,.15); border-color:#3fb950; color:#3fb950; }
-.lv-step.act   { background:rgba(245,166,35,.18); border-color:var(--ac); color:var(--ac); }
-.lv-pts-display {
-  display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;
-}
-.lv-pt-badge {
-  font-family:var(--mono); font-size:9px; padding:3px 8px; border-radius:10px;
-  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3);
-}
-.lv-pt-badge.set { background:rgba(245,166,35,.15); border-color:var(--ac); color:var(--ac); }
-.lv-canvas-hint {
-  position:absolute; top:10px; left:50%; transform:translateX(-50%);
-  background:rgba(245,166,35,.92); color:#000; font-weight:700;
-  font-size:12px; padding:8px 18px; border-radius:20px; z-index:50;
-  pointer-events:none; white-space:nowrap; display:none;
-}
-.lv-overlay-panel {
-  position:absolute; bottom:16px; right:16px; z-index:60;
-  background:var(--sf); border:1px solid var(--bd2); border-radius:8px;
-  padding:14px 16px; width:240px; box-shadow:0 4px 20px rgba(0,0,0,.5);
-  display:none;
-}
-.lv-overlay-panel h4 { font-size:12px; font-weight:700; color:var(--ac); margin-bottom:10px; }
+.lv-step.done { background:rgba(63,185,80,.15); border-color:#3fb950; color:#3fb950; }
+.lv-step.act  { background:rgba(245,166,35,.18); border-color:var(--ac); color:var(--ac); }
 
 /* Touch drag ghost */
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);}
@@ -450,7 +452,70 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <span id="scaleBarLabel">—</span>
       </div>
       <div class="calibrate-hint hid" id="calHint">📏 Klicke zwei Punkte für eine bekannte Distanz</div>
-      <div class="lv-canvas-hint" id="lvCanvasHint">📍 Klicke Punkt 1 (Ecke oben links)</div>
+
+      <!-- LV: Zeichnungs-Overlay-Canvas (über allem) -->
+      <canvas id="lvOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:110;display:none"></canvas>
+
+      <!-- LV: Hinweis-Banner oben -->
+      <div id="lvDrawBanner">💡 Linie 1 ziehen — Raumbreite</div>
+
+      <!-- LV: Einstellungs-Panel rechts oben -->
+      <div id="lvOverlayPanel">
+        <h4>💡 <span id="lvPanelTitle">Beleuchtung</span></h4>
+        <div class="lv-step-indicator" id="lvStepBar">
+          <div class="lv-step act" id="lvStep1">① Typ</div>
+          <div class="lv-step"     id="lvStep2">② Raum</div>
+          <div class="lv-step"     id="lvStep3">③ Verteilen</div>
+        </div>
+
+        <!-- Pane 1: Symbol -->
+        <div id="lvPane1">
+          <div class="lv-sec-ttl">Leuchtmitteltyp</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px" id="lvSymGrid"></div>
+          <div class="lv-field">
+            <label>Stromkreis</label>
+            <input type="text" id="lvCircuit" value="F01.1">
+          </div>
+          <button class="btn ba" style="width:100%;margin-top:6px" onclick="lvGoStep2()">
+            Weiter → Raum zeichnen
+          </button>
+        </div>
+
+        <!-- Pane 2: Zeichnen -->
+        <div id="lvPane2" style="display:none">
+          <div class="lv-sec-ttl" id="lvDrawTitle">Linie 1 — Raumbreite ziehen</div>
+          <div style="font-size:10px;color:var(--tx2);line-height:1.6;margin-bottom:8px" id="lvDrawInfo">
+            Maustaste/Touch auf den Grundriss drücken und entlang der <strong style="color:var(--ac)">Raumbreite</strong> ziehen.
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--tx3);margin-bottom:8px" id="lvLineStatus">
+            Linie 1: —&nbsp;&nbsp;&nbsp;Linie 2: —
+          </div>
+          <button class="btn bg" style="width:100%;font-size:10px" onclick="lvResetLines()">↺ Linien zurücksetzen</button>
+          <button class="btn bg" style="width:100%;font-size:10px;margin-top:4px" onclick="closeLVModal()">Abbrechen</button>
+        </div>
+
+        <!-- Pane 3: Verteilen -->
+        <div id="lvPane3" style="display:none">
+          <div class="lv-sec-ttl">Lampen verteilen</div>
+          <canvas id="lvMiniCanvas" height="130"></canvas>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div class="lv-field">
+              <label>Anzahl Lampen</label>
+              <input type="number" id="lvAnzahl" value="4" min="1" max="48" oninput="lvCalcAndDraw()">
+            </div>
+            <div class="lv-field">
+              <label>Anzahl Reihen</label>
+              <input type="number" id="lvReihen" value="2" min="1" max="12" oninput="lvCalcAndDraw()">
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--tx2);line-height:1.6;margin-bottom:8px" id="lvInfo">—</div>
+          <div style="display:flex;gap:5px">
+            <button class="btn bg" onclick="lvGoStep2()" style="font-size:10px">← Zurück</button>
+            <button class="btn ba" style="flex:1;font-size:11px" onclick="lvPlace()">✓ Platzieren</button>
+          </div>
+          <button class="btn bg" style="width:100%;font-size:10px;margin-top:4px" onclick="closeLVModal()">Abbrechen</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -936,85 +1001,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="btn bg" onclick="deleteSelectedSymbol()">🗑 Löschen</button>
       <button class="btn bg" onclick="closeSymModal()">Schließen</button>
     </div>
-  </div>
-</div>
-
-<!-- BELEUCHTUNGSVERTEILUNG MODAL -->
-<div class="modal-ov hid" id="lvModal">
-  <div class="modal lv-modal">
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <span style="font-size:20px">💡</span>
-      <h3 style="margin:0;font-size:14px">Beleuchtung im Raum verteilen</h3>
-      <div style="flex:1"></div>
-      <button class="btn bg" onclick="closeLVModal()" style="font-size:11px;padding:4px 9px">✕</button>
-    </div>
-
-    <!-- Fortschritt -->
-    <div class="lv-step-indicator" id="lvStepBar">
-      <div class="lv-step act" id="lvStep1">① Leuchtmittel</div>
-      <div class="lv-step"     id="lvStep2">② Raum zeichnen</div>
-      <div class="lv-step"     id="lvStep3">③ Verteilen</div>
-    </div>
-
-    <!-- SCHRITT 1: Leuchtmitteltyp -->
-    <div id="lvPane1">
-      <div class="lv-sec-ttl" style="margin-bottom:8px">Leuchtmitteltyp</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px" id="lvSymGrid"></div>
-      <div class="lv-field">
-        <label>Stromkreis</label>
-        <input type="text" id="lvCircuit" value="F01.1" style="width:110px">
-      </div>
-      <button class="btn ba" style="width:100%;margin-top:8px" onclick="lvGoStep2()">
-        Weiter — Raum einzeichnen →
-      </button>
-    </div>
-
-    <!-- SCHRITT 2: Raum einzeichnen mit 2 Linien -->
-    <div id="lvPane2" style="display:none">
-      <div class="lv-sec-ttl" style="margin-bottom:6px">Raum einzeichnen</div>
-      <div style="display:flex;gap:6px;margin-bottom:8px">
-        <div id="lvInstr1" style="flex:1;background:rgba(245,166,35,.18);border:1px solid var(--ac);border-radius:5px;padding:7px 9px;font-size:10px;line-height:1.5">
-          <div style="font-weight:700;color:var(--ac);margin-bottom:2px">① Breite ziehen</div>
-          <div style="color:var(--tx2)">Entlang der <strong>Raumbreite</strong> ziehen</div>
-        </div>
-        <div id="lvInstr2" style="flex:1;background:var(--sf2);border:1px solid var(--bd);border-radius:5px;padding:7px 9px;font-size:10px;line-height:1.5;opacity:.5">
-          <div style="font-weight:700;color:var(--tx2);margin-bottom:2px">② Tiefe ziehen</div>
-          <div style="color:var(--tx3)">Entlang der <strong>Raumtiefe</strong> ziehen</div>
-        </div>
-      </div>
-      <canvas id="lvDrawCanvas" height="240"
-        style="background:#f0f2f5;border:2px solid var(--ac);border-radius:6px;display:block;width:100%;cursor:crosshair;touch-action:none">
-      </canvas>
-      <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:5px" id="lvDrawHint">
-        Linie 1: Maustaste halten und Breite des Raums einzeichnen
-      </div>
-      <button class="btn bg" style="width:100%;margin-top:6px;font-size:11px" onclick="lvResetLines()">↺ Zurücksetzen</button>
-    </div>
-
-    <!-- SCHRITT 3: Anzahl & Reihen -->
-    <div id="lvPane3" style="display:none">
-      <div class="lv-sec-ttl" style="margin-bottom:6px">Lampen verteilen</div>
-      <canvas id="lvMiniCanvas" height="180"
-        style="background:#f0f2f5;border:1px solid var(--bd2);border-radius:5px;display:block;width:100%;margin-bottom:8px">
-      </canvas>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="lv-field">
-          <label>Anzahl Lampen</label>
-          <input type="number" id="lvAnzahl" value="4" min="1" max="48" oninput="lvCalcAndDraw()">
-        </div>
-        <div class="lv-field">
-          <label>Anzahl Reihen</label>
-          <input type="number" id="lvReihen" value="2" min="1" max="12" oninput="lvCalcAndDraw()">
-        </div>
-      </div>
-      <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:4px;padding:7px 9px;font-family:var(--mono);font-size:10px;color:var(--tx2);line-height:1.7;margin-bottom:8px" id="lvInfo">—</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn bg" onclick="lvGoStep2()" style="font-size:11px">← Zurück</button>
-        <button class="btn ba" style="flex:1" onclick="lvPlace()">✓ Auf Grundriss platzieren</button>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -5348,7 +5334,7 @@ function setStatus(msg,col) {
 }
 
 // ═══════════════════════════════════════════════════
-//  BELEUCHTUNGSVERTEILUNG — 2-Linien Raum + Raster
+//  BELEUCHTUNGSVERTEILUNG — Overlay auf Grundriss
 // ═══════════════════════════════════════════════════
 
 const LV_SYMBOL_TYPES = [
@@ -5362,35 +5348,48 @@ const LV_SYMBOL_TYPES = [
 
 // ── State ──
 let _lv = {
-  step:    1,           // 1 | 2 | 3
-  symKey: 'deckenleuchte',
-  circuit:'F01.1',
-  // 2 Linien, jede als {x1,y1,x2,y2} in Draw-Canvas-Pixeln
-  lineA:   null,        // Breitenlinie (erste Linie)
-  lineB:   null,        // Tiefenlinie  (zweite Linie)
-  dragging:false,
-  dragStart:null,
-  anzahl:  4,
-  reihen:  2,
-  positions:[],         // berechnete Canvas-Weltkoords  [{x,y}]
+  active:   false,  // Zeichenmodus läuft
+  step:     1,      // 1=Typ  2=Zeichnen  3=Verteilen
+  symKey:  'deckenleuchte',
+  circuit: 'F01.1',
+  // Zwei Linien in Canvas-WELT-Koordinaten
+  lineA:    null,   // {x1,y1,x2,y2}  Breite
+  lineB:    null,   // {x1,y1,x2,y2}  Tiefe
+  // Drag-State
+  dragPt:   null,   // {x,y} Startpunkt aktueller Linie
+  dragCur:  null,   // {x,y} aktuelle Mausposition
+  // Ergebnis
+  anzahl:   4,
+  reihen:   2,
+  positions:[],     // [{x,y}] in Weltkoords
 };
 
-// ─────────────────────────────────────
-//  Schritt-Navigation
-// ─────────────────────────────────────
+// ──────────────────────────────────────
+//  Panel öffnen / schließen
+// ──────────────────────────────────────
 
 function openLVModal() {
-  _lv.step = 1; _lv.lineA = null; _lv.lineB = null;
-  _lv.positions = []; _lv.dragging = false;
+  _lv.active   = false;
+  _lv.step     = 1;
+  _lv.lineA    = null; _lv.lineB = null;
+  _lv.dragPt   = null; _lv.dragCur = null;
+  _lv.positions= [];
   lvRenderSymGrid();
   lvUpdateStepBar();
   lvShowPane(1);
   document.getElementById('lvCircuit').value = _lv.circuit;
-  document.getElementById('lvModal').classList.remove('hid');
+  document.getElementById('lvOverlayPanel').style.display = 'block';
+  document.getElementById('lvDrawBanner').style.display   = 'none';
 }
 
 function closeLVModal() {
-  document.getElementById('lvModal').classList.add('hid');
+  _lv.active  = false;
+  _lv.dragPt  = null; _lv.dragCur = null;
+  document.getElementById('lvOverlayPanel').style.display = 'none';
+  document.getElementById('lvDrawBanner').style.display   = 'none';
+  document.getElementById('lvOverlayCanvas').style.display = 'none';
+  document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
+  lvRedrawOverlay(); // löscht Overlay
 }
 
 function lvAbort() { closeLVModal(); }
@@ -5400,6 +5399,8 @@ function lvShowPane(n) {
     const p = document.getElementById('lvPane'+i);
     if (p) p.style.display = (i===n) ? 'block' : 'none';
   });
+  _lv.step = n;
+  lvUpdateStepBar();
 }
 
 function lvUpdateStepBar() {
@@ -5412,9 +5413,9 @@ function lvUpdateStepBar() {
   });
 }
 
-// ─────────────────────────────────────
-//  Schritt 1 — Symbolwahl
-// ─────────────────────────────────────
+// ──────────────────────────────────────
+//  Schritt 1 — Symbol wählen
+// ──────────────────────────────────────
 
 function lvRenderSymGrid() {
   const g = document.getElementById('lvSymGrid');
@@ -5422,457 +5423,438 @@ function lvRenderSymGrid() {
   g.innerHTML = LV_SYMBOL_TYPES.map(s =>
     `<div class="lv-card${s.key===_lv.symKey?' sel':''}" onclick="lvSelSym('${s.key}',this)">
        <span class="lv-ico">${s.icon}</span>
-       <div>
-         <div style="font-weight:600;font-size:11px">${s.label}</div>
-         <div style="font-size:9px;color:var(--tx3);font-family:var(--mono)">NYM-J 3×1,5 / 10A</div>
-       </div>
+       <div style="font-size:10px;font-weight:600">${s.label}</div>
      </div>`
   ).join('');
 }
 
 function lvSelSym(key, el) {
   _lv.symKey = key;
-  document.querySelectorAll('#lvSymGrid .lv-card').forEach(c=>c.classList.remove('sel'));
+  document.querySelectorAll('#lvSymGrid .lv-card').forEach(c2=>c2.classList.remove('sel'));
   el.classList.add('sel');
 }
 
 function lvGoStep2() {
   _lv.circuit = document.getElementById('lvCircuit').value || 'F01.1';
-  _lv.step = 2;
-  _lv.lineA = null; _lv.lineB = null;
-  lvUpdateStepBar();
+  _lv.lineA   = null; _lv.lineB = null;
+  _lv.dragPt  = null; _lv.dragCur = null;
+  _lv.active  = true;
   lvShowPane(2);
-  lvUpdateInstrCards();
-  // Draw-Canvas initialisieren
-  requestAnimationFrame(lvInitDrawCanvas);
+  lvSetDrawPhase(1);
+  // Overlay-Canvas aktivieren
+  lvInitOverlayCanvas();
+  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
+  document.getElementById('lvDrawBanner').style.display = 'block';
+  document.getElementById('lvDrawBanner').textContent   = '✏ Linie 1 ziehen — Raumbreite einzeichnen';
 }
 
-// ─────────────────────────────────────
-//  Schritt 2 — 2 Linien zeichnen
-// ─────────────────────────────────────
+// ──────────────────────────────────────
+//  Overlay-Canvas initialisieren
+// ──────────────────────────────────────
 
-function lvInitDrawCanvas() {
-  const cv = document.getElementById('lvDrawCanvas');
-  if (!cv) return;
-  // Breite vom Container
-  cv.width = cv.parentElement.clientWidth - 4;
-  lvDrawCanvasRender();
+function lvInitOverlayCanvas() {
+  const ov = document.getElementById('lvOverlayCanvas');
+  if (!ov) return;
+  const wr = document.getElementById('canvas-wrap');
+  ov.width  = wr.clientWidth;
+  ov.height = wr.clientHeight;
+  ov.style.display = 'block';
+  ov.style.width   = wr.clientWidth  + 'px';
+  ov.style.height  = wr.clientHeight + 'px';
+  // Events (einmalig binden)
+  if (ov._lvBound) { lvRedrawOverlay(); return; }
+  ov._lvBound = true;
+  ov.style.pointerEvents = 'auto'; // übernimmt Events
 
-  // Events (nur einmal binden)
-  if (cv._lvBound) return;
-  cv._lvBound = true;
-
-  function getPos(e) {
-    const r = cv.getBoundingClientRect();
+  function worldPt(e) {
+    const r   = ov.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - r.left, y: src.clientY - r.top };
+    const cx  = src.clientX - r.left;
+    const cy  = src.clientY - r.top;
+    // Screen → Welt
+    return {
+      x: (cx - state.pan.x) / state.zoom,
+      y: (cy - state.pan.y) / state.zoom,
+    };
   }
 
   function onDown(e) {
-    e.preventDefault();
-    _lv.dragging  = true;
-    _lv.dragStart = getPos(e);
+    if (!_lv.active) return;
+    e.preventDefault(); e.stopPropagation();
+    _lv.dragPt  = worldPt(e);
+    _lv.dragCur = worldPt(e);
   }
   function onMove(e) {
-    e.preventDefault();
-    if (!_lv.dragging) return;
-    const cur = getPos(e);
-    // Vorschau der aktuellen Linie
-    _lv._dragCur = cur;
-    lvDrawCanvasRender();
+    if (!_lv.active || !_lv.dragPt) return;
+    e.preventDefault(); e.stopPropagation();
+    _lv.dragCur = worldPt(e);
+    lvRedrawOverlay();
   }
   function onUp(e) {
-    e.preventDefault();
-    if (!_lv.dragging) return;
-    _lv.dragging = false;
-    const src = e.changedTouches ? e.changedTouches[0] : e;
-    const r   = cv.getBoundingClientRect();
-    const end = { x: src.clientX - r.left, y: src.clientY - r.top };
-    _lv._dragCur = null;
-
-    // Zu kurz → ignorieren
-    const len = Math.hypot(end.x - _lv.dragStart.x, end.y - _lv.dragStart.y);
-    if (len < 20) return;
-
-    const line = { x1:_lv.dragStart.x, y1:_lv.dragStart.y, x2:end.x, y2:end.y };
-
-    if (!_lv.lineA) {
-      _lv.lineA = line;
-      lvUpdateInstrCards();
-      document.getElementById('lvDrawHint').textContent =
-        'Linie 2: Maustaste halten und Tiefe (Raumtiefe) einzeichnen';
-    } else if (!_lv.lineB) {
-      _lv.lineB = line;
-      lvUpdateInstrCards();
-      document.getElementById('lvDrawHint').textContent =
-        '✅ Beide Linien gesetzt — weiter zu Schritt 3';
-      // Nach kurzer Pause zu Schritt 3
-      setTimeout(lvGoStep3, 600);
+    if (!_lv.active || !_lv.dragPt) return;
+    e.preventDefault(); e.stopPropagation();
+    const end = worldPt(e.changedTouches ? {clientX:e.changedTouches[0].clientX,clientY:e.changedTouches[0].clientY} : e);
+    const len  = Math.hypot(end.x-_lv.dragPt.x, end.y-_lv.dragPt.y);
+    if (len > 10/state.zoom) {          // Mindestlänge
+      const line = {x1:_lv.dragPt.x, y1:_lv.dragPt.y, x2:end.x, y2:end.y};
+      if (!_lv.lineA) {
+        _lv.lineA = line;
+        lvSetDrawPhase(2);
+      } else if (!_lv.lineB) {
+        _lv.lineB = line;
+        lvSetDrawPhase(3);           // → Schritt 3 automatisch
+      }
     }
-    lvDrawCanvasRender();
+    _lv.dragPt  = null;
+    _lv.dragCur = null;
+    lvRedrawOverlay();
   }
 
-  cv.addEventListener('mousedown',  onDown,  { passive:false });
-  cv.addEventListener('mousemove',  onMove,  { passive:false });
-  cv.addEventListener('mouseup',    onUp,    { passive:false });
-  cv.addEventListener('mouseleave', onUp,    { passive:false });
-  cv.addEventListener('touchstart', onDown,  { passive:false });
-  cv.addEventListener('touchmove',  onMove,  { passive:false });
-  cv.addEventListener('touchend',   onUp,    { passive:false });
+  ov.addEventListener('mousedown',  onDown, {passive:false});
+  ov.addEventListener('mousemove',  onMove, {passive:false});
+  ov.addEventListener('mouseup',    onUp,   {passive:false});
+  ov.addEventListener('touchstart', onDown, {passive:false});
+  ov.addEventListener('touchmove',  onMove, {passive:false});
+  ov.addEventListener('touchend',   onUp,   {passive:false});
+  lvRedrawOverlay();
 }
 
-function lvUpdateInstrCards() {
-  const i1 = document.getElementById('lvInstr1');
-  const i2 = document.getElementById('lvInstr2');
-  if (!i1||!i2) return;
-  if (!_lv.lineA) {
-    i1.style.opacity='1';  i1.style.background='rgba(245,166,35,.18)'; i1.style.borderColor='var(--ac)';
-    i2.style.opacity='.4'; i2.style.background='var(--sf2)'; i2.style.borderColor='var(--bd)';
-  } else if (!_lv.lineB) {
-    i1.style.opacity='.7'; i1.style.background='rgba(63,185,80,.1)'; i1.style.borderColor='var(--gr)';
-    i2.style.opacity='1';  i2.style.background='rgba(245,166,35,.18)'; i2.style.borderColor='var(--ac)';
-  } else {
-    i1.style.opacity='.7'; i1.style.background='rgba(63,185,80,.1)'; i1.style.borderColor='var(--gr)';
-    i2.style.opacity='.7'; i2.style.background='rgba(63,185,80,.1)'; i2.style.borderColor='var(--gr)';
+function lvSetDrawPhase(phase) {
+  const banner = document.getElementById('lvDrawBanner');
+  const title  = document.getElementById('lvDrawTitle');
+  const info   = document.getElementById('lvDrawInfo');
+  const status = document.getElementById('lvLineStatus');
+
+  const l1done = _lv.lineA ? '✓' : '—';
+  const l2done = _lv.lineB ? '✓' : '—';
+  if (status) status.textContent = `Linie 1 (Breite): ${l1done}   Linie 2 (Tiefe): ${l2done}`;
+
+  if (phase === 1) {
+    if (banner) { banner.style.display='block'; banner.textContent='✏ Linie 1 ziehen — Raumbreite einzeichnen'; }
+    if (title)  title.textContent = 'Linie 1 — Raumbreite ziehen';
+    if (info)   info.innerHTML    = 'Maustaste/Touch drücken + entlang der <strong style="color:var(--ac)">Raumbreite</strong> ziehen';
+  } else if (phase === 2) {
+    if (banner) { banner.style.display='block'; banner.textContent='✏ Linie 2 ziehen — Raumtiefe einzeichnen'; }
+    if (title)  title.textContent = 'Linie 2 — Raumtiefe ziehen';
+    if (info)   info.innerHTML    = 'Jetzt entlang der <strong style="color:#58a6ff">Raumtiefe</strong> ziehen (senkrecht zur 1. Linie)';
+  } else if (phase === 3) {
+    // Beide Linien da → zu Schritt 3
+    if (banner) banner.style.display = 'none';
+    document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
+    _lv.active = false;
+    setTimeout(() => {
+      lvShowPane(3);
+      document.getElementById('lvAnzahl').value = _lv.anzahl;
+      document.getElementById('lvReihen').value  = _lv.reihen;
+      lvCalcAndDraw();
+    }, 200);
   }
+}
+
+// ──────────────────────────────────────
+//  Overlay zeichnen (auf lvOverlayCanvas)
+// ──────────────────────────────────────
+
+function lvRedrawOverlay() {
+  const ov  = document.getElementById('lvOverlayCanvas');
+  if (!ov) return;
+  const oc  = ov.getContext('2d');
+  const W   = ov.width, H = ov.height;
+  oc.clearRect(0,0,W,H);
+
+  // Transformation: Welt → Screen (gleich wie Hauptcanvas)
+  oc.save();
+  oc.setTransform(state.zoom, 0, 0, state.zoom, state.pan.x, state.pan.y);
+
+  // Bereits gesetzte Linie A (orange)
+  if (_lv.lineA) lvDrawWorldLine(oc, _lv.lineA, '#f5a623', 'Breite', state.scale);
+  // Bereits gesetzte Linie B (blau)
+  if (_lv.lineB) lvDrawWorldLine(oc, _lv.lineB, '#58a6ff', 'Tiefe',  state.scale);
+
+  // Aktuell gezogene Linie (hellgelb gestrichelt)
+  if (_lv.dragPt && _lv.dragCur) {
+    const col = _lv.lineA ? '#58a6ff' : '#f5a623';
+    oc.save();
+    oc.strokeStyle = col;
+    oc.lineWidth   = 2.5 / state.zoom;
+    oc.lineCap     = 'round';
+    oc.setLineDash([8/state.zoom, 5/state.zoom]);
+    oc.globalAlpha = 0.8;
+    oc.beginPath();
+    oc.moveTo(_lv.dragPt.x, _lv.dragPt.y);
+    oc.lineTo(_lv.dragCur.x, _lv.dragCur.y);
+    oc.stroke();
+    oc.setLineDash([]);
+    // Länge anzeigen
+    if (state.scale) {
+      const m = (Math.hypot(_lv.dragCur.x-_lv.dragPt.x, _lv.dragCur.y-_lv.dragPt.y)/state.scale).toFixed(1);
+      const mx = (_lv.dragPt.x+_lv.dragCur.x)/2, my = (_lv.dragPt.y+_lv.dragCur.y)/2;
+      oc.globalAlpha = 1;
+      oc.fillStyle   = col;
+      oc.font        = `bold ${12/state.zoom}px IBM Plex Mono,monospace`;
+      oc.textAlign   = 'center';
+      oc.fillText(m+'m', mx, my-8/state.zoom);
+      oc.textAlign = 'left';
+    }
+    oc.restore();
+  }
+
+  // Raum-Parallelogramm wenn beide Linien gesetzt
+  if (_lv.lineA && _lv.lineB) {
+    const O  = {x:_lv.lineA.x1, y:_lv.lineA.y1};
+    const vX = {x:_lv.lineA.x2-O.x, y:_lv.lineA.y2-O.y};
+    const vY = {x:_lv.lineB.x2-_lv.lineB.x1, y:_lv.lineB.y2-_lv.lineB.y1};
+    const P3 = {x:O.x+vX.x+vY.x, y:O.y+vX.y+vY.y};
+    oc.save();
+    oc.strokeStyle = 'rgba(245,166,35,.35)';
+    oc.fillStyle   = 'rgba(245,166,35,.06)';
+    oc.lineWidth   = 1.5/state.zoom;
+    oc.setLineDash([6/state.zoom,4/state.zoom]);
+    oc.beginPath();
+    oc.moveTo(O.x,O.y); oc.lineTo(O.x+vX.x,O.y+vX.y);
+    oc.lineTo(P3.x,P3.y); oc.lineTo(O.x+vY.x,O.y+vY.y);
+    oc.closePath();
+    oc.fill(); oc.stroke();
+    oc.setLineDash([]);
+    oc.restore();
+    // Berechnete Lampen-Vorschau auf Grundriss
+    _lv.positions.forEach(pos => {
+      const R = 14/state.zoom;
+      oc.save();
+      oc.beginPath(); oc.arc(pos.x,pos.y,R,0,Math.PI*2);
+      oc.fillStyle='rgba(255,230,60,.25)'; oc.fill();
+      oc.beginPath(); oc.arc(pos.x,pos.y,R*0.6,0,Math.PI*2);
+      oc.fillStyle='rgba(255,255,255,.85)'; oc.strokeStyle='#f5a623'; oc.lineWidth=1.5/state.zoom;
+      oc.fill(); oc.stroke();
+      oc.strokeStyle='#f5a623'; oc.lineWidth=1.2/state.zoom;
+      oc.beginPath(); oc.moveTo(pos.x-R*.45,pos.y); oc.lineTo(pos.x+R*.45,pos.y); oc.stroke();
+      oc.beginPath(); oc.moveTo(pos.x,pos.y-R*.45); oc.lineTo(pos.x,pos.y+R*.45); oc.stroke();
+      oc.restore();
+    });
+  }
+
+  oc.restore();
+}
+
+function lvDrawWorldLine(oc, line, col, label, scale) {
+  oc.save();
+  oc.strokeStyle = col;
+  oc.lineWidth   = 3/state.zoom;
+  oc.lineCap     = 'round';
+  oc.beginPath();
+  oc.moveTo(line.x1,line.y1); oc.lineTo(line.x2,line.y2);
+  oc.stroke();
+  // Endpunkte
+  [[line.x1,line.y1],[line.x2,line.y2]].forEach(([px,py])=>{
+    oc.beginPath(); oc.arc(px,py,5/state.zoom,0,Math.PI*2);
+    oc.fillStyle=col; oc.fill();
+    oc.strokeStyle='white'; oc.lineWidth=1.5/state.zoom; oc.stroke();
+  });
+  // Label + Länge
+  const mx=(line.x1+line.x2)/2, my=(line.y1+line.y2)/2;
+  oc.fillStyle=col;
+  oc.font=`bold ${10/state.zoom}px IBM Plex Mono,monospace`;
+  oc.textAlign='center';
+  oc.fillText(label, mx, my-10/state.zoom);
+  if (scale) {
+    const m = (Math.hypot(line.x2-line.x1,line.y2-line.y1)/scale).toFixed(1);
+    oc.font=`${9/state.zoom}px IBM Plex Mono,monospace`;
+    oc.fillText(m+'m', mx, my-1/state.zoom+10/state.zoom);
+  }
+  oc.textAlign='left';
+  oc.restore();
 }
 
 function lvResetLines() {
-  _lv.lineA=null; _lv.lineB=null; _lv.dragging=false; _lv._dragCur=null;
-  lvUpdateInstrCards();
-  document.getElementById('lvDrawHint').textContent = 'Linie 1: Maustaste halten und Breite des Raums einzeichnen';
-  lvDrawCanvasRender();
+  _lv.lineA=null; _lv.lineB=null; _lv.dragPt=null; _lv.dragCur=null;
+  _lv.positions=[];
+  _lv.active=true;
+  lvSetDrawPhase(1);
+  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
+  lvRedrawOverlay();
+  lvShowPane(2);
 }
 
-function lvDrawCanvasRender() {
-  const cv = document.getElementById('lvDrawCanvas');
-  if (!cv) return;
-  const W = cv.width, H = cv.height;
-  const c = cv.getContext('2d');
-  c.clearRect(0,0,W,H);
-
-  // Hintergrund mit Raumgrundriss-Andeutung
-  c.fillStyle = '#f0f2f5';
-  c.fillRect(0,0,W,H);
-  // Gitter
-  c.strokeStyle='rgba(0,0,0,.06)'; c.lineWidth=1;
-  for(let x=0;x<W;x+=20){c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke();}
-  for(let y=0;y<H;y+=20){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
-
-  // Anleitung wenn leer
-  if (!_lv.lineA && !_lv._dragCur) {
-    c.fillStyle='rgba(0,0,0,.22)';
-    c.font='13px IBM Plex Sans,sans-serif';
-    c.textAlign='center';
-    c.fillText('Klicken + ziehen → Raumbreite einzeichnen', W/2, H/2-8);
-    c.font='10px IBM Plex Mono,monospace';
-    c.fillStyle='rgba(245,166,35,.8)';
-    c.fillText('z. B. von links nach rechts', W/2, H/2+12);
-    c.textAlign='left';
-  }
-
-  // Hilfslinien: Raumrechteck andeuten wenn beide Linien da
-  if (_lv.lineA && _lv.lineB) {
-    const O  = { x:_lv.lineA.x1, y:_lv.lineA.y1 };
-    const vX = { x:_lv.lineA.x2-O.x, y:_lv.lineA.y2-O.y };
-    const vY = { x:_lv.lineB.x2-_lv.lineB.x1, y:_lv.lineB.y2-_lv.lineB.y1 };
-    const P3 = { x:O.x+vX.x+vY.x, y:O.y+vX.y+vY.y };
-    c.save();
-    c.strokeStyle='rgba(245,166,35,.3)';
-    c.lineWidth=1;
-    c.setLineDash([4,3]);
-    c.beginPath();
-    c.moveTo(O.x,O.y);
-    c.lineTo(O.x+vX.x, O.y+vX.y);
-    c.lineTo(P3.x,P3.y);
-    c.lineTo(O.x+vY.x, O.y+vY.y);
-    c.closePath(); c.stroke();
-    c.setLineDash([]);
-    c.restore();
-  }
-
-  // Aktuell gezogene Linie (Preview)
-  if (_lv.dragging && _lv.dragStart && _lv._dragCur) {
-    lvDrawLine(c, _lv.dragStart, _lv._dragCur, 'rgba(245,166,35,.7)', true);
-  }
-
-  // Linie A (Breite)
-  if (_lv.lineA) {
-    lvDrawLine(c,
-      {x:_lv.lineA.x1,y:_lv.lineA.y1},
-      {x:_lv.lineA.x2,y:_lv.lineA.y2},
-      '#f5a623', false, 'Breite', !_lv.lineB ? null : '#3fb950');
-  }
-
-  // Linie B (Tiefe)
-  if (_lv.lineB) {
-    lvDrawLine(c,
-      {x:_lv.lineB.x1,y:_lv.lineB.y1},
-      {x:_lv.lineB.x2,y:_lv.lineB.y2},
-      '#58a6ff', false, 'Tiefe');
-  }
-}
-
-function lvDrawLine(c, a, b, col, dashed, label, finalCol) {
-  const color = finalCol || col;
-  c.save();
-  c.strokeStyle = color;
-  c.lineWidth   = 2.5;
-  c.lineCap     = 'round';
-  if (dashed) c.setLineDash([6,4]);
-  c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(b.x,b.y); c.stroke();
-  c.setLineDash([]);
-  // Endpunkte
-  [a,b].forEach(p => {
-    c.beginPath(); c.arc(p.x,p.y,5,0,Math.PI*2);
-    c.fillStyle=color; c.fill();
-    c.strokeStyle='white'; c.lineWidth=1.5; c.stroke();
-  });
-  // Länge + Label
-  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-  const len=Math.hypot(b.x-a.x,b.y-a.y);
-  c.fillStyle=color;
-  c.font='bold 10px IBM Plex Mono,monospace';
-  c.textAlign='center';
-  if (label) c.fillText(label, mx, my-8);
-  c.font='9px IBM Plex Mono,monospace';
-  c.fillText(Math.round(len)+'px', mx, my+14);
-  c.textAlign='left';
-  c.restore();
-}
-
-// ─────────────────────────────────────
-//  Schritt 3 — Berechnen & Vorschau
-// ─────────────────────────────────────
-
-function lvGoStep3() {
-  if (!_lv.lineA || !_lv.lineB) return;
-  _lv.step = 3;
-  lvUpdateStepBar();
-  lvShowPane(3);
-  document.getElementById('lvAnzahl').value = _lv.anzahl;
-  document.getElementById('lvReihen').value  = _lv.reihen;
-  requestAnimationFrame(lvCalcAndDraw);
-}
+// ──────────────────────────────────────
+//  Schritt 3 — Berechnen & Mini-Vorschau
+// ──────────────────────────────────────
 
 function lvCalcAndDraw() {
   _lv.anzahl = Math.max(1, parseInt(document.getElementById('lvAnzahl').value)||4);
   _lv.reihen = Math.max(1, parseInt(document.getElementById('lvReihen').value)||2);
   if (!_lv.lineA || !_lv.lineB) return;
 
-  // Raumvektoren in Draw-Canvas-Pixeln
-  const O  = { x:_lv.lineA.x1, y:_lv.lineA.y1 };          // Ursprung
-  const vX = { x:_lv.lineA.x2-O.x, y:_lv.lineA.y2-O.y };  // Breitenvektor
-  const vY = { x:_lv.lineB.x2-_lv.lineB.x1,                // Tiefenvektor
-               y:_lv.lineB.y2-_lv.lineB.y1 };
+  // Raumvektoren in Welt-Koordinaten
+  const O  = {x:_lv.lineA.x1, y:_lv.lineA.y1};
+  const vX = {x:_lv.lineA.x2-O.x, y:_lv.lineA.y2-O.y};
+  // Tiefenvektor: Richtung Linie B, aber vom Ursprung O ausgehend
+  const lenB = Math.hypot(_lv.lineB.x2-_lv.lineB.x1, _lv.lineB.y2-_lv.lineB.y1);
+  const vY   = {x:_lv.lineB.x2-_lv.lineB.x1, y:_lv.lineB.y2-_lv.lineB.y1};
 
   const reihen   = _lv.reihen;
   const gesamt   = _lv.anzahl;
-  const proReihe = Math.ceil(gesamt / reihen);
-
-  // Positionen in Draw-Canvas-Pixeln berechnen
-  const posPx = [];
+  const proReihe = Math.ceil(gesamt/reihen);
+  _lv.positions  = [];
   let placed = 0;
+
   for (let r=0; r<reihen && placed<gesamt; r++) {
     const inRow = Math.min(proReihe, gesamt-placed);
     const tY    = reihen>1 ? (r+0.5)/reihen : 0.5;
-    for (let c=0; c<inRow && placed<gesamt; c++) {
-      const tX = inRow>1 ? (c+0.5)/inRow : 0.5;
-      posPx.push({
-        px: O.x + tX*vX.x + tY*vY.x,
-        py: O.y + tX*vX.y + tY*vY.y,
+    for (let col=0; col<inRow && placed<gesamt; col++) {
+      const tX = inRow>1 ? (col+0.5)/inRow : 0.5;
+      _lv.positions.push({
+        x: O.x + tX*vX.x + tY*vY.x,
+        y: O.y + tX*vX.y + tY*vY.y,
       });
       placed++;
     }
   }
-  _lv.positions = posPx;
 
+  lvRedrawOverlay();   // Vorschau auf Grundriss aktualisieren
   lvUpdateInfo();
-  lvDrawMini(O, vX, vY);
+  lvDrawMini();
 }
 
 function lvUpdateInfo() {
   const el = document.getElementById('lvInfo');
   if (!el) return;
-  const reihen  = _lv.reihen;
-  const gesamt  = _lv.anzahl;
   const symName = LV_SYMBOL_TYPES.find(s=>s.key===_lv.symKey)?.label || _lv.symKey;
-
-  // Pixel → Meter wenn Maßstab da
   let raumInfo = '';
   if (state.scale && _lv.lineA && _lv.lineB) {
-    // Draw-Canvas-Pixel → Welt-Pixel
-    const dcv = document.getElementById('lvDrawCanvas');
-    const ratio = dcv ? (canvas.width / dcv.width / state.zoom) : 1;
-    const bm  = (Math.hypot(_lv.lineA.x2-_lv.lineA.x1, _lv.lineA.y2-_lv.lineA.y1) * ratio / state.scale).toFixed(1);
-    const tm  = (Math.hypot(_lv.lineB.x2-_lv.lineB.x1, _lv.lineB.y2-_lv.lineB.y1) * ratio / state.scale).toFixed(1);
-    raumInfo = `Raum ca.: ${bm}m × ${tm}m\n`;
+    const bm = (Math.hypot(_lv.lineA.x2-_lv.lineA.x1,_lv.lineA.y2-_lv.lineA.y1)/state.scale).toFixed(1);
+    const tm = (Math.hypot(_lv.lineB.x2-_lv.lineB.x1,_lv.lineB.y2-_lv.lineB.y1)/state.scale).toFixed(1);
+    raumInfo = `Raum: ${bm}m × ${tm}m  `;
   }
-
-  el.textContent =
-    raumInfo +
-    `Symbol: ${symName}\n` +
-    `${gesamt} Leuchten · ${reihen} Reihe(n) · ${Math.ceil(gesamt/reihen)} pro Reihe\n` +
-    `Stromkreis: ${_lv.circuit} · NYM-J 3×1,5 / LS 10A B`;
+  el.textContent = raumInfo +
+    `${_lv.anzahl} Leuchten · ${_lv.reihen} Reihe(n)\n` +
+    `${symName} · ${_lv.circuit}`;
 }
 
-function lvDrawMini(O, vX, vY) {
+function lvDrawMini() {
   const cv = document.getElementById('lvMiniCanvas');
-  if (!cv) return;
-  cv.width = cv.parentElement?.clientWidth || 440;
-  const W = cv.width, H = cv.height;
-  const c = cv.getContext('2d');
-  c.clearRect(0,0,W,H);
+  if (!cv || !_lv.lineA || !_lv.lineB) return;
+  cv.width = cv.parentElement?.clientWidth - 2 || 248;
+  const W=cv.width, H=cv.height;
+  const c2=cv.getContext('2d');
+  c2.clearRect(0,0,W,H);
 
-  // Vierter Eckpunkt
-  const P1 = { x:O.x+vX.x, y:O.y+vX.y };
-  const P2 = { x:O.x+vY.x, y:O.y+vY.y };
-  const P3 = { x:O.x+vX.x+vY.x, y:O.y+vX.y+vY.y };
+  const O  = {x:_lv.lineA.x1,y:_lv.lineA.y1};
+  const vX = {x:_lv.lineA.x2-O.x,y:_lv.lineA.y2-O.y};
+  const vY = {x:_lv.lineB.x2-_lv.lineB.x1,y:_lv.lineB.y2-_lv.lineB.y1};
+  const P1={x:O.x+vX.x,y:O.y+vX.y};
+  const P2={x:O.x+vY.x,y:O.y+vY.y};
+  const P3={x:O.x+vX.x+vY.x,y:O.y+vX.y+vY.y};
 
-  const posAll = [O,P1,P2,P3,..._lv.positions.map(p=>({x:p.px,y:p.py}))];
-  const minX=Math.min(...posAll.map(p=>p.x)), maxX=Math.max(...posAll.map(p=>p.x));
-  const minY=Math.min(...posAll.map(p=>p.y)), maxY=Math.max(...posAll.map(p=>p.y));
-  const pad=24;
-  const sc = Math.min((W-pad*2)/Math.max(1,maxX-minX), (H-pad*2)/Math.max(1,maxY-minY));
-  const ox = pad + ((W-pad*2)-(maxX-minX)*sc)/2;
-  const oy = pad + ((H-pad*2)-(maxY-minY)*sc)/2;
-  const tx=wx=>ox+(wx-minX)*sc;
-  const ty=wy=>oy+(wy-minY)*sc;
+  const all=[O,P1,P2,P3,..._lv.positions];
+  const minX=Math.min(...all.map(p=>p.x)),maxX=Math.max(...all.map(p=>p.x));
+  const minY=Math.min(...all.map(p=>p.y)),maxY=Math.max(...all.map(p=>p.y));
+  const pad=16;
+  const sc=Math.min((W-pad*2)/Math.max(1,maxX-minX),(H-pad*2)/Math.max(1,maxY-minY));
+  const ox=pad+((W-pad*2)-(maxX-minX)*sc)/2;
+  const oy=pad+((H-pad*2)-(maxY-minY)*sc)/2;
+  const tx=wx=>ox+(wx-minX)*sc, ty=wy=>oy+(wy-minY)*sc;
 
-  // Hintergrund
-  c.fillStyle='#f0f2f5'; c.fillRect(0,0,W,H);
-  // Gitter
-  c.strokeStyle='rgba(0,0,0,.05)'; c.lineWidth=1;
-  for(let x=0;x<W;x+=20){c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke();}
-  for(let y=0;y<H;y+=20){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+  // BG + Gitter
+  c2.fillStyle='#1a1f2e'; c2.fillRect(0,0,W,H);
+  c2.strokeStyle='rgba(255,255,255,.04)'; c2.lineWidth=1;
+  for(let x=0;x<W;x+=16){c2.beginPath();c2.moveTo(x,0);c2.lineTo(x,H);c2.stroke();}
+  for(let y=0;y<H;y+=16){c2.beginPath();c2.moveTo(0,y);c2.lineTo(W,y);c2.stroke();}
 
   // Raumfläche
-  c.beginPath();
-  c.moveTo(tx(O.x),ty(O.y)); c.lineTo(tx(P1.x),ty(P1.y));
-  c.lineTo(tx(P3.x),ty(P3.y)); c.lineTo(tx(P2.x),ty(P2.y));
-  c.closePath();
-  c.fillStyle='rgba(255,255,255,.9)'; c.fill();
-  c.strokeStyle='#445'; c.lineWidth=2; c.stroke();
+  c2.beginPath();
+  c2.moveTo(tx(O.x),ty(O.y));c2.lineTo(tx(P1.x),ty(P1.y));
+  c2.lineTo(tx(P3.x),ty(P3.y));c2.lineTo(tx(P2.x),ty(P2.y));
+  c2.closePath();
+  c2.fillStyle='rgba(255,255,255,.06)'; c2.fill();
+  c2.strokeStyle='rgba(255,255,255,.3)'; c2.lineWidth=1.5; c2.stroke();
 
-  // Breitenlinie
-  c.strokeStyle='#f5a623'; c.lineWidth=1.5; c.setLineDash([4,3]);
-  c.beginPath(); c.moveTo(tx(O.x),ty(O.y)); c.lineTo(tx(P1.x),ty(P1.y)); c.stroke();
-  // Tiefenlinie
-  c.strokeStyle='#58a6ff';
-  c.beginPath(); c.moveTo(tx(O.x),ty(O.y)); c.lineTo(tx(P2.x),ty(P2.y)); c.stroke();
-  c.setLineDash([]);
-
-  // Maß-Label
-  if (state.scale) {
-    const dcv = document.getElementById('lvDrawCanvas');
-    const ratio = dcv ? (canvas.width / dcv.width / state.zoom) : 1;
-    const bm = (Math.hypot(vX.x,vX.y)*ratio/state.scale).toFixed(1);
-    const tm = (Math.hypot(vY.x,vY.y)*ratio/state.scale).toFixed(1);
-    c.font='9px IBM Plex Mono,monospace'; c.textAlign='center';
-    c.fillStyle='#f5a623';
-    c.fillText(bm+'m', (tx(O.x)+tx(P1.x))/2, Math.min(ty(O.y),ty(P1.y))-5);
-    c.fillStyle='#58a6ff';
-    c.fillText(tm+'m', tx(O.x)-18, (ty(O.y)+ty(P2.y))/2);
-    c.textAlign='left';
-  }
+  // Linie A (Breite) orange
+  c2.strokeStyle='#f5a623'; c2.lineWidth=1.5;
+  c2.beginPath(); c2.moveTo(tx(O.x),ty(O.y)); c2.lineTo(tx(P1.x),ty(P1.y)); c2.stroke();
+  // Linie B (Tiefe) blau
+  c2.strokeStyle='#58a6ff';
+  c2.beginPath(); c2.moveTo(tx(O.x),ty(O.y)); c2.lineTo(tx(P2.x),ty(P2.y)); c2.stroke();
 
   // Reihen-Hilfslinien
-  for (let r=1; r<_lv.reihen; r++) {
-    const t = r / _lv.reihen;
-    const ax=tx(O.x+t*vY.x), ay=ty(O.y+t*vY.y);
-    const bx=tx(P1.x+t*vY.x), by=ty(P1.y+t*vY.y);
-    c.strokeStyle='rgba(88,166,255,.25)'; c.lineWidth=1; c.setLineDash([3,3]);
-    c.beginPath(); c.moveTo(ax,ay); c.lineTo(bx,by); c.stroke();
-    c.setLineDash([]);
+  for(let r=1;r<_lv.reihen;r++){
+    const t=r/_lv.reihen;
+    c2.strokeStyle='rgba(88,166,255,.2)'; c2.lineWidth=1; c2.setLineDash([3,3]);
+    c2.beginPath();
+    c2.moveTo(tx(O.x+t*vY.x),ty(O.y+t*vY.y));
+    c2.lineTo(tx(P1.x+t*vY.x),ty(P1.y+t*vY.y));
+    c2.stroke(); c2.setLineDash([]);
+  }
+
+  // Maßlabel
+  if (state.scale) {
+    const bm=(Math.hypot(vX.x,vX.y)/state.scale).toFixed(1);
+    const tm=(Math.hypot(vY.x,vY.y)/state.scale).toFixed(1);
+    c2.font='8px IBM Plex Mono,monospace'; c2.textAlign='center';
+    c2.fillStyle='#f5a623';
+    c2.fillText(bm+'m',(tx(O.x)+tx(P1.x))/2, Math.min(ty(O.y),ty(P1.y))-4);
+    c2.fillStyle='#58a6ff';
+    c2.fillText(tm+'m', tx(O.x)-16,(ty(O.y)+ty(P2.y))/2);
+    c2.textAlign='left';
   }
 
   // Lampen
   _lv.positions.forEach((pos,idx)=>{
-    const px=tx(pos.px), py=ty(pos.py), R=9;
-    // Aura
-    const g2=c.createRadialGradient(px,py,0,px,py,R*2.2);
-    g2.addColorStop(0,'rgba(255,230,80,.6)'); g2.addColorStop(1,'rgba(255,200,0,0)');
-    c.beginPath(); c.arc(px,py,R*2.2,0,Math.PI*2); c.fillStyle=g2; c.fill();
-    // Kreis
-    c.beginPath(); c.arc(px,py,R,0,Math.PI*2);
-    c.fillStyle='#fff'; c.strokeStyle='#f5a623'; c.lineWidth=2; c.fill(); c.stroke();
-    // Kreuz
-    c.strokeStyle='#f5a623'; c.lineWidth=1.5;
-    c.beginPath(); c.moveTo(px-5,py); c.lineTo(px+5,py); c.stroke();
-    c.beginPath(); c.moveTo(px,py-5); c.lineTo(px,py+5); c.stroke();
-    // Nr
-    c.fillStyle='#333'; c.font='bold 7px monospace'; c.textAlign='center';
-    c.fillText(idx+1, px, py+R+9); c.textAlign='left';
+    const px=tx(pos.x),py=ty(pos.y),R=7;
+    const g2=c2.createRadialGradient(px,py,0,px,py,R*2);
+    g2.addColorStop(0,'rgba(255,230,80,.7)'); g2.addColorStop(1,'rgba(255,200,0,0)');
+    c2.beginPath();c2.arc(px,py,R*2,0,Math.PI*2);c2.fillStyle=g2;c2.fill();
+    c2.beginPath();c2.arc(px,py,R,0,Math.PI*2);
+    c2.fillStyle='#fff';c2.strokeStyle='#f5a623';c2.lineWidth=1.5;c2.fill();c2.stroke();
+    c2.strokeStyle='#f5a623';c2.lineWidth=1.2;
+    c2.beginPath();c2.moveTo(px-4,py);c2.lineTo(px+4,py);c2.stroke();
+    c2.beginPath();c2.moveTo(px,py-4);c2.lineTo(px,py+4);c2.stroke();
+    c2.fillStyle='#ccc';c2.font='bold 6px monospace';c2.textAlign='center';
+    c2.fillText(idx+1,px,py+R+7);c2.textAlign='left';
   });
 }
 
-// ─────────────────────────────────────
-//  Platzieren auf dem Grundriss
-// ─────────────────────────────────────
+// ──────────────────────────────────────
+//  Platzieren
+// ──────────────────────────────────────
 
 function lvPlace() {
-  if (!_lv.positions.length || !_lv.lineA) {
-    setStatus('Bitte zuerst den Raum einzeichnen'); return;
-  }
+  if (!_lv.positions.length) { setStatus('Bitte erst Raum einzeichnen und Anzahl eingeben'); return; }
   saveUndo();
+  const symDef = SYMBOLS[_lv.symKey];
+  const autoK  = autoKabelConfig(_lv.symKey);
+  const placed = [];
 
-  // Skalierungsfaktor: Draw-Canvas-Pixel → Hauptcanvas-Weltkoords
-  const dcv   = document.getElementById('lvDrawCanvas');
-  const dcW   = dcv ? dcv.width  : 400;
-  const dcH   = dcv ? dcv.height : 240;
-  // Aktueller sichtbarer Weltbereich
-  const visX1 = -state.pan.x / state.zoom;
-  const visY1 = -state.pan.y / state.zoom;
-  const visW  = canvas.width  / state.zoom;
-  const visH  = canvas.height / state.zoom;
-  // Draw-Canvas-Pixel → Weltkoords
-  const mapX = px => visX1 + (px / dcW) * visW;
-  const mapY = py => visY1 + (py / dcH) * visH;
-
-  const circuit = _lv.circuit || 'F01.1';
-  const symDef  = SYMBOLS[_lv.symKey];
-  const autoK   = autoKabelConfig(_lv.symKey);
-  const placed  = [];
-
-  _lv.positions.forEach((pos, idx) => {
-    const s = {
-      id:           gid(),
-      type:         _lv.symKey,
-      x:            mapX(pos.px),
-      y:            mapY(pos.py),
-      rotation:     0,
-      label:        (symDef?.name||_lv.symKey) + ' ' + (idx+1),
-      circuit,
-      phase:        symDef?.phase   || 'L1',
-      nennstrom:    autoK?.nennstrom || symDef?.nennstrom || 10,
-      kabel:        autoK?.kabel     || symDef?.kabel     || 'NYM-J 3×1.5',
-      kabelHinweis: autoK?.kabelHinweis || 'NYM-J 3×1,5 / LS 10A B',
-      lsKurve:      'B',
-      kabelPosition:'unten',
-      kabelLaenge:  '',
-      kommentar:    `${_lv.reihen} Reihe(n), ${_lv.anzahl} Leuchten`,
-      count:        1,
+  _lv.positions.forEach((pos,idx)=>{
+    const s={
+      id:gid(), type:_lv.symKey,
+      x:pos.x, y:pos.y, rotation:0,
+      label:(symDef?.name||_lv.symKey)+' '+(idx+1),
+      circuit:_lv.circuit,
+      phase:symDef?.phase||'L1',
+      nennstrom:autoK?.nennstrom||symDef?.nennstrom||10,
+      kabel:autoK?.kabel||symDef?.kabel||'NYM-J 3×1.5',
+      kabelHinweis:autoK?.kabelHinweis||'NYM-J 3×1,5 / LS 10A B',
+      lsKurve:'B', kabelPosition:'unten', kabelLaenge:'',
+      kommentar:`${_lv.reihen} Reihe(n), ${_lv.anzahl} Leuchten`,
+      count:1,
     };
     state.symbols.push(s);
     placed.push(s);
   });
 
-  if (state.symbols.length > 0) {
-    const uz = document.getElementById('uploadZone');
-    if (uz) uz.style.display = 'none';
-  }
+  if (state.symbols.length>0){const uz=document.getElementById('uploadZone');if(uz)uz.style.display='none';}
 
-  _lv.lineA = null; _lv.lineB = null; _lv.positions = [];
+  _lv.lineA=null;_lv.lineB=null;_lv.positions=[];
   closeLVModal();
   render();
-  setStatus(`✅ ${placed.length} Leuchten platziert · ${_lv.reihen} Reihe(n) · Stromkreis ${circuit}`);
+  setStatus(`✅ ${placed.length} Leuchten platziert · ${_lv.reihen} Reihe(n) · Stromkreis ${_lv.circuit}`);
 }
 
-// ── lvDrawOverlay: nicht mehr nötig (kein Klick auf Hauptcanvas) ──
-function lvDrawOverlay() { /* leer */ }
-function lvShowHint()    { /* leer */ }
-function lvHideHint()    { /* leer */ }
-function lvHandleCanvasClick() { return false; }
+// ── Stubs (nicht mehr gebraucht) ──
+function lvDrawOverlay()         { /* Overlay läuft eigenständig via lvRedrawOverlay */ }
+function lvHandleCanvasClick()   { return false; }
+function lvShowHint()            { /* */ }
+function lvHideHint()            { /* */ }
 
 
 </script>
