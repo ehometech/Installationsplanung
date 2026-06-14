@@ -198,6 +198,49 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .lv-step.done { background:rgba(63,185,80,.15); border-color:#3fb950; color:#3fb950; }
 .lv-step.act  { background:rgba(245,166,35,.18); border-color:var(--ac); color:var(--ac); }
 
+/* ── WAND-VERTEILER (WD) PANEL ── */
+#wdOverlayPanel {
+  position:absolute; top:12px; right:12px; z-index:120;
+  background:var(--sf); border:1px solid var(--bd2); border-radius:8px;
+  padding:14px 16px; width:300px;
+  box-shadow:0 4px 24px rgba(0,0,0,.6); display:none;
+}
+#wdOverlayPanel h4 { font-size:13px;font-weight:700;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:7px; }
+#wdDrawBanner {
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(245,166,35,.95);color:#000;font-weight:700;
+  font-size:12px;padding:9px 22px;border-radius:24px;z-index:131;
+  pointer-events:none;white-space:nowrap;display:none;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);
+}
+.wd-sym-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-height:220px;overflow-y:auto;margin-bottom:8px; }
+.wd-sym-grid::-webkit-scrollbar{width:3px}
+.wd-sym-grid::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.wd-sym-btn {
+  background:var(--sf2);border:1px solid var(--bd);border-radius:5px;
+  padding:5px 3px;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:2px;transition:all .15s;font-size:9px;
+  color:var(--tx2);text-align:center;
+}
+.wd-sym-btn:hover{border-color:var(--ac);color:var(--ac);}
+.wd-sym-btn.sel{border-color:var(--ac);background:rgba(245,166,35,.12);color:var(--ac);}
+.wd-sym-btn svg,.wd-sym-btn img{width:28px;height:28px;}
+.wd-cat-tabs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;}
+.wd-cat-tab{font-size:9px;padding:2px 7px;border-radius:10px;cursor:pointer;
+  background:var(--sf2);border:1px solid var(--bd);color:var(--tx3);transition:all .15s;}
+.wd-cat-tab:hover{border-color:var(--bd2);color:var(--tx2);}
+.wd-cat-tab.sel{background:rgba(245,166,35,.15);border-color:var(--ac);color:var(--ac);}
+
+/* ── SYMBOL MANAGER PLUS BUTTON ── */
+.cat-add-btn {
+  width:64px;height:64px;background:var(--sf2);border:2px dashed var(--bd2);
+  border-radius:6px;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  color:var(--tx3);font-size:22px;transition:all .15s;
+}
+.cat-add-btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(245,166,35,.05);}
+.cat-add-btn span{font-size:8px;font-weight:600;}
+
 /* Touch drag ghost */
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);}
 
@@ -430,7 +473,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf" style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
-      <button class="btn" style="background:rgba(241,196,15,.2);color:#f1c40f;border:1px solid rgba(241,196,15,.4);font-size:11px" onclick="openLVModal()" title="Beleuchtung zentrieren / gleichmäßig verteilen">💡 Beleuchtung verteilen</button>
+      <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ac);border:1px solid rgba(245,166,35,.4);font-size:11px" onclick="openWDModal()" title="Symbole an Linie gleichmäßig verteilen">📐 An Linie verteilen</button>
     </div>
     <div id="canvas-wrap">
       <canvas id="main-canvas"></canvas>
@@ -453,8 +496,69 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       </div>
       <div class="calibrate-hint hid" id="calHint">📏 Klicke zwei Punkte für eine bekannte Distanz</div>
 
-      <!-- LV: Zeichnungs-Overlay-Canvas (über allem) -->
+      <!-- WD: Wand-Verteiler Banner -->
+      <div id="wdDrawBanner">📐 Linie ziehen — Wand / Achse</div>
+
+      <!-- WD: Einstellungs-Panel -->
+      <div id="wdOverlayPanel">
+        <h4>📐 <span id="wdPanelTitle">An Linie verteilen</span>
+          <button onclick="closeWDModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
+        </h4>
+        <div class="lv-step-indicator">
+          <div class="lv-step act" id="wdStep1">① Symbol</div>
+          <div class="lv-step"     id="wdStep2">② Linie</div>
+          <div class="lv-step"     id="wdStep3">③ Verteilen</div>
+        </div>
+
+        <!-- Pane 1: Symbol & Kategorie -->
+        <div id="wdPane1">
+          <div class="lv-sec-ttl">Kategorie</div>
+          <div class="wd-cat-tabs" id="wdCatTabs"></div>
+          <div class="lv-sec-ttl" style="margin-top:6px">Symbol wählen</div>
+          <div class="wd-sym-grid" id="wdSymGrid"></div>
+          <div class="lv-field">
+            <label>Stromkreis</label>
+            <input type="text" id="wdCircuit" value="SK1">
+          </div>
+          <button class="btn ba" style="width:100%;margin-top:6px" onclick="wdGoStep2()">
+            Weiter → Linie zeichnen
+          </button>
+        </div>
+
+        <!-- Pane 2: Linie zeichnen -->
+        <div id="wdPane2" style="display:none">
+          <div class="lv-sec-ttl" id="wdDrawTitle">Linie auf Grundriss ziehen</div>
+          <div style="font-size:10px;color:var(--tx2);line-height:1.6;margin-bottom:8px">
+            Maustaste/Touch entlang der <strong style="color:var(--ac)">Wand oder Achse</strong> ziehen.<br>
+            Die Symbole werden gleichmäßig auf dieser Linie verteilt.
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--tx3);margin-bottom:8px" id="wdLineStatus">Linie: —</div>
+          <button class="btn bg" style="width:100%;font-size:10px" onclick="wdResetLine()">↺ Linie zurücksetzen</button>
+          <button class="btn bg" style="width:100%;font-size:10px;margin-top:4px" onclick="closeWDModal()">Abbrechen</button>
+        </div>
+
+        <!-- Pane 3: Anzahl -->
+        <div id="wdPane3" style="display:none">
+          <div class="lv-sec-ttl">Anzahl & Vorschau</div>
+          <canvas id="wdMiniCanvas" height="90"
+            style="background:#1a1f2e;border:1px solid var(--bd2);border-radius:4px;display:block;width:100%;margin-bottom:8px">
+          </canvas>
+          <div class="lv-field">
+            <label>Anzahl Symbole</label>
+            <input type="number" id="wdAnzahl" value="3" min="1" max="30" oninput="wdCalcAndDraw()">
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--tx2);line-height:1.6;margin-bottom:8px" id="wdInfo">—</div>
+          <div style="display:flex;gap:5px">
+            <button class="btn bg" onclick="wdGoStep2()" style="font-size:10px">← Zurück</button>
+            <button class="btn ba" style="flex:1;font-size:11px" onclick="wdPlace()">✓ Platzieren</button>
+          </div>
+          <button class="btn bg" style="width:100%;font-size:10px;margin-top:4px" onclick="closeWDModal()">Abbrechen</button>
+        </div>
+      </div>
+
+      <!-- LV + WD: Zeichnungs-Overlay-Canvas -->
       <canvas id="lvOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:110;display:none"></canvas>
+      <canvas id="wdOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:111;display:none"></canvas>
 
       <!-- LV: Hinweis-Banner oben -->
       <div id="lvDrawBanner">💡 Linie 1 ziehen — Raumbreite</div>
@@ -1757,22 +1861,27 @@ function showSymbolEditForm(upload) {
   document.getElementById('symEditForm').style.display = 'flex';
   document.getElementById('symPreviewImg').src = upload.dataUrl;
   document.getElementById('symPreviewName').textContent = upload.file.name;
-  // Pre-fill name from filename
   const name = upload.name.charAt(0).toUpperCase() + upload.name.slice(1);
   document.getElementById('seBezeichnung').value = name;
   document.getElementById('seAbbr').value = name.substring(0,4).toUpperCase().replace(/\s/g,'');
-  // Auto-detect category from filename
-  const lower = upload.name.toLowerCase();
-  let cat = 'Sonstige';
-  if (/steckdose|outlet|socket/.test(lower)) cat = 'Steckdosen';
-  else if (/schalter|taster|switch|dimmer/.test(lower)) cat = 'Schalter & Taster';
-  else if (/leuchte|lampe|light|beleuchtung|auslass/.test(lower)) cat = 'Beleuchtung';
-  else if (/herd|backofen|wasch|trockner|kühl|klima|boiler/.test(lower)) cat = 'Elektrogeräte';
-  else if (/verteiler|zähler|gong|klingel/.test(lower)) cat = 'Verteiler & Technik';
-  else if (/lüft|lueft|ventil/.test(lower)) cat = 'Haustechnik';
-  else if (/rauch|alarm|kamera|sicher/.test(lower)) cat = 'Sicherheit';
-  document.getElementById('seCat').value = cat;
-  // Scroll to form
+  // Kategorie: pendingUploadCat hat Vorrang, dann Auto-detect
+  let cat = _pendingUploadCat || 'Sonstige';
+  if (!_pendingUploadCat) {
+    const lower = upload.name.toLowerCase();
+    if (/steckdose|outlet|socket/.test(lower)) cat = 'Steckdosen';
+    else if (/schalter|taster|switch|dimmer/.test(lower)) cat = 'Schalter & Taster';
+    else if (/leuchte|lampe|light|beleuchtung|auslass/.test(lower)) cat = 'Beleuchtung';
+    else if (/herd|backofen|wasch|trockner|kühl|klima|boiler/.test(lower)) cat = 'Elektrogeräte';
+    else if (/verteiler|zähler|gong|klingel/.test(lower)) cat = 'Verteiler & Technik';
+    else if (/lüft|lueft|ventil/.test(lower)) cat = 'Haustechnik';
+    else if (/rauch|alarm|kamera|sicher/.test(lower)) cat = 'Sicherheit';
+  }
+  _pendingUploadCat = null; // Reset
+  // Kategorie setzen
+  const sel = document.getElementById('seCat');
+  for (const opt of sel.options) {
+    if (opt.text.replace(/&amp;/g,'&') === cat) { sel.value = opt.value; break; }
+  }
   document.getElementById('symEditForm').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
@@ -1874,7 +1983,6 @@ function renderSymbolManager() {
   const search  = (document.getElementById('symMgrSearch')?.value || '').toLowerCase();
   const catFilt = document.getElementById('symMgrCatFilter')?.value || '';
 
-  // Group ALL symbols by category
   const cats = {};
   for (const [key, sym] of Object.entries(SYMBOLS)) {
     const cat = sym.cat || 'Sonstige';
@@ -1884,6 +1992,9 @@ function renderSymbolManager() {
     cats[cat].push([key, sym]);
   }
 
+  // Alle Kategorien (auch leere wenn Filter aktiv) anzeigen
+  if (catFilt && !cats[catFilt]) cats[catFilt] = [];
+
   if (Object.keys(cats).length === 0) {
     body.innerHTML = '<div style="color:var(--tx3);text-align:center;padding:30px">Keine Symbole gefunden</div>';
     return;
@@ -1892,23 +2003,27 @@ function renderSymbolManager() {
   let html = '';
   for (const [cat, syms] of Object.entries(cats)) {
     const customCount = syms.filter(([k]) => customSymbols[k]).length;
+    // Kategorie-Header mit Plus-Button
+    const catEncoded = encodeURIComponent(cat);
     html += `<div class="cat-section">
       <div class="cat-section-hdr">
-        ${cat}
+        ${esc(cat)}
         <span class="cat-badge">${syms.length} Symbole</span>
         ${customCount ? `<span class="cat-badge" style="background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.3);color:var(--gr)">${customCount} eigene</span>` : ''}
+        <button class="cat-add-btn-inline" onclick="symMgrAddToCat('${catEncoded}')"
+          title="Neues Symbol in Kategorie ${esc(cat)} hinzufügen"
+          style="margin-left:auto;background:rgba(245,166,35,.1);border:1px dashed rgba(245,166,35,.5);border-radius:4px;padding:2px 10px;cursor:pointer;color:var(--ac);font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+          + Symbol hinzufügen
+        </button>
       </div>
       <div class="sym-mgr-grid">`;
     for (const [key, sym] of syms) {
       const isCustom = !!customSymbols[key];
       const imgSrc = sym.imgData || '';
       const svgContent = sym.svg || '';
-      let preview = '';
-      if (imgSrc) {
-        preview = `<img src="${imgSrc}" alt="${sym.name}" style="width:42px;height:42px;object-fit:contain">`;
-      } else {
-        preview = `<svg viewBox="0 0 40 40" width="42" height="42" style="color:${sym.color||'#555'}">${svgContent}</svg>`;
-      }
+      let preview = imgSrc
+        ? `<img src="${imgSrc}" alt="${sym.name}" style="width:42px;height:42px;object-fit:contain">`
+        : `<svg viewBox="0 0 40 40" width="42" height="42" style="color:${sym.color||'#555'}">${svgContent}</svg>`;
       html += `<div class="sym-mgr-card" title="${sym.name}">
         ${isCustom ? `<button class="sm-edit" onclick="openSymbolEdit('${key}')" title="Bearbeiten">✏</button>` : ''}
         ${isCustom ? `<button class="sm-del" onclick="confirmDeleteSymbol('${key}')" title="Löschen">✕</button>` : ''}
@@ -1918,10 +2033,39 @@ function renderSymbolManager() {
         ${isCustom ? '<div style="font-size:8px;color:var(--gr);margin-top:2px">● eigenes</div>' : '<div style="font-size:8px;color:var(--tx3);margin-top:2px">○ Standard</div>'}
       </div>`;
     }
+    // Plus-Karte am Ende des Grids
+    html += `<div class="cat-add-btn" onclick="symMgrAddToCat('${catEncoded}')" title="Neues Symbol hinzufügen">
+        <span style="font-size:24px;line-height:1">＋</span>
+        <span>Symbol</span>
+      </div>`;
     html += '</div></div>';
   }
   body.innerHTML = html;
 }
+
+// Öffnet Upload-Dialog mit Kategorie vorbelegt
+function symMgrAddToCat(catEncoded) {
+  const cat = decodeURIComponent(catEncoded);
+  // Scroll zur Upload-Zone
+  const uz = document.getElementById('symUploadZone');
+  if (uz) uz.scrollIntoView({behavior:'smooth', block:'center'});
+  // Kategorie im Formular vorbelegen (falls sichtbar)
+  const sel = document.getElementById('seCat');
+  if (sel) {
+    // Versuche passende Option zu finden
+    for (const opt of sel.options) {
+      if (opt.text.replace(/&amp;/g,'&') === cat || opt.value === cat) {
+        sel.value = opt.value; break;
+      }
+    }
+  }
+  // Datei-Dialog öffnen
+  document.getElementById('symFileInput').click();
+  // Nach Upload Kategorie nochmal setzen
+  _pendingUploadCat = cat;
+  setStatus(`📁 Symbol für Kategorie "${cat}" hochladen`);
+}
+let _pendingUploadCat = null;
 
 function confirmDeleteSymbol(key) {
   const name = customSymbols[key]?.name || key;
@@ -4579,58 +4723,180 @@ function renderStueckliste() {
   // ── Zusammenfassung ──
   const sumEl = document.getElementById('stSummary');
   if (sumEl) {
-    const typeRows = Object.entries(byType).map(([t,c])=>`<div class="rp-stat">${esc(t)}<span>${c}×</span></div>`).join('');
-
-    // ── Kabel-Gesamtlänge Tabelle (prominent) ──
-    const totalKabel = Object.values(byKabel).reduce((a,v)=>a+v,0);
-    const kabelTableRows = Object.entries(byKabel)
-      .sort((a,b)=>b[1]-a[1])
-      .map(([k,m],ci)=>{
-        const pct = totalKabel>0?(m/totalKabel*100).toFixed(0):0;
-        const barCol = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#2ecc71'][ci%8];
-        return `<tr>
-          <td style="font-family:var(--mono);font-size:10px;color:var(--tx)">${esc(k)}</td>
-          <td style="font-family:var(--mono);font-size:11px;font-weight:700;color:${barCol};text-align:right">${m.toFixed(1)} m</td>
-          <td style="width:80px">
-            <div style="background:var(--sf3);border-radius:2px;height:6px;overflow:hidden">
-              <div style="width:${pct}%;background:${barCol};height:6px;border-radius:2px"></div>
-            </div>
-            <span style="font-size:9px;color:var(--tx3);font-family:var(--mono)">${pct}%</span>
-          </td>
-        </tr>`;
-      }).join('');
-
-    const kabelSection = Object.keys(byKabel).length ? `
-      <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:14px">
-        <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-          🔌 Kabelmengen gesamt
-          <span style="background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:1px 8px;font-family:var(--mono);font-size:9px;color:var(--ac)">${totalKabel.toFixed(1)} m total</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr>
-            <th style="text-align:left;font-size:9px;color:var(--tx3);padding:4px 0;border-bottom:1px solid var(--bd)">Kabeltyp</th>
-            <th style="text-align:right;font-size:9px;color:var(--tx3);padding:4px 8px;border-bottom:1px solid var(--bd)">Länge</th>
-            <th style="font-size:9px;color:var(--tx3);padding:4px 0;border-bottom:1px solid var(--bd)">Anteil</th>
-          </tr></thead>
-          <tbody>${kabelTableRows}</tbody>
-          <tfoot><tr>
-            <td style="font-weight:700;font-size:10px;color:var(--tx);padding:6px 0;border-top:1px solid var(--bd)">GESAMT</td>
-            <td style="font-weight:700;font-family:var(--mono);font-size:12px;color:var(--gr);text-align:right;padding:6px 8px;border-top:1px solid var(--bd)">${totalKabel.toFixed(1)} m</td>
-            <td style="border-top:1px solid var(--bd)"></td>
-          </tr></tfoot>
-        </table>
-        <div style="margin-top:8px;font-size:9px;color:var(--tx3);font-family:var(--mono)">
-          ℹ️ Inkl. manueller Zuleitungslängen aus Symboleigenschaften · zzgl. 10–15% Verschnitt empfohlen
-        </div>
-      </div>` : '';
-
-    sumEl.innerHTML = kabelSection + `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        ${typeRows ? `<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geräte nach Typ</div>
-          <div style="font-family:var(--mono);font-size:11px">${typeRows}</div></div>` : ''}
-      </div>`;
+    const sd = buildSummaryData(syms, wires, byType, byKabel, wireFilterTotal);
+    sumEl.innerHTML = renderSummaryHTML(sd, false);
   }
+}
+
+// ═══════════════════════════════════════════════════
+//  ZENTRALE ZUSAMMENFASSUNGS-DATEN (für Stückliste + PDF + CSV)
+// ═══════════════════════════════════════════════════
+function buildSummaryData(syms, wires, byType, byKabel, wireTotal) {
+  // Geräte nach Typ
+  const geraeteByTyp = {};
+  for (const s of syms) {
+    const n = (SYMBOLS[s.type]?.name || s.type);
+    const cat = (SYMBOLS[s.type]?.cat || 'Sonstige');
+    if (!geraeteByTyp[n]) geraeteByTyp[n] = { count:0, cat, abbr: SYMBOLS[s.type]?.abbr||'' };
+    geraeteByTyp[n].count += (s.count||1);
+  }
+  const totalGeraete   = Object.values(geraeteByTyp).reduce((a,v)=>a+v.count,0);
+
+  // Kabel inkl. manueller Zuleitungen
+  const kabelMap = { ...byKabel };
+  const totalKabel = Object.values(kabelMap).reduce((a,v)=>a+v,0);
+
+  // Leitungen nach Typ
+  const leitungByTyp = {};
+  for (const w of wires) {
+    const key = (WIRE_TYPES[w.wireType]?.label || w.wireType || 'Strom') + ' · ' + (w.kabel||'—');
+    if (!leitungByTyp[key]) leitungByTyp[key] = { laenge:0, adern: w.adern||0, kabel: w.kabel||'—' };
+    leitungByTyp[key].laenge += parseFloat(w.laenge_m||0);
+  }
+
+  // Stromkreise
+  const skSet = new Set(syms.map(s=>s.circuit).filter(Boolean));
+
+  return {
+    geraeteByTyp, totalGeraete,
+    kabelMap, totalKabel,
+    leitungByTyp,
+    skCount: skSet.size,
+    wireCount: wires.length,
+    wireTotal,
+  };
+}
+
+function renderSummaryHTML(sd, forPrint=false) {
+  const {geraeteByTyp, totalGeraete, kabelMap, totalKabel, leitungByTyp, skCount, wireCount, wireTotal} = sd;
+  const BAR_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#2ecc71','#e91e63','#00bcd4'];
+
+  const sf    = forPrint ? '#f8f8f8' : 'var(--sf)';
+  const bd    = forPrint ? '#ddd'    : 'var(--bd)';
+  const tx    = forPrint ? '#222'    : 'var(--tx)';
+  const tx2   = forPrint ? '#555'    : 'var(--tx2)';
+  const tx3   = forPrint ? '#888'    : 'var(--tx3)';
+  const ac    = forPrint ? '#f5a623' : 'var(--ac)';
+  const gr    = forPrint ? '#27ae60' : 'var(--gr)';
+  const bl    = forPrint ? '#3498db' : 'var(--bl)';
+  const sf3   = forPrint ? '#eee'    : 'var(--sf3)';
+  const mono  = 'IBM Plex Mono,monospace';
+
+  // ── Block 1: Gesamtübersicht (3 KPI-Boxen) ──
+  const kpiBlock = `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+    <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
+      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${ac}">${totalGeraete}</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Geräte gesamt</div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${Object.keys(geraeteByTyp).length} Typen · ${skCount} Stromkreise</div>
+    </div>
+    <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
+      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${gr}">${totalKabel.toFixed(1)} m</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Kabel gesamt</div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${Object.keys(kabelMap).length} Kabeltypen</div>
+    </div>
+    <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
+      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${bl}">${wireTotal.toFixed(1)} m</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Leitungen verlegt</div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${wireCount} Abschnitte</div>
+    </div>
+  </div>`;
+
+  // ── Block 2: Geräte nach Typ ──
+  const geraeteRows = Object.entries(geraeteByTyp)
+    .sort((a,b)=>b[1].count-a[1].count)
+    .map(([name,d]) => `<tr>
+      <td style="padding:5px 8px;font-size:10px;color:${tx}">${esc(name)}</td>
+      <td style="padding:5px 8px;font-size:9px;color:${tx3}">${esc(d.cat)}</td>
+      <td style="padding:5px 8px;font-family:${mono};font-size:11px;font-weight:700;color:${ac};text-align:right">${d.count} Stk.</td>
+    </tr>`).join('');
+
+  const geraeteBlock = `
+  <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:${ac};text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">
+      🔧 Geräte nach Typ — Gesamt: ${totalGeraete} Stück
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Gerät / Typ</th>
+        <th style="text-align:left;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Kategorie</th>
+        <th style="text-align:right;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Anzahl</th>
+      </tr></thead>
+      <tbody>${geraeteRows||`<tr><td colspan="3" style="color:${tx3};padding:10px 8px;text-align:center">Keine Geräte</td></tr>`}</tbody>
+      <tfoot><tr>
+        <td colspan="2" style="padding:6px 8px;font-size:10px;font-weight:700;color:${tx};border-top:1px solid ${bd}">GESAMT</td>
+        <td style="padding:6px 8px;font-family:${mono};font-size:12px;font-weight:700;color:${ac};text-align:right;border-top:1px solid ${bd}">${totalGeraete} Stk.</td>
+      </tr></tfoot>
+    </table>
+  </div>`;
+
+  // ── Block 3: Kabel nach Typ (mit Balken) ──
+  const kabelRows = Object.entries(kabelMap)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,m],ci) => {
+      const pct = totalKabel>0?(m/totalKabel*100).toFixed(0):0;
+      const col = BAR_COLORS[ci%BAR_COLORS.length];
+      return `<tr>
+        <td style="padding:5px 8px;font-family:${mono};font-size:10px;color:${tx}">${esc(k)}</td>
+        <td style="padding:5px 8px;font-family:${mono};font-size:11px;font-weight:700;color:${col};text-align:right;white-space:nowrap">${m.toFixed(1)} m</td>
+        <td style="padding:5px 8px;width:90px">
+          <div style="background:${sf3};border-radius:3px;height:7px;overflow:hidden;margin-bottom:2px">
+            <div style="width:${pct}%;background:${col};height:7px;border-radius:3px"></div>
+          </div>
+          <span style="font-size:9px;color:${tx3};font-family:${mono}">${pct}%</span>
+        </td>
+      </tr>`;
+    }).join('');
+
+  const kabelBlock = Object.keys(kabelMap).length ? `
+  <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:${ac};text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      🔌 Kabelmengen nach Typ
+      <span style="background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:1px 8px;font-family:${mono};font-size:9px;color:${ac}">${totalKabel.toFixed(1)} m gesamt</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Kabeltyp</th>
+        <th style="text-align:right;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Länge</th>
+        <th style="font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Anteil</th>
+      </tr></thead>
+      <tbody>${kabelRows}</tbody>
+      <tfoot><tr>
+        <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${tx};border-top:2px solid ${bd}">GESAMT</td>
+        <td style="padding:6px 8px;font-family:${mono};font-size:13px;font-weight:700;color:${gr};text-align:right;border-top:2px solid ${bd}">${totalKabel.toFixed(1)} m</td>
+        <td style="border-top:2px solid ${bd}"></td>
+      </tr></tfoot>
+    </table>
+    <div style="margin-top:8px;font-size:9px;color:${tx3};font-family:${mono}">ℹ️ Inkl. manueller Zuleitungen · zzgl. 10–15% Verschnitt empfohlen</div>
+  </div>` : '';
+
+  // ── Block 4: Leitungen nach Typ ──
+  const leitungRows = Object.entries(leitungByTyp)
+    .sort((a,b)=>b[1].laenge-a[1].laenge)
+    .map(([name,d]) => `<tr>
+      <td style="padding:5px 8px;font-size:10px;color:${tx}">${esc(name)}</td>
+      <td style="padding:5px 8px;font-family:${mono};font-size:10px;color:${tx2};text-align:right">${d.laenge.toFixed(1)} m</td>
+    </tr>`).join('');
+
+  const leitungBlock = Object.keys(leitungByTyp).length ? `
+  <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:${ac};text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">
+      ⚡ Leitungen nach Typ — Gesamt: ${wireTotal.toFixed(1)} m verlegt
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Leitungstyp · Kabeltyp</th>
+        <th style="text-align:right;font-size:9px;color:${tx3};padding:4px 8px;border-bottom:1px solid ${bd}">Länge</th>
+      </tr></thead>
+      <tbody>${leitungRows}</tbody>
+      <tfoot><tr>
+        <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${tx};border-top:2px solid ${bd}">GESAMT</td>
+        <td style="padding:6px 8px;font-family:${mono};font-size:13px;font-weight:700;color:${gr};text-align:right;border-top:2px solid ${bd}">${wireTotal.toFixed(1)} m</td>
+      </tr></tfoot>
+    </table>
+  </div>` : '';
+
+  return kpiBlock + geraeteBlock + kabelBlock + leitungBlock;
 }
 
 // ═══════════════════════════════════════════════════
@@ -4946,32 +5212,51 @@ function exportFloorplanPDF() {
   ectx.drawImage(canvas, 0, 0);
   const imgData = exportCanvas.toDataURL('image/png');
 
+  // Stückliste rendern damit byType/byKabel aktuell ist
   renderStueckliste();
   setTimeout(()=>{
+    // Daten berechnen
+    const _symsAll = state.symbols;
+    const _wiresAll = state.wires;
+    const _byType={}, _byKabel={};
+    for(const s of _symsAll){ const n=SYMBOLS[s.type]?.name||s.type; _byType[n]=(_byType[n]||0)+(s.count||1); }
+    for(const s of _symsAll){ if(s.kabelLaenge&&parseFloat(s.kabelLaenge)>0){const k=s.kabel||'NYM-J 3×1.5';_byKabel[k]=(_byKabel[k]||0)+parseFloat(s.kabelLaenge);} }
+    for(const w of _wiresAll){ _byKabel[w.kabel||'—']=(_byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
+    const _wTotal = _wiresAll.reduce((a,w)=>a+parseFloat(w.laenge_m||0),0);
+    const sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
+    const summaryHTML = renderSummaryHTML(sd, true); // forPrint=true → helle Farben
+
     const tbl = document.getElementById('stBody')?.parentElement?.outerHTML||'';
     const w = window.open('','_blank');
     const heute = new Date().toLocaleDateString('de-DE');
     w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
     <title>${pn} — Elektroplan</title>
     <style>
-      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0}
-      .page{padding:20mm 15mm;min-height:297mm;}
-      .header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:14px;display:flex;gap:20px}
-      .hdr-logo{font-size:18px;font-weight:700;color:#f5a623}
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#222}
+      .page{padding:14mm 12mm;}
+      .header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:12px;display:flex;gap:20px;align-items:flex-start}
+      .hdr-logo{font-size:18px;font-weight:700;color:#f5a623;white-space:nowrap}
       .hdr-info{flex:1}
-      .hdr-info h1{font-size:16px;margin:0 0 4px}
-      .hdr-info p{font-size:11px;color:#555;margin:0}
-      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;border:1px solid #ddd;border-radius:4px;padding:10px}
-      .info-sec h3{font-size:10px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px}
-      .info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:3px 0;font-size:10px}
-      .info-row strong{color:#333}
-      .plan-img{width:100%;border:1px solid #ccc;border-radius:4px;margin-bottom:14px}
-      table{width:100%;border-collapse:collapse;font-size:10px}
-      th{background:#f5a623;color:white;padding:5px 8px;text-align:left}
-      td{border:1px solid #ddd;padding:4px 7px}
-      tr:nth-child(even)td{background:#fafafa}
-      .footer{border-top:1px solid #ddd;margin-top:16px;padding-top:8px;font-size:9px;color:#999;display:flex;justify-content:space-between}
-      @media print{.page{padding:10mm}}
+      .hdr-info h1{font-size:16px;margin:0 0 3px;color:#222}
+      .hdr-info p{font-size:10px;color:#555;margin:0}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px;padding:10px}
+      .info-sec h3{font-size:9px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px;letter-spacing:.5px}
+      .info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:2px 0;font-size:9px}
+      .info-row strong{color:#222}
+      .plan-img{width:100%;border:1px solid #ccc;border-radius:3px;margin-bottom:12px;page-break-after:always}
+      .pg-break{page-break-before:always}
+      table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
+      th{background:#f5a623;color:white;padding:4px 7px;text-align:left;font-size:9px}
+      td{border:1px solid #e0e0e0;padding:3px 7px}
+      tr:nth-child(even) td{background:#fafafa}
+      tfoot td{background:#f8f8f8;font-weight:700;border-top:2px solid #ccc}
+      h3.sec{font-size:11px;font-weight:700;color:#f5a623;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #f5a623}
+      .footer{border-top:1px solid #ddd;margin-top:12px;padding-top:6px;font-size:8px;color:#999;display:flex;justify-content:space-between}
+      @media print{
+        .page{padding:8mm}
+        .pg-break{page-break-before:always}
+      }
     </style>
     </head><body>
     <div class="page">
@@ -4982,6 +5267,8 @@ function exportFloorplanPDF() {
           <p>Gewerk: ${pd.gewerk||'Elektroinstallation'} &nbsp;|&nbsp; Erstellt: ${heute} &nbsp;|&nbsp; Auftrag: ${pd.auftragsnr||'—'}</p>
         </div>
       </div>
+
+      <!-- Projektdaten -->
       <div class="info-grid">
         <div class="info-sec">
           <h3>👤 Kundendaten</h3>
@@ -5006,21 +5293,54 @@ function exportFloorplanPDF() {
         </div>
         <div class="info-sec">
           <h3>📝 Notizen</h3>
-          <div style="font-size:10px;color:#555;line-height:1.4">${(pd.notizen||'Keine Bemerkungen').replace(/\n/g,'<br>')}</div>
+          <div style="font-size:9px;color:#555;line-height:1.5">${(pd.notizen||'—').replace(/\n/g,'<br>')}</div>
         </div>
       </div>
-      <h3 style="font-size:12px;margin:0 0 6px;color:#555">Grundrissplan</h3>
+
+      <!-- Grundrissplan -->
+      <h3 class="sec">Grundrissplan</h3>
       <img src="${imgData}" class="plan-img">
-      <h3 style="font-size:12px;margin:14px 0 6px;color:#555">📦 Stückliste Elektroinstallation</h3>
-      ${tbl}
+
+      <!-- Geräte-Stückliste -->
+      <div class="pg-break">
+        <h3 class="sec">📦 Stückliste — Geräte</h3>
+        ${tbl}
+
+        <!-- Leitungen -->
+        <h3 class="sec" style="margin-top:14px">⚡ Leitungsverzeichnis</h3>
+        <table>
+          <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Länge</th></tr></thead>
+          <tbody>
+            ${_wiresAll.map((ww,wi)=>`<tr>
+              <td>${wi+1}</td>
+              <td style="font-family:monospace">${ww.circuit||'—'}</td>
+              <td>${(WIRE_TYPES[ww.wireType]||{label:ww.wireType||'Strom'}).label}</td>
+              <td style="font-family:monospace">${ww.phase||'L1'}</td>
+              <td style="font-family:monospace">${ww.kabel||'—'}</td>
+              <td>${ww.adernLabel||''}</td>
+              <td>${ww.verlegeart||'—'}${ww.trasseHoehe?' '+ww.trasseHoehe+'cm':''}</td>
+              <td style="font-family:monospace;font-weight:700">${ww.laenge_m?ww.laenge_m+'m':'—'}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr>
+            <td colspan="7" style="text-align:right">GESAMT LEITUNGEN</td>
+            <td style="font-family:monospace;color:#27ae60">${_wTotal.toFixed(1)} m</td>
+          </tr></tfoot>
+        </table>
+
+        <!-- Zusammenfassung -->
+        <h3 class="sec" style="margin-top:14px">📊 Zusammenfassung &amp; Kabelmengen</h3>
+        ${summaryHTML}
+      </div>
+
       <div class="footer">
         <span>⚡ Elektro-Grundriss Planer — Anvolt GmbH</span>
-        <span>Dokument: ${pn} &nbsp;|&nbsp; Seite 1</span>
-        <span>Erstellt: ${heute}</span>
+        <span>${pn} &nbsp;|&nbsp; Erstellt: ${heute}</span>
+        <span>Seite 1</span>
       </div>
     </div>
     <\x73cript>window.print();<\/script>
-    </body></html>`);
+    </body></html>\`);
     w.document.close();
   },200);
 }
@@ -5855,6 +6175,361 @@ function lvDrawOverlay()         { /* Overlay läuft eigenständig via lvRedrawO
 function lvHandleCanvasClick()   { return false; }
 function lvShowHint()            { /* */ }
 function lvHideHint()            { /* */ }
+
+// ═══════════════════════════════════════════════════
+//  AN LINIE VERTEILEN — Alle Symboltypen
+// ═══════════════════════════════════════════════════
+
+// ── Alle Kategorien + ihre Symbole (dynamisch aus SYMBOLS)
+const WD_CATS = [
+  'Steckdosen','Schalter & Taster','Beleuchtung','Elektrogeräte',
+  'Kälte & Klima','Verteiler & Technik','Haustechnik','Sicherheit',
+  'KNX / Smarthome','Sonstige'
+];
+
+let _wd = {
+  step:    1,
+  cat:     'Steckdosen',
+  symKey:  null,      // gewählter Symbol-Key
+  circuit: 'SK1',
+  line:    null,      // {x1,y1,x2,y2} Weltkoords
+  dragPt:  null,
+  dragCur: null,
+  active:  false,
+  anzahl:  3,
+  positions: [],
+};
+
+// ── Panel öffnen / schließen ──
+
+function openWDModal() {
+  _wd.step=1; _wd.line=null; _wd.dragPt=null; _wd.dragCur=null;
+  _wd.positions=[]; _wd.active=false; _wd.symKey=null;
+  wdBuildCatTabs();
+  wdRenderSymGrid();
+  wdShowPane(1);
+  document.getElementById('wdCircuit').value = _wd.circuit;
+  document.getElementById('wdOverlayPanel').style.display = 'block';
+  document.getElementById('wdDrawBanner').style.display   = 'none';
+}
+
+function closeWDModal() {
+  _wd.active=false; _wd.dragPt=null; _wd.dragCur=null;
+  document.getElementById('wdOverlayPanel').style.display  = 'none';
+  document.getElementById('wdDrawBanner').style.display    = 'none';
+  const ov=document.getElementById('wdOverlayCanvas');
+  if(ov){ov.style.display='none'; const oc=ov.getContext('2d'); oc.clearRect(0,0,ov.width,ov.height);}
+  document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
+}
+
+function wdShowPane(n) {
+  [1,2,3].forEach(i=>{
+    const p=document.getElementById('wdPane'+i);
+    if(p) p.style.display=(i===n)?'block':'none';
+  });
+  _wd.step=n;
+  wdUpdateStepBar();
+}
+function wdUpdateStepBar() {
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById('wdStep'+i);
+    if(!el)return;
+    el.className='lv-step';
+    if(i<_wd.step) el.classList.add('done');
+    if(i===_wd.step) el.classList.add('act');
+  });
+}
+
+// ── Schritt 1: Kategorie + Symbol wählen ──
+
+function wdBuildCatTabs() {
+  const el=document.getElementById('wdCatTabs');
+  if(!el)return;
+  el.innerHTML = WD_CATS.map(cat=>
+    `<div class="wd-cat-tab${cat===_wd.cat?' sel':''}" onclick="wdSelCat('${encodeURIComponent(cat)}')">${cat}</div>`
+  ).join('');
+}
+
+function wdSelCat(catEncoded) {
+  _wd.cat=decodeURIComponent(catEncoded);
+  _wd.symKey=null;
+  wdBuildCatTabs();
+  wdRenderSymGrid();
+}
+
+function wdRenderSymGrid() {
+  const g=document.getElementById('wdSymGrid');
+  if(!g)return;
+  const syms=Object.entries(SYMBOLS).filter(([,s])=>s.cat===_wd.cat);
+  if(!syms.length){
+    g.innerHTML='<div style="color:var(--tx3);font-size:10px;padding:8px;grid-column:1/-1">Keine Symbole</div>';
+    return;
+  }
+  g.innerHTML = syms.map(([key,sym])=>{
+    const preview = sym.imgData
+      ? `<img src="${sym.imgData}" style="width:28px;height:28px;object-fit:contain">`
+      : `<svg viewBox="0 0 40 40" width="28" height="28" style="color:${sym.color||'#555'}">${sym.svg||''}</svg>`;
+    return `<div class="wd-sym-btn${_wd.symKey===key?' sel':''}" onclick="wdSelSym('${key}',this)" title="${sym.name}">
+      ${preview}
+      <div>${(sym.abbr||sym.name||'').substring(0,8)}</div>
+    </div>`;
+  }).join('');
+}
+
+function wdSelSym(key,el) {
+  _wd.symKey=key;
+  document.querySelectorAll('#wdSymGrid .wd-sym-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function wdGoStep2() {
+  if(!_wd.symKey){setStatus('Bitte zuerst ein Symbol wählen');return;}
+  _wd.circuit=document.getElementById('wdCircuit').value||'SK1';
+  _wd.line=null; _wd.dragPt=null; _wd.dragCur=null; _wd.positions=[];
+  _wd.active=true;
+  wdShowPane(2);
+  wdInitOverlay();
+  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
+  document.getElementById('wdDrawBanner').style.display='block';
+  document.getElementById('wdDrawBanner').textContent='📐 Linie ziehen — Wand oder Achse einzeichnen';
+  document.getElementById('wdLineStatus').textContent='Linie: —';
+}
+
+// ── Overlay-Canvas initialisieren ──
+
+function wdInitOverlay() {
+  const ov=document.getElementById('wdOverlayCanvas');
+  const wr=document.getElementById('canvas-wrap');
+  ov.width=wr.clientWidth; ov.height=wr.clientHeight;
+  ov.style.display='block';
+  ov.style.width=wr.clientWidth+'px'; ov.style.height=wr.clientHeight+'px';
+  wdRedraw();
+
+  if(ov._wdBound)return;
+  ov._wdBound=true;
+  ov.style.pointerEvents='auto';
+
+  function wp(e){
+    const r=ov.getBoundingClientRect();
+    const src=e.touches?e.touches[0]:e;
+    return{x:(src.clientX-r.left-state.pan.x)/state.zoom,
+           y:(src.clientY-r.top -state.pan.y)/state.zoom};
+  }
+  function onDown(e){
+    if(!_wd.active)return;
+    e.preventDefault();e.stopPropagation();
+    _wd.dragPt=wp(e); _wd.dragCur=wp(e);
+  }
+  function onMove(e){
+    if(!_wd.active||!_wd.dragPt)return;
+    e.preventDefault();e.stopPropagation();
+    _wd.dragCur=wp(e); wdRedraw();
+  }
+  function onUp(e){
+    if(!_wd.active||!_wd.dragPt)return;
+    e.preventDefault();e.stopPropagation();
+    const src=e.changedTouches?e.changedTouches[0]:e;
+    const r=ov.getBoundingClientRect();
+    const end={x:(src.clientX-r.left-state.pan.x)/state.zoom,
+               y:(src.clientY-r.top -state.pan.y)/state.zoom};
+    const len=Math.hypot(end.x-_wd.dragPt.x,end.y-_wd.dragPt.y);
+    if(len>10/state.zoom){
+      _wd.line={x1:_wd.dragPt.x,y1:_wd.dragPt.y,x2:end.x,y2:end.y};
+      // → Schritt 3
+      _wd.active=false;
+      document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
+      document.getElementById('wdDrawBanner').style.display='none';
+      const lenM=state.scale?(Math.hypot(end.x-_wd.dragPt.x,end.y-_wd.dragPt.y)/state.scale).toFixed(1)+'m':'—';
+      document.getElementById('wdLineStatus').textContent='Linie: '+lenM;
+      setTimeout(()=>{
+        wdShowPane(3);
+        document.getElementById('wdAnzahl').value=_wd.anzahl;
+        wdCalcAndDraw();
+      },150);
+    }
+    _wd.dragPt=null; _wd.dragCur=null; wdRedraw();
+  }
+  ov.addEventListener('mousedown',onDown,{passive:false});
+  ov.addEventListener('mousemove',onMove,{passive:false});
+  ov.addEventListener('mouseup',  onUp,  {passive:false});
+  ov.addEventListener('touchstart',onDown,{passive:false});
+  ov.addEventListener('touchmove', onMove,{passive:false});
+  ov.addEventListener('touchend',  onUp,  {passive:false});
+}
+
+function wdResetLine(){
+  _wd.line=null;_wd.positions=[];_wd.dragPt=null;_wd.dragCur=null;
+  _wd.active=true;
+  wdShowPane(2);
+  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
+  document.getElementById('wdDrawBanner').style.display='block';
+  document.getElementById('wdDrawBanner').textContent='📐 Linie ziehen — Wand oder Achse einzeichnen';
+  document.getElementById('wdLineStatus').textContent='Linie: —';
+  wdRedraw();
+}
+
+// ── Overlay zeichnen ──
+
+function wdRedraw() {
+  const ov=document.getElementById('wdOverlayCanvas');
+  if(!ov)return;
+  const oc=ov.getContext('2d');
+  oc.clearRect(0,0,ov.width,ov.height);
+  oc.save();
+  oc.setTransform(state.zoom,0,0,state.zoom,state.pan.x,state.pan.y);
+
+  // Aktuelle Linie (ziehen)
+  if(_wd.dragPt&&_wd.dragCur){
+    oc.strokeStyle='rgba(245,166,35,.8)'; oc.lineWidth=2.5/state.zoom;
+    oc.lineCap='round'; oc.setLineDash([8/state.zoom,5/state.zoom]);
+    oc.beginPath(); oc.moveTo(_wd.dragPt.x,_wd.dragPt.y); oc.lineTo(_wd.dragCur.x,_wd.dragCur.y); oc.stroke();
+    oc.setLineDash([]);
+    if(state.scale){
+      const m=(Math.hypot(_wd.dragCur.x-_wd.dragPt.x,_wd.dragCur.y-_wd.dragPt.y)/state.scale).toFixed(1);
+      const mx=(_wd.dragPt.x+_wd.dragCur.x)/2, my=(_wd.dragPt.y+_wd.dragCur.y)/2;
+      oc.fillStyle='#f5a623'; oc.font=`bold ${12/state.zoom}px IBM Plex Mono,monospace`;
+      oc.textAlign='center'; oc.fillText(m+'m',mx,my-10/state.zoom); oc.textAlign='left';
+    }
+  }
+
+  // Gesetzte Linie
+  if(_wd.line){
+    oc.strokeStyle='#f5a623'; oc.lineWidth=2.5/state.zoom; oc.lineCap='round';
+    oc.beginPath(); oc.moveTo(_wd.line.x1,_wd.line.y1); oc.lineTo(_wd.line.x2,_wd.line.y2); oc.stroke();
+    // Endpunkte
+    [[_wd.line.x1,_wd.line.y1],[_wd.line.x2,_wd.line.y2]].forEach(([px,py])=>{
+      oc.beginPath(); oc.arc(px,py,5/state.zoom,0,Math.PI*2);
+      oc.fillStyle='#f5a623'; oc.fill();
+      oc.strokeStyle='white'; oc.lineWidth=1.5/state.zoom; oc.stroke();
+    });
+    // Maß
+    if(state.scale){
+      const m=(Math.hypot(_wd.line.x2-_wd.line.x1,_wd.line.y2-_wd.line.y1)/state.scale).toFixed(1);
+      oc.fillStyle='#f5a623'; oc.font=`bold ${10/state.zoom}px IBM Plex Mono,monospace`;
+      oc.textAlign='center';
+      oc.fillText(m+'m',(_wd.line.x1+_wd.line.x2)/2,(_wd.line.y1+_wd.line.y2)/2-10/state.zoom);
+      oc.textAlign='left';
+    }
+  }
+
+  // Symbol-Vorschau auf Linie
+  if(_wd.line&&_wd.positions.length){
+    const sym=SYMBOLS[_wd.symKey];
+    _wd.positions.forEach((pos,idx)=>{
+      const R=14/state.zoom;
+      oc.beginPath(); oc.arc(pos.x,pos.y,R,0,Math.PI*2);
+      oc.fillStyle='rgba(255,255,255,.85)'; oc.strokeStyle=sym?.color||'#f5a623'; oc.lineWidth=1.5/state.zoom;
+      oc.fill(); oc.stroke();
+      // Kreuz
+      oc.strokeStyle=sym?.color||'#f5a623'; oc.lineWidth=1.2/state.zoom;
+      oc.beginPath(); oc.moveTo(pos.x-R*.5,pos.y); oc.lineTo(pos.x+R*.5,pos.y); oc.stroke();
+      oc.beginPath(); oc.moveTo(pos.x,pos.y-R*.5); oc.lineTo(pos.x,pos.y+R*.5); oc.stroke();
+      // Nummer
+      oc.fillStyle='#333'; oc.font=`bold ${9/state.zoom}px IBM Plex Mono,monospace`;
+      oc.textAlign='center'; oc.fillText(idx+1,pos.x,pos.y+R+9/state.zoom); oc.textAlign='left';
+    });
+  }
+  oc.restore();
+}
+
+// ── Schritt 3: Berechnen ──
+
+function wdCalcAndDraw(){
+  _wd.anzahl=Math.max(1,parseInt(document.getElementById('wdAnzahl').value)||3);
+  if(!_wd.line)return;
+  const dx=_wd.line.x2-_wd.line.x1, dy=_wd.line.y2-_wd.line.y1;
+  _wd.positions=[];
+  for(let i=0;i<_wd.anzahl;i++){
+    const t=_wd.anzahl>1?(i+0.5)/_wd.anzahl:0.5;
+    _wd.positions.push({x:_wd.line.x1+t*dx, y:_wd.line.y1+t*dy});
+  }
+  // Info
+  const sym=SYMBOLS[_wd.symKey]; const el=document.getElementById('wdInfo');
+  if(el){
+    let info='';
+    if(state.scale){
+      const m=(Math.hypot(dx,dy)/state.scale).toFixed(1);
+      info=`Linie: ${m}m  `;
+    }
+    info+=`${_wd.anzahl}× ${sym?.name||_wd.symKey} · ${_wd.circuit}`;
+    el.textContent=info;
+  }
+  wdRedraw();
+  wdDrawMini();
+}
+
+function wdDrawMini(){
+  const cv=document.getElementById('wdMiniCanvas');
+  if(!cv||!_wd.line)return;
+  cv.width=cv.parentElement?.clientWidth-2||248;
+  const W=cv.width,H=cv.height;
+  const c2=cv.getContext('2d');
+  c2.clearRect(0,0,W,H);
+  c2.fillStyle='#1a1f2e'; c2.fillRect(0,0,W,H);
+
+  const all=[{x:_wd.line.x1,y:_wd.line.y1},{x:_wd.line.x2,y:_wd.line.y2},..._wd.positions];
+  const minX=Math.min(...all.map(p=>p.x)),maxX=Math.max(...all.map(p=>p.x));
+  const minY=Math.min(...all.map(p=>p.y)),maxY=Math.max(...all.map(p=>p.y));
+  const pad=18;
+  const rW=Math.max(1,maxX-minX),rH=Math.max(1,maxY-minY);
+  // Für sehr flache Linien (horizontal/vertikal) padding erhöhen
+  const sc=Math.min((W-pad*2)/rW,(H-pad*2)/rH,20);
+  const ox=W/2-(minX+maxX)/2*sc, oy=H/2-(minY+maxY)/2*sc;
+  const tx=wx=>ox+wx*sc, ty=wy=>oy+wy*sc;
+
+  // Linie
+  c2.strokeStyle='#f5a623'; c2.lineWidth=2; c2.lineCap='round';
+  c2.beginPath(); c2.moveTo(tx(_wd.line.x1),ty(_wd.line.y1)); c2.lineTo(tx(_wd.line.x2),ty(_wd.line.y2)); c2.stroke();
+  // Maß
+  if(state.scale){
+    const m=(Math.hypot(_wd.line.x2-_wd.line.x1,_wd.line.y2-_wd.line.y1)/state.scale).toFixed(1);
+    c2.fillStyle='#f5a623'; c2.font='8px IBM Plex Mono,monospace'; c2.textAlign='center';
+    c2.fillText(m+'m',(tx(_wd.line.x1)+tx(_wd.line.x2))/2,(ty(_wd.line.y1)+ty(_wd.line.y2))/2-10);
+    c2.textAlign='left';
+  }
+  // Symbole
+  const sym=SYMBOLS[_wd.symKey];
+  _wd.positions.forEach((pos,idx)=>{
+    const px=tx(pos.x),py=ty(pos.y),R=7;
+    c2.beginPath(); c2.arc(px,py,R,0,Math.PI*2);
+    c2.fillStyle='white'; c2.strokeStyle=sym?.color||'#f5a623'; c2.lineWidth=1.5; c2.fill(); c2.stroke();
+    c2.strokeStyle=sym?.color||'#f5a623'; c2.lineWidth=1.2;
+    c2.beginPath(); c2.moveTo(px-4,py); c2.lineTo(px+4,py); c2.stroke();
+    c2.beginPath(); c2.moveTo(px,py-4); c2.lineTo(px,py+4); c2.stroke();
+    c2.fillStyle='#aaa'; c2.font='bold 6px monospace'; c2.textAlign='center';
+    c2.fillText(idx+1,px,py+R+7); c2.textAlign='left';
+  });
+}
+
+// ── Platzieren ──
+
+function wdPlace(){
+  if(!_wd.positions.length||!_wd.symKey){setStatus('Bitte Symbol und Linie definieren');return;}
+  saveUndo();
+  const symDef=SYMBOLS[_wd.symKey];
+  const autoK=autoKabelConfig(_wd.symKey);
+  const placed=[];
+  _wd.positions.forEach((pos,idx)=>{
+    const s={
+      id:gid(), type:_wd.symKey,
+      x:pos.x, y:pos.y, rotation:0,
+      label:(symDef?.name||_wd.symKey)+' '+(idx+1),
+      circuit:_wd.circuit,
+      phase:symDef?.phase||'L1',
+      nennstrom:autoK?.nennstrom||symDef?.nennstrom||16,
+      kabel:autoK?.kabel||symDef?.kabel||'NYM-J 3×2.5',
+      kabelHinweis:autoK?.kabelHinweis||'',
+      lsKurve:'B', kabelPosition:'unten', kabelLaenge:'',
+      kommentar:`Linienv. ${_wd.anzahl}×`,
+      count:1,
+    };
+    state.symbols.push(s); placed.push(s);
+  });
+  if(state.symbols.length>0){const uz=document.getElementById('uploadZone');if(uz)uz.style.display='none';}
+  _wd.line=null; _wd.positions=[];
+  closeWDModal(); render();
+  setStatus(`✅ ${placed.length}× ${SYMBOLS[_wd.symKey]?.name||_wd.symKey} platziert · Stromkreis ${_wd.circuit}`);
+}
 
 
 </script>
