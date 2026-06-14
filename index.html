@@ -141,6 +141,32 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .modal h3{font-size:14px;margin-bottom:14px;}
 .mft{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
 
+/* ── BELEUCHTUNGSVERTEILUNG MODAL ── */
+.lv-modal { width:560px; max-width:96vw; }
+.lv-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.lv-card {
+  background:var(--sf2); border:2px solid var(--bd); border-radius:6px;
+  padding:9px 10px; cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; gap:8px; font-size:11px;
+}
+.lv-card:hover { border-color:var(--ac); color:var(--ac); }
+.lv-card.sel { border-color:var(--ac); background:rgba(245,166,35,.12); color:var(--ac); }
+.lv-card .lv-ico { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
+.lv-sec { margin-bottom:12px; }
+.lv-sec-ttl { font-size:10px; font-weight:700; color:var(--ac); text-transform:uppercase;
+  letter-spacing:.7px; margin-bottom:7px; padding-bottom:3px; border-bottom:1px solid var(--bd); }
+.lv-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:11px; color:var(--tx2); }
+.lv-row label { min-width:130px; }
+.lv-row input, .lv-row select { background:var(--sf2); border:1px solid var(--bd); color:var(--tx);
+  font-family:var(--sans); font-size:11px; padding:4px 7px; border-radius:3px; outline:none; }
+.lv-row input:focus, .lv-row select:focus { border-color:var(--ac); }
+#lvPreviewCanvas { background:#f0f2f5; border:1px solid var(--bd2); border-radius:4px;
+  display:block; width:100%; margin-top:8px; cursor:crosshair; }
+.lv-hint { font-size:9px; color:var(--tx3); font-family:var(--mono); margin-top:4px; }
+.lv-result { background:rgba(63,185,80,.08); border:1px solid rgba(63,185,80,.25);
+  border-radius:4px; padding:8px 10px; font-size:10px; font-family:var(--mono);
+  color:var(--gr); margin-top:8px; line-height:1.7; }
+
 /* Touch drag ghost */
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);}
 
@@ -340,17 +366,29 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="undoAction()" title="Rückgängig">↩</button>
       <button class="tool-btn" onclick="clearAll()" title="Alles löschen">🗑</button>
       <div class="vs"></div>
-      <select class="rp-sel" id="wireTypeSelect" onchange="setActiveWireType(this.value)" style="width:160px;font-size:10px" title="Leitungstyp">
-        <option value="strom">⚡ Strom NYM-J 3-adrig</option>
-        <option value="strom3">⚡ Drehstrom NYM-J 5-adrig</option>
-        <option value="nyy">🟤 NYY-J Erdkabel 3-adrig</option>
-        <option value="nyy5">🟤 NYY-J Erdkabel 5-adrig</option>
-        <option value="erdung">🟡🟢 Erdungsleitung grün-gelb</option>
-        <option value="erde">🌍 Erdkabel NYY-J</option>
-        <option value="daten">💻 Datenkabel CAT6</option>
-        <option value="sat">📡 SAT-Kabel Koax</option>
-        <option value="telefon">📞 Telefonkabel</option>
-        <option value="bus">🔶 KNX/Bus-Kabel</option>
+      <select class="rp-sel" id="wireTypeSelect" onchange="setActiveWireType(this.value)" style="width:200px;font-size:10px" title="Leitungstyp">
+        <optgroup label="── Auto (DIN 18015) ──">
+          <option value="strom25">🔌 Steckdose NYM-J 3×2,5 / 16A</option>
+          <option value="beleuchtung">💡 Beleuchtung NYM-J 3×1,5 / 10A</option>
+          <option value="taster">🔘 Taster NYM-J 5×1,5 / 10A</option>
+        </optgroup>
+        <optgroup label="── Strom ──">
+          <option value="strom">⚡ NYM-J 3×1,5 allgemein</option>
+          <option value="strom3">⚡ NYM-J 5-adrig Drehstrom</option>
+        </optgroup>
+        <optgroup label="── Erdkabel ──">
+          <option value="nyy">🟤 NYY-J 3-adrig</option>
+          <option value="nyy5">🟤 NYY-J 5-adrig</option>
+          <option value="erde">🌍 NYY-J allgemein</option>
+        </optgroup>
+        <optgroup label="── Sonstige ──">
+          <option value="erdung">🟡🟢 PE grün-gelb</option>
+          <option value="daten">💻 CAT6</option>
+          <option value="sat">📡 SAT Koax</option>
+          <option value="telefon">📞 Telefon</option>
+          <option value="bus">🔶 KNX/Bus</option>
+          <option value="custom">✏️ Benutzerdefiniert</option>
+        </optgroup>
       </select>
       <div class="vs"></div>
       <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählt löschen (Entf)" style="color:var(--rd)">✂</button>
@@ -360,6 +398,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         📁 Grundriss laden
         <input type="file" accept="image/*,application/pdf" style="display:none" onchange="loadFloorplan(event)">
       </label>
+      <div class="vs"></div>
+      <button class="btn" style="background:rgba(241,196,15,.2);color:#f1c40f;border:1px solid rgba(241,196,15,.4);font-size:11px" onclick="openLVModal()" title="Beleuchtung zentrieren / gleichmäßig verteilen">💡 Beleuchtung verteilen</button>
     </div>
     <div id="canvas-wrap">
       <canvas id="main-canvas"></canvas>
@@ -865,6 +905,67 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <div class="mft">
       <button class="btn bg" onclick="deleteSelectedSymbol()">🗑 Löschen</button>
       <button class="btn bg" onclick="closeSymModal()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- BELEUCHTUNGSVERTEILUNG MODAL -->
+<div class="modal-ov hid" id="lvModal">
+  <div class="modal lv-modal">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:20px">💡</span>
+      <h3 style="margin:0">Beleuchtung platzieren &amp; verteilen</h3>
+      <div style="flex:1"></div>
+      <button class="btn bg" onclick="closeLVModal()" style="font-size:11px">✕</button>
+    </div>
+
+    <!-- Schritt 1: Symbolwahl -->
+    <div class="lv-sec">
+      <div class="lv-sec-ttl">① Leuchtmitteltyp wählen</div>
+      <div class="lv-grid" id="lvSymGrid"></div>
+    </div>
+
+    <!-- Schritt 2: Raumdefinition & Anzahl -->
+    <div class="lv-sec">
+      <div class="lv-sec-ttl">② Raum &amp; Verteilung</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
+          <label>Anzahl Lampen</label>
+          <input type="number" id="lvAnzahl" value="4" min="1" max="24" style="width:80px" oninput="lvUpdate()">
+        </div>
+        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
+          <label>Stromkreis</label>
+          <input type="text" id="lvCircuit" value="F01.1" style="width:100px" oninput="lvUpdate()">
+        </div>
+        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
+          <label>Verteilungsart</label>
+          <select id="lvModus" onchange="lvUpdate()" style="width:160px">
+            <option value="center">⊙ Einzeln zentriert (1 Lampe)</option>
+            <option value="raster" selected>⊞ Raster (gleichmäßig)</option>
+            <option value="reihe">═ Reihe (1 Reihe mittig)</option>
+            <option value="rand">□ Rand (entlang Wände)</option>
+            <option value="manuell">✏ Manuell (Raum klicken)</option>
+          </select>
+        </div>
+        <div class="lv-row" style="flex-direction:column;align-items:flex-start;gap:3px">
+          <label>Abstand zur Wand (cm)</label>
+          <input type="number" id="lvWandAbstand" value="50" min="0" max="200" step="10" style="width:80px" oninput="lvUpdate()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Schritt 3: Raumvorschau -->
+    <div class="lv-sec">
+      <div class="lv-sec-ttl">③ Raum definieren — zwei Ecken klicken</div>
+      <canvas id="lvPreviewCanvas" height="200"></canvas>
+      <div class="lv-hint" id="lvHint">Klicke zwei Ecken des Raums im Vorschau-Canvas (oben links → unten rechts)</div>
+      <div class="lv-result hid" id="lvResult"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn bg" style="flex:1" onclick="lvReset()">↺ Zurücksetzen</button>
+      <button class="btn bg" onclick="closeLVModal()">Abbrechen</button>
+      <button class="btn ba" id="lvPlaceBtn" onclick="lvPlace()" disabled style="flex:1">✓ Platzieren</button>
     </div>
   </div>
 </div>
@@ -2446,21 +2547,35 @@ function endWireDraw(pt) {
   if (near && !near.circuit) near.circuit = circuit;
   const usedCircuit = srcSym?.circuit || circuit;
 
+  // Auto-Kabeltyp aus Quellsymbol ableiten
+  let autoWireType = _pendingWI.wireType || 'strom';
+  let autoWireKabel = srcSym?.kabel || 'NYM-J 3×1.5';
+  if (srcSym) {
+    const ak = autoKabelConfig(srcSym.type);
+    if (ak) {
+      autoWireKabel = ak.kabel;
+      // Kabeltyp passend wählen
+      if (ak.kabel.includes('3×2.5')) autoWireType = 'strom25';
+      else if (ak.kabel.includes('5×1.5')) autoWireType = 'taster';
+      else if (ak.kabel.includes('3×1.5')) autoWireType = 'beleuchtung';
+    }
+  }
+
   state.wires.push({
     id: gid(),
     points: pts,
     circuit: usedCircuit,
     phase: srcSym?.phase || 'L1',
-    wireType: _pendingWI.wireType || 'strom',
-    kabel: srcSym?.kabel || 'NYM-J 3×1.5',
+    wireType: autoWireType,
+    kabel: autoWireKabel,
     verlegeart: _pendingWI.verlegeart || 'UP',
     trasseHoehe: _pendingWI.trasseHoehe || 20,
     rohrTyp: _pendingWI.rohrTyp || '',
     laenge_m: calcWireLengthPts(pts),
     srcId: _wireSrcId,
     dstId: near?.id || null,
-    adern: WIRE_TYPES[_pendingWI.wireType||'strom']?.adern || 3,
-    adernLabel: WIRE_TYPES[_pendingWI.wireType||'strom']?.adernLabel || '',
+    adern: WIRE_TYPES[autoWireType]?.adern || 3,
+    adernLabel: WIRE_TYPES[autoWireType]?.adernLabel || '',
   });
 
   const newIdx = state.wires.length - 1;
@@ -3201,14 +3316,62 @@ function handleMeasureClick(pt, e) {
 // ═══════════════════════════════════════════════════
 //  SYMBOL OPERATIONS
 // ═══════════════════════════════════════════════════
+// ─────────────────────────────────────────────
+//  AUTO-KABEL: Regel nach Symboltyp
+// ─────────────────────────────────────────────
+function autoKabelConfig(key) {
+  const STECKDOSEN_TYPEN = [
+    'steckdose_1','steckdose_2','steckdose_ip44','steckdose_fi',
+    'cee16','cee32','usb_steckdose','datensteckdose','antennensteckdose',
+    'backofen','waschmaschine','trockner','geschirrspueler','boiler',
+    'steckdose_3fach','steckdose_5fach'
+  ];
+  const BELEUCHTUNG_TYPEN = [
+    'deckenleuchte','wandleuchte','einbaustrahler','notleuchte',
+    'aussenleuchte','led_streifen','bewegungsmelder_licht',
+    'leseleuchte','nachtlicht'
+  ];
+  const TASTER_TYPEN = [
+    'taster','taster_leuchte','klingel_taster','jalousietaster',
+    'dimmer','wechselschalter','kreuzschalter','serienschalter',
+    'ausschalter'
+  ];
+
+  // Steckdose → NYM-J 3×2,5 / 16A LS
+  if (STECKDOSEN_TYPEN.includes(key) || (SYMBOLS[key]?.cat === 'Steckdosen')) {
+    return { kabel: 'NYM-J 3×2.5', nennstrom: 16, lsKurve: 'B', kabelHinweis: 'NYM-J 3×2,5 / LS 16A B' };
+  }
+  // Taster / Schalter → NYM-J 5×1,5 / 10A LS
+  if (TASTER_TYPEN.includes(key) || (SYMBOLS[key]?.cat === 'Schalter & Taster')) {
+    return { kabel: 'NYM-J 5×1.5', nennstrom: 10, lsKurve: 'B', kabelHinweis: 'NYM-J 5×1,5 / LS 10A B' };
+  }
+  // Beleuchtung → NYM-J 3×1,5 / 10A LS
+  if (BELEUCHTUNG_TYPEN.includes(key) || (SYMBOLS[key]?.cat === 'Beleuchtung')) {
+    return { kabel: 'NYM-J 3×1.5', nennstrom: 10, lsKurve: 'B', kabelHinweis: 'NYM-J 3×1,5 / LS 10A B' };
+  }
+  // Fallback: Symboldefault
+  return null;
+}
+
 function placeSymbol(key, x, y) {
   const sym = SYMBOLS[key];
   if (!sym) return;
   saveUndo();
+
+  // Auto-Kabelkonfiguration
+  const autoK = autoKabelConfig(key);
+  const kabel     = autoK?.kabel     || sym.kabel    || 'NYM-J 3×1.5';
+  const nennstrom = autoK?.nennstrom || sym.nennstrom || 16;
+
   const s = {
     id: gid(), type: key, x, y, rotation: 0,
     label: sym.name, circuit: 'SK1', phase: sym.phase||'L1',
-    nennstrom: sym.nennstrom||16, kabel: sym.kabel||'NYM-J 3×1.5',
+    nennstrom, kabel,
+    kabelHinweis: autoK?.kabelHinweis || '',
+    lsKurve: autoK?.lsKurve || 'B',
+    // Kabelausführung (Position am Symbol)
+    kabelPosition: 'unten', // oben | unten | links | rechts
+    kabelLaenge: '',        // Zuleitung in m (manuell, wenn kein Maßstab)
     kommentar: '', count: 1
   };
   state.symbols.push(s);
@@ -3336,17 +3499,20 @@ function drawCalPoints() {
 
 // Wire types with colors and styles
 const WIRE_TYPES = {
-  strom:   { label:'Strom NYM-J 3-adrig',     color:'#e74c3c', dash:[],        width:2.5, kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig' },
-  strom3:  { label:'Drehstrom NYM-J 5-adrig',  color:'#9b59b6', dash:[],        width:2.5, kabel:'NYM-J 5×2.5',  adern:5, adernLabel:'5-adrig' },
-  nyy:     { label:'NYY-J 3-adrig Erdkabel',   color:'#6d4c41', dash:[],        width:3.5, kabel:'NYY-J 3×2.5',  adern:3, adernLabel:'NYY-J 3A' },
-  nyy5:    { label:'NYY-J 5-adrig Erdkabel',   color:'#4e342e', dash:[],        width:3.5, kabel:'NYY-J 5×6',    adern:5, adernLabel:'NYY-J 5A' },
-  erdung:  { label:'Erdungsleitung grün-gelb',  color:'#27ae60', dash:[],        width:2.5, kabel:'H07V-K 1×6 grün-gelb', adern:1, adernLabel:'PE grün-gelb', isErdung:true },
-  erde:    { label:'Erdkabel (NYY-J)',          color:'#795548', dash:[],        width:3,   kabel:'NYY-J 5×6',    adern:5, adernLabel:'Erdkabel' },
-  daten:   { label:'Datenkabel (CAT6)',         color:'#9c27b0', dash:[6,3],     width:2,   kabel:'CAT 6 U/UTP',  adern:8, adernLabel:'CAT6' },
-  sat:     { label:'SAT-Kabel (Koax)',          color:'#1565c0', dash:[8,3],     width:2,   kabel:'Koax RG-6',    adern:1, adernLabel:'Koax' },
-  telefon: { label:'Telefonkabel',             color:'#607d8b', dash:[4,2],     width:1.8, kabel:'J-Y(St)Y 2×2×0.6', adern:4, adernLabel:'Tel' },
-  bus:     { label:'KNX/Bus-Kabel',            color:'#ff5722', dash:[3,2],     width:1.8, kabel:'YCYM 2×2×0.8', adern:2, adernLabel:'TKNX' },
-  custom:  { label:'Benutzerdefiniert',        color:'#27ae60', dash:[],        width:2,   kabel:'—',             adern:0, adernLabel:'' },
+  strom:       { label:'Strom NYM-J 3×1,5',        color:'#e74c3c', dash:[],    width:2.5, kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig',      lsA:16 },
+  strom25:     { label:'Steckdose NYM-J 3×2,5 LS 16A', color:'#e67e22', dash:[],width:3,  kabel:'NYM-J 3×2.5',  adern:3, adernLabel:'3-adrig',      lsA:16, autoKabel:'steckdose' },
+  beleuchtung: { label:'Beleuchtung NYM-J 3×1,5 LS 10A',color:'#f1c40f',dash:[],width:2.5,kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig',      lsA:10, autoKabel:'beleuchtung' },
+  taster:      { label:'Taster NYM-J 5×1,5 LS 10A', color:'#3498db', dash:[],   width:2.5, kabel:'NYM-J 5×1.5', adern:5, adernLabel:'5-adrig',      lsA:10, autoKabel:'taster' },
+  strom3:      { label:'Drehstrom NYM-J 5-adrig',  color:'#9b59b6', dash:[],    width:2.5, kabel:'NYM-J 5×2.5',  adern:5, adernLabel:'5-adrig',      lsA:16 },
+  nyy:         { label:'NYY-J 3-adrig Erdkabel',   color:'#6d4c41', dash:[],    width:3.5, kabel:'NYY-J 3×2.5',  adern:3, adernLabel:'NYY-J 3A',     lsA:16 },
+  nyy5:        { label:'NYY-J 5-adrig Erdkabel',   color:'#4e342e', dash:[],    width:3.5, kabel:'NYY-J 5×6',    adern:5, adernLabel:'NYY-J 5A',     lsA:16 },
+  erdung:      { label:'Erdungsleitung grün-gelb',  color:'#27ae60', dash:[],    width:2.5, kabel:'H07V-K 1×6 grün-gelb', adern:1, adernLabel:'PE grün-gelb', isErdung:true },
+  erde:        { label:'Erdkabel (NYY-J)',          color:'#795548', dash:[],    width:3,   kabel:'NYY-J 5×6',    adern:5, adernLabel:'Erdkabel',     lsA:16 },
+  daten:       { label:'Datenkabel (CAT6)',         color:'#9c27b0', dash:[6,3], width:2,   kabel:'CAT 6 U/UTP',  adern:8, adernLabel:'CAT6' },
+  sat:         { label:'SAT-Kabel (Koax)',          color:'#1565c0', dash:[8,3], width:2,   kabel:'Koax RG-6',    adern:1, adernLabel:'Koax' },
+  telefon:     { label:'Telefonkabel',             color:'#607d8b', dash:[4,2], width:1.8, kabel:'J-Y(St)Y 2×2×0.6', adern:4, adernLabel:'Tel' },
+  bus:         { label:'KNX/Bus-Kabel',            color:'#ff5722', dash:[3,2], width:1.8, kabel:'YCYM 2×2×0.8', adern:2, adernLabel:'TKNX' },
+  custom:      { label:'Benutzerdefiniert',        color:'#27ae60', dash:[],    width:2,   kabel:'—',             adern:0, adernLabel:'' },
 };
 
 const PHASE_COLORS = {
@@ -3375,13 +3541,51 @@ let draggingWire = null;   // { wireId, ptIdx, offX, offY }
 let hoveredWirePt = null;  // { wireId, ptIdx } for hover highlight
 let addingMidPoint = null; // { wireId, segIdx, x, y } when clicking segment midpoint
 
+// Stromkreis-Farbpalette (für Kennzeichnung gleicher Stromkreise)
+const CIRCUIT_COLORS = [
+  '#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#2ecc71','#e91e63','#00bcd4',
+  '#ff5722','#607d8b','#8bc34a','#ff9800','#673ab7'
+];
+function getCircuitColor(circuitName) {
+  if (!circuitName) return null;
+  // Hash circuit name to consistent color index
+  let h = 0;
+  for (let i=0; i<circuitName.length; i++) h = ((h<<5)-h)+circuitName.charCodeAt(i)|0;
+  return CIRCUIT_COLORS[Math.abs(h) % CIRCUIT_COLORS.length];
+}
+
 function drawWires() {
+  // ── Schritt 1: Gleiche Stromkreise mit Farb-Halo hervorheben ──
+  const circuitSeen = {};
+  for (const wire of state.wires) {
+    if (wire.circuit) circuitSeen[wire.circuit] = (circuitSeen[wire.circuit]||0)+1;
+  }
+
   for (const wire of state.wires) {
     const isSel = wire.id === selectedWireId;
     const wt = WIRE_TYPES[wire.wireType] || WIRE_TYPES.strom;
     const col = isSel ? '#f5a623' : getWireColor(wire);
     const dash = isSel ? [] : getWireDash(wire);
     const lw   = isSel ? 3.5 : getWireWidth(wire);
+
+    // ── Stromkreis-Farb-Halo (zeigt gleiche Stromkreise farblich) ──
+    if (wire.circuit && circuitSeen[wire.circuit] >= 1 && !isSel) {
+      const circCol = getCircuitColor(wire.circuit);
+      if (circCol) {
+        ctx.save();
+        ctx.strokeStyle = circCol;
+        ctx.lineWidth = (lw+4) / state.zoom;
+        ctx.globalAlpha = 0.18;
+        ctx.setLineDash([]);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(wire.points[0].x, wire.points[0].y);
+        for (let i=1; i<wire.points.length; i++) ctx.lineTo(wire.points[i].x, wire.points[i].y);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     ctx.save();
 
@@ -3448,13 +3652,30 @@ function drawWires() {
 
     // Labels at midpoint
     const mid = wire.points[Math.floor(wire.points.length / 2)];
-    ctx.fillStyle = col;
-    ctx.font = `bold ${10/state.zoom}px IBM Plex Mono,monospace`;
-    if (wire.circuit) ctx.fillText(wire.circuit, mid.x+4/state.zoom, mid.y-5/state.zoom);
+    // Stromkreis-Label mit Farb-Badge
+    if (wire.circuit) {
+      const circCol = getCircuitColor(wire.circuit);
+      const lbFont = `bold ${9/state.zoom}px IBM Plex Mono,monospace`;
+      ctx.font = lbFont;
+      const lbW = ctx.measureText(wire.circuit).width + 6/state.zoom;
+      const lbH = 11/state.zoom;
+      const lbX = mid.x+4/state.zoom, lbY = mid.y-14/state.zoom;
+      // Badge-Hintergrund
+      ctx.fillStyle = circCol || '#555';
+      ctx.globalAlpha = isSel ? 1.0 : 0.82;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(lbX-1/state.zoom, lbY-lbH+2/state.zoom, lbW, lbH, 2/state.zoom);
+      else ctx.rect(lbX-1/state.zoom, lbY-lbH+2/state.zoom, lbW, lbH);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'white';
+      ctx.font = lbFont;
+      ctx.fillText(wire.circuit, lbX+2/state.zoom, lbY-1/state.zoom);
+    }
     if (wire.laenge_m) {
       ctx.font = `${8/state.zoom}px IBM Plex Mono,monospace`;
-      ctx.fillStyle = col;
-      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+6/state.zoom);
+      ctx.fillStyle = isSel ? '#f5a623' : col;
+      ctx.fillText(wire.laenge_m+'m', mid.x+4/state.zoom, mid.y+4/state.zoom);
     }
     // Ader label
     const adernLabel = wire.adernLabel || wt.adernLabel || '';
@@ -3685,6 +3906,51 @@ function drawSymbols() {
       ctx.fillText(sym.circuit, 0, SZ/2+21/state.zoom);
     }
     ctx.restore();
+
+    // ── Kabelausführungs-Pfeil (Richtung vom Symbol) ──
+    if (sym.kabelPosition) {
+      const arrLen = 18/state.zoom;
+      const arrW   = 5/state.zoom;
+      const dirs = { unten:{dx:0,dy:1}, oben:{dx:0,dy:-1}, links:{dx:-1,dy:0}, rechts:{dx:1,dy:0} };
+      const d = dirs[sym.kabelPosition] || dirs.unten;
+      const ax = sym.x + d.dx*(SZ/2+6/state.zoom);
+      const ay = sym.y + d.dy*(SZ/2+6/state.zoom);
+      ctx.save();
+      // Stromkreis-Farbe für Kabelausführungspfeil
+      const arrowCol = sel ? '#f5a623' : (PHASE_COLORS[sym.phase]||'#0077cc');
+      ctx.strokeStyle = arrowCol;
+      ctx.fillStyle   = arrowCol;
+      ctx.lineWidth   = 1.8/state.zoom;
+      ctx.setLineDash([3/state.zoom, 2/state.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax+d.dx*arrLen, ay+d.dy*arrLen);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Pfeilspitze
+      const tipX=ax+d.dx*arrLen, tipY=ay+d.dy*arrLen;
+      ctx.beginPath();
+      ctx.moveTo(tipX,tipY);
+      ctx.lineTo(tipX-d.dx*arrW+d.dy*arrW, tipY-d.dy*arrW-d.dx*arrW);
+      ctx.lineTo(tipX-d.dx*arrW-d.dy*arrW, tipY-d.dy*arrW+d.dx*arrW);
+      ctx.closePath(); ctx.fill();
+      // Label
+      if (sym.kabelHinweis || sym.kabel) {
+        ctx.font = `${7/state.zoom}px IBM Plex Mono,monospace`;
+        ctx.fillStyle = '#0077cc';
+        const lblX = ax+d.dx*(arrLen/2)+(d.dy ? 4/state.zoom : 0);
+        const lblY = ay+d.dy*(arrLen/2)+(d.dx ? -3/state.zoom : 8/state.zoom);
+        ctx.textAlign = d.dx<0?'right':'left';
+        const hint = (sym.kabelHinweis||sym.kabel||'').replace(' / ',' / ');
+        ctx.fillText(hint, lblX, lblY);
+        if (sym.kabelLaenge) {
+          ctx.fillStyle='#27ae60';
+          ctx.fillText(sym.kabelLaenge+'m', lblX, lblY+9/state.zoom);
+        }
+        ctx.textAlign='left';
+      }
+      ctx.restore();
+    }
   }
 }
 
@@ -3756,6 +4022,21 @@ function renderProps(sym) {
         <input class="rp-input" type="number" value="${sym.count||1}" min="1" oninput="updSym('${sym.id}','count',+this.value)"></div>
       <div class="rp-row"><label class="rp-lbl">Kommentar</label>
         <input class="rp-input" value="${esc(sym.kommentar||'')}" oninput="updSym('${sym.id}','kommentar',this.value)"></div>
+
+      ${sym.kabelHinweis ? `
+      <div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:4px;padding:6px 8px;margin-bottom:6px">
+        <div style="font-size:9px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">⚡ Auto-Kabel (DIN 18015)</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--tx)">${esc(sym.kabelHinweis)}</div>
+      </div>` : ''}
+
+      <div class="rp-row"><label class="rp-lbl">🔌 Kabelausführung (Position am Symbol)</label>
+        <select class="rp-sel" onchange="updSym('${sym.id}','kabelPosition',this.value)">
+          ${['unten','oben','links','rechts'].map(p=>`<option${p===(sym.kabelPosition||'unten')?' selected':''}>${p}</option>`).join('')}
+        </select></div>
+      <div class="rp-row"><label class="rp-lbl">Zuleitungslänge manuell (m)</label>
+        <input class="rp-input" type="number" step="0.1" min="0" value="${sym.kabelLaenge||''}"
+          placeholder="z.B. 3.5" oninput="updSym('${sym.id}','kabelLaenge',this.value)"></div>
+
       <div style="margin-top:8px;display:flex;gap:5px">
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(-90)">↺ -90°</button>
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(90)">↻ +90°</button>
@@ -4174,6 +4455,13 @@ function renderStueckliste() {
   body.innerHTML = rows || '<tr><td colspan="9" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Elemente platziert</td></tr>';
 
   // ── Leitungen Tabelle ──
+  // Manuelle Zuleitungslängen aus Symbolen einberechnen
+  for (const s of syms) {
+    if (s.kabelLaenge && parseFloat(s.kabelLaenge)>0) {
+      const k = s.kabel||'NYM-J 3×1.5';
+      byKabel[k] = (byKabel[k]||0) + parseFloat(s.kabelLaenge);
+    }
+  }
   for (const w of wires) { byKabel[w.kabel||'—'] = (byKabel[w.kabel||'—']||0) + parseFloat(w.laenge_m||0); }
 
   const stWiresEl = document.getElementById('stWires');
@@ -4247,15 +4535,55 @@ function renderStueckliste() {
   const sumEl = document.getElementById('stSummary');
   if (sumEl) {
     const typeRows = Object.entries(byType).map(([t,c])=>`<div class="rp-stat">${esc(t)}<span>${c}×</span></div>`).join('');
-    const kabelRows = Object.entries(byKabel).map(([k,m])=>`<div class="rp-stat">${esc(k)}<span>${m.toFixed(1)}m</span></div>`).join('');
-    sumEl.innerHTML = `
+
+    // ── Kabel-Gesamtlänge Tabelle (prominent) ──
+    const totalKabel = Object.values(byKabel).reduce((a,v)=>a+v,0);
+    const kabelTableRows = Object.entries(byKabel)
+      .sort((a,b)=>b[1]-a[1])
+      .map(([k,m],ci)=>{
+        const pct = totalKabel>0?(m/totalKabel*100).toFixed(0):0;
+        const barCol = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#2ecc71'][ci%8];
+        return `<tr>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--tx)">${esc(k)}</td>
+          <td style="font-family:var(--mono);font-size:11px;font-weight:700;color:${barCol};text-align:right">${m.toFixed(1)} m</td>
+          <td style="width:80px">
+            <div style="background:var(--sf3);border-radius:2px;height:6px;overflow:hidden">
+              <div style="width:${pct}%;background:${barCol};height:6px;border-radius:2px"></div>
+            </div>
+            <span style="font-size:9px;color:var(--tx3);font-family:var(--mono)">${pct}%</span>
+          </td>
+        </tr>`;
+      }).join('');
+
+    const kabelSection = Object.keys(byKabel).length ? `
+      <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+          🔌 Kabelmengen gesamt
+          <span style="background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:1px 8px;font-family:var(--mono);font-size:9px;color:var(--ac)">${totalKabel.toFixed(1)} m total</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;font-size:9px;color:var(--tx3);padding:4px 0;border-bottom:1px solid var(--bd)">Kabeltyp</th>
+            <th style="text-align:right;font-size:9px;color:var(--tx3);padding:4px 8px;border-bottom:1px solid var(--bd)">Länge</th>
+            <th style="font-size:9px;color:var(--tx3);padding:4px 0;border-bottom:1px solid var(--bd)">Anteil</th>
+          </tr></thead>
+          <tbody>${kabelTableRows}</tbody>
+          <tfoot><tr>
+            <td style="font-weight:700;font-size:10px;color:var(--tx);padding:6px 0;border-top:1px solid var(--bd)">GESAMT</td>
+            <td style="font-weight:700;font-family:var(--mono);font-size:12px;color:var(--gr);text-align:right;padding:6px 8px;border-top:1px solid var(--bd)">${totalKabel.toFixed(1)} m</td>
+            <td style="border-top:1px solid var(--bd)"></td>
+          </tr></tfoot>
+        </table>
+        <div style="margin-top:8px;font-size:9px;color:var(--tx3);font-family:var(--mono)">
+          ℹ️ Inkl. manueller Zuleitungslängen aus Symboleigenschaften · zzgl. 10–15% Verschnitt empfohlen
+        </div>
+      </div>` : '';
+
+    sumEl.innerHTML = kabelSection + `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         ${typeRows ? `<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geräte nach Typ</div>
           <div style="font-family:var(--mono);font-size:11px">${typeRows}</div></div>` : ''}
-        ${kabelRows ? `<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Kabel nach Typ</div>
-          <div style="font-family:var(--mono);font-size:11px">${kabelRows}</div></div>` : ''}
       </div>`;
   }
 }
@@ -4959,6 +5287,424 @@ function setStatus(msg,col) {
   dot.style.background=col||'var(--gr)';
   if(col) setTimeout(()=>dot.style.background='var(--gr)',3000);
 }
+
+// ═══════════════════════════════════════════════════
+//  BELEUCHTUNGSVERTEILUNG — Raum zentrieren & verteilen
+// ═══════════════════════════════════════════════════
+
+// Beleuchtungs-Symboltypen
+const LV_SYMBOL_TYPES = [
+  { key:'deckenleuchte',   label:'Deckenleuchte',   icon:'💡' },
+  { key:'einbaustrahler',  label:'Einbaustrahler',   icon:'⚡' },
+  { key:'wandleuchte',     label:'Wandleuchte',      icon:'🔆' },
+  { key:'led_streifen',    label:'LED-Streifen',     icon:'〰' },
+  { key:'notleuchte',      label:'Notleuchte',       icon:'🟢' },
+  { key:'aussenleuchte',   label:'Außenleuchte',     icon:'🌕' },
+];
+
+// State für das Modal
+let _lv = {
+  symKey:      'deckenleuchte',
+  modus:       'raster',
+  anzahl:      4,
+  wandAbstand: 50,    // cm (für Raum → px-Umrechnung)
+  circuit:     'F01.1',
+  roomPts:     [],    // 2 Ecken auf Preview-Canvas [{ cx, cy }]
+  positions:   [],    // berechnete Lampen-Positionen im Vorschau-Canvas
+  roomRect:    null,  // { x1, y1, x2, y2 } Vorschau-Canvas-Koordinaten
+  manualPts:   [],    // für Modus 'manuell'
+  previewW:    0,
+  previewH:    0,
+};
+
+function openLVModal() {
+  // Fülle Symbol-Grid
+  const grid = document.getElementById('lvSymGrid');
+  if (!grid) return;
+  grid.innerHTML = LV_SYMBOL_TYPES.map(s =>
+    `<div class="lv-card${s.key===_lv.symKey?' sel':''}" onclick="lvSelSym('${s.key}',this)">
+      <span class="lv-ico">${s.icon}</span>
+      <div>
+        <div style="font-weight:600">${s.label}</div>
+        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono)">NYM-J 3×1,5 / LS 10A</div>
+      </div>
+    </div>`
+  ).join('');
+  // Felder vorbelegen
+  document.getElementById('lvAnzahl').value   = _lv.anzahl;
+  document.getElementById('lvCircuit').value  = _lv.circuit;
+  document.getElementById('lvModus').value    = _lv.modus;
+  document.getElementById('lvWandAbstand').value = _lv.wandAbstand;
+  // Reset Raum
+  lvReset(false);
+  document.getElementById('lvModal').classList.remove('hid');
+  // Canvas initialisieren
+  requestAnimationFrame(lvInitCanvas);
+}
+
+function closeLVModal() {
+  document.getElementById('lvModal').classList.add('hid');
+}
+
+function lvSelSym(key, el) {
+  _lv.symKey = key;
+  document.querySelectorAll('.lv-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  lvUpdate();
+}
+
+function lvReset(redraw=true) {
+  _lv.roomPts   = [];
+  _lv.positions = [];
+  _lv.roomRect  = null;
+  _lv.manualPts = [];
+  document.getElementById('lvHint').textContent   = 'Klicke zwei Ecken des Raums im Vorschau-Canvas';
+  document.getElementById('lvResult').classList.add('hid');
+  document.getElementById('lvPlaceBtn').disabled   = true;
+  if (redraw) lvDrawPreview();
+}
+
+function lvInitCanvas() {
+  const cv = document.getElementById('lvPreviewCanvas');
+  if (!cv) return;
+  const W = cv.parentElement.clientWidth - 2;
+  cv.width  = W;
+  cv.height = Math.max(180, Math.round(W * 0.42));
+  _lv.previewW = cv.width;
+  _lv.previewH = cv.height;
+  lvDrawPreview();
+  cv.onmousedown = lvCanvasClick;
+  cv.ontouchstart = (e) => { e.preventDefault(); const r=cv.getBoundingClientRect(),t=e.touches[0]; lvCanvasClick({offsetX:t.clientX-r.left,offsetY:t.clientY-r.top}); };
+}
+
+function lvCanvasClick(e) {
+  const modus = document.getElementById('lvModus').value;
+  if (modus === 'manuell') {
+    _lv.manualPts.push({ cx: e.offsetX, cy: e.offsetY });
+    _lv.anzahl = _lv.manualPts.length;
+    document.getElementById('lvAnzahl').value = _lv.anzahl;
+    lvUpdate();
+    return;
+  }
+  if (_lv.roomPts.length >= 2) {
+    _lv.roomPts = [];
+    _lv.positions = [];
+  }
+  _lv.roomPts.push({ cx: e.offsetX, cy: e.offsetY });
+  if (_lv.roomPts.length === 2) {
+    lvBuildRoomRect();
+    lvUpdate();
+    document.getElementById('lvHint').textContent = '✅ Raum definiert — Verteilung berechnet';
+  } else {
+    document.getElementById('lvHint').textContent = 'Klicke jetzt die gegenüberliegende Ecke…';
+    lvDrawPreview();
+  }
+}
+
+function lvBuildRoomRect() {
+  const [a, b] = _lv.roomPts;
+  _lv.roomRect = {
+    x1: Math.min(a.cx, b.cx),
+    y1: Math.min(a.cy, b.cy),
+    x2: Math.max(a.cx, b.cx),
+    y2: Math.max(a.cy, b.cy),
+  };
+}
+
+function lvUpdate() {
+  _lv.anzahl      = parseInt(document.getElementById('lvAnzahl').value)     || 1;
+  _lv.circuit     = document.getElementById('lvCircuit').value              || 'F01.1';
+  _lv.modus       = document.getElementById('lvModus').value;
+  _lv.wandAbstand = parseInt(document.getElementById('lvWandAbstand').value) || 0;
+
+  if (_lv.modus === 'manuell') {
+    _lv.positions = _lv.manualPts.map(p => ({ cx: p.cx, cy: p.cy }));
+  } else if (_lv.roomRect) {
+    _lv.positions = lvCalcPositions(_lv.roomRect, _lv.anzahl, _lv.modus, _lv.wandAbstand);
+  } else {
+    _lv.positions = [];
+  }
+
+  const canPlace = _lv.positions.length > 0;
+  document.getElementById('lvPlaceBtn').disabled = !canPlace;
+
+  if (canPlace) {
+    const r = _lv.roomRect;
+    const W = r ? (r.x2 - r.x1) : 0;
+    const H = r ? (r.y2 - r.y1) : 0;
+    const ratio = _lv.previewW > 0 ? (W / _lv.previewW) : 1;
+    let info = '';
+    if (state.scale && r) {
+      const wM = (W / _lv.previewW * (_lv.previewW / state.scale)).toFixed(1);
+      const hM = (H / _lv.previewH * (_lv.previewH / state.scale)).toFixed(1);
+      info = `Raum: ca. ${wM}m × ${hM}m\n`;
+    }
+    info += `${_lv.positions.length} Leuchten · Modus: ${_lv.modus}\nSymbol: ${LV_SYMBOL_TYPES.find(s=>s.key===_lv.symKey)?.label||_lv.symKey}\nStromkreis: ${_lv.circuit} · NYM-J 3×1,5 / LS 10A`;
+    const resEl = document.getElementById('lvResult');
+    resEl.textContent = info;
+    resEl.classList.remove('hid');
+  }
+
+  lvDrawPreview();
+}
+
+function lvCalcPositions(r, anzahl, modus, wandAbstand) {
+  const W = r.x2 - r.x1;
+  const H = r.y2 - r.y1;
+  // wandAbstand in % des Raums (Preview-px haben keinen Maßstab → prozentual)
+  const wandPx = Math.min(wandAbstand / 500 * Math.min(W, H), Math.min(W,H)*0.25);
+  const iW = W - 2 * wandPx;
+  const iH = H - 2 * wandPx;
+  const ox = r.x1 + wandPx;
+  const oy = r.y1 + wandPx;
+  const positions = [];
+
+  switch(modus) {
+    case 'center': {
+      // Einzelne Lampe exakt in der Mitte
+      positions.push({ cx: r.x1 + W/2, cy: r.y1 + H/2 });
+      break;
+    }
+    case 'raster': {
+      // Gleichmäßiges Raster: optimale Zeilen/Spalten
+      if (anzahl === 1) { positions.push({ cx: r.x1+W/2, cy: r.y1+H/2 }); break; }
+      let cols = Math.round(Math.sqrt(anzahl * W / H));
+      cols = Math.max(1, Math.min(cols, anzahl));
+      let rows = Math.ceil(anzahl / cols);
+      // Abgleich: wenn zu viele Zellen → cols--
+      while (cols * rows > anzahl + cols - 1 && cols > 1) cols--;
+      rows = Math.ceil(anzahl / cols);
+      const stepX = cols > 1 ? iW / (cols - 1) : 0;
+      const stepY = rows > 1 ? iH / (rows - 1) : 0;
+      let count = 0;
+      for (let row = 0; row < rows && count < anzahl; row++) {
+        const lampsInRow = Math.min(cols, anzahl - count);
+        const rowStepX   = lampsInRow > 1 ? iW / (lampsInRow - 1) : 0;
+        const rowOffsetX  = lampsInRow > 1 ? 0 : iW / 2;
+        for (let col = 0; col < lampsInRow && count < anzahl; col++) {
+          positions.push({
+            cx: ox + (lampsInRow > 1 ? col * rowStepX : iW/2),
+            cy: oy + (rows > 1 ? row * (iH/(rows-1)) : iH/2)
+          });
+          count++;
+        }
+      }
+      break;
+    }
+    case 'reihe': {
+      // Einzelne Reihe, mittig horizontal, gleichmäßig verteilt
+      if (anzahl === 1) { positions.push({ cx: r.x1+W/2, cy: r.y1+H/2 }); break; }
+      for (let i = 0; i < anzahl; i++) {
+        positions.push({
+          cx: ox + (anzahl > 1 ? i * iW/(anzahl-1) : iW/2),
+          cy: r.y1 + H/2
+        });
+      }
+      break;
+    }
+    case 'rand': {
+      // Entlang der Wände verteilt (Rahmen)
+      if (anzahl === 0) break;
+      const perimeter = 2 * (iW + iH);
+      const step = perimeter / anzahl;
+      for (let i = 0; i < anzahl; i++) {
+        const d = i * step;
+        let cx, cy;
+        if (d < iW) {
+          cx = ox + d; cy = oy;
+        } else if (d < iW + iH) {
+          cx = ox + iW; cy = oy + (d - iW);
+        } else if (d < 2*iW + iH) {
+          cx = ox + iW - (d - iW - iH); cy = oy + iH;
+        } else {
+          cx = ox; cy = oy + iH - (d - 2*iW - iH);
+        }
+        positions.push({ cx, cy });
+      }
+      break;
+    }
+  }
+  return positions;
+}
+
+function lvDrawPreview() {
+  const cv = document.getElementById('lvPreviewCanvas');
+  if (!cv) return;
+  const ctx2 = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx2.clearRect(0, 0, W, H);
+
+  // Hintergrund (Raumgrundriss-Feeling)
+  ctx2.fillStyle = '#f5f6f8';
+  ctx2.fillRect(0, 0, W, H);
+
+  // Subtile Gitterlinien
+  ctx2.strokeStyle = 'rgba(0,0,0,.06)';
+  ctx2.lineWidth   = 1;
+  const gs = 20;
+  for (let x=0; x<W; x+=gs) { ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,H); ctx2.stroke(); }
+  for (let y=0; y<H; y+=gs) { ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(W,y); ctx2.stroke(); }
+
+  // Raum-Rechteck zeichnen
+  if (_lv.roomRect) {
+    const r = _lv.roomRect;
+    // Raum-Fläche
+    ctx2.fillStyle = 'rgba(255,255,255,.9)';
+    ctx2.fillRect(r.x1, r.y1, r.x2-r.x1, r.y2-r.y1);
+    // Wandlinien
+    ctx2.strokeStyle = '#334';
+    ctx2.lineWidth   = 2.5;
+    ctx2.strokeRect(r.x1, r.y1, r.x2-r.x1, r.y2-r.y1);
+    // Wandabstand-Hilfslinien
+    if (_lv.wandAbstand > 0 && _lv.modus !== 'center') {
+      const wa = Math.min(_lv.wandAbstand / 500 * Math.min(r.x2-r.x1, r.y2-r.y1), Math.min(r.x2-r.x1,r.y2-r.y1)*0.25);
+      if (wa > 4) {
+        ctx2.strokeStyle = 'rgba(245,166,35,.35)';
+        ctx2.lineWidth   = 1;
+        ctx2.setLineDash([4,3]);
+        ctx2.strokeRect(r.x1+wa, r.y1+wa, r.x2-r.x1-2*wa, r.y2-r.y1-2*wa);
+        ctx2.setLineDash([]);
+      }
+    }
+    // Maß-Label
+    ctx2.fillStyle   = '#888';
+    ctx2.font        = '9px IBM Plex Mono,monospace';
+    ctx2.textAlign   = 'center';
+    ctx2.fillText('← Breite →', r.x1+(r.x2-r.x1)/2, r.y2+12);
+    ctx2.save();
+    ctx2.translate(r.x1-10, r.y1+(r.y2-r.y1)/2);
+    ctx2.rotate(-Math.PI/2);
+    ctx2.fillText('Tiefe', 0, 0);
+    ctx2.restore();
+    ctx2.textAlign = 'left';
+  } else if (_lv.roomPts.length === 1) {
+    // Erster Punkt gesetzt
+    const p = _lv.roomPts[0];
+    ctx2.beginPath();
+    ctx2.arc(p.cx, p.cy, 6, 0, Math.PI*2);
+    ctx2.fillStyle = '#f5a623';
+    ctx2.fill();
+  }
+
+  // Lampen-Positionen zeichnen
+  _lv.positions.forEach((pos, idx) => {
+    const R = 11;
+    // Licht-Aura
+    const grad = ctx2.createRadialGradient(pos.cx, pos.cy, 0, pos.cx, pos.cy, R*2.2);
+    grad.addColorStop(0,   'rgba(255,230,80,.55)');
+    grad.addColorStop(0.5, 'rgba(255,200,40,.18)');
+    grad.addColorStop(1,   'rgba(255,200,0,0)');
+    ctx2.beginPath();
+    ctx2.arc(pos.cx, pos.cy, R*2.2, 0, Math.PI*2);
+    ctx2.fillStyle = grad;
+    ctx2.fill();
+    // Symbol-Kreis
+    ctx2.beginPath();
+    ctx2.arc(pos.cx, pos.cy, R, 0, Math.PI*2);
+    ctx2.fillStyle   = '#fff';
+    ctx2.strokeStyle = '#f5a623';
+    ctx2.lineWidth   = 2;
+    ctx2.fill(); ctx2.stroke();
+    // Kreuz (Leuchten-Symbol nach DIN)
+    ctx2.strokeStyle = '#f5a623';
+    ctx2.lineWidth   = 1.5;
+    ctx2.beginPath(); ctx2.moveTo(pos.cx-6, pos.cy); ctx2.lineTo(pos.cx+6, pos.cy); ctx2.stroke();
+    ctx2.beginPath(); ctx2.moveTo(pos.cx, pos.cy-6); ctx2.lineTo(pos.cx, pos.cy+6); ctx2.stroke();
+    // Nummer
+    ctx2.fillStyle   = '#333';
+    ctx2.font        = 'bold 8px IBM Plex Mono,monospace';
+    ctx2.textAlign   = 'center';
+    ctx2.fillText(idx+1, pos.cx, pos.cy+R+10);
+    ctx2.textAlign   = 'left';
+  });
+
+  // Anleitung wenn leer
+  if (_lv.roomPts.length === 0 && _lv.positions.length === 0) {
+    ctx2.fillStyle = 'rgba(0,0,0,.25)';
+    ctx2.font      = '13px IBM Plex Sans,sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.fillText('Klicke hier zwei Ecken des Raums', W/2, H/2 - 10);
+    ctx2.font      = '11px IBM Plex Mono,monospace';
+    ctx2.fillStyle = 'rgba(245,166,35,.7)';
+    ctx2.fillText('Ecke 1 → Ecke 2 (diagonal gegenüber)', W/2, H/2 + 12);
+    ctx2.textAlign = 'left';
+  }
+}
+
+function lvPlace() {
+  if (!_lv.positions.length) return;
+
+  // Koordinaten aus Preview-Canvas auf Haupt-Canvas umrechnen
+  const cv = document.getElementById('lvPreviewCanvas');
+  const W  = cv.width, H = cv.height;
+
+  // Bestimme den sichtbaren Canvas-Bereich im Weltkoordinatensystem
+  const visX1 = -state.pan.x / state.zoom;
+  const visY1 = -state.pan.y / state.zoom;
+  const visW   = canvas.width  / state.zoom;
+  const visH   = canvas.height / state.zoom;
+
+  // Preview-Canvas → Hauptcanvas-Weltkoords
+  const mapX = (cx) => visX1 + (cx / W) * visW;
+  const mapY = (cy) => visY1 + (cy / H) * visH;
+
+  saveUndo();
+
+  const circuit  = _lv.circuit || 'F01.1';
+  const placed   = [];
+
+  _lv.positions.forEach((pos, idx) => {
+    const wx = mapX(pos.cx);
+    const wy = mapY(pos.cy);
+
+    const sym = SYMBOLS[_lv.symKey];
+    if (!sym) return;
+
+    const autoK = autoKabelConfig(_lv.symKey);
+    const s = {
+      id:           gid(),
+      type:         _lv.symKey,
+      x:            wx,
+      y:            wy,
+      rotation:     0,
+      label:        (sym.name || _lv.symKey) + ' ' + (idx + 1),
+      circuit:      circuit,
+      phase:        sym.phase   || 'L1',
+      nennstrom:    autoK?.nennstrom || sym.nennstrom || 10,
+      kabel:        autoK?.kabel     || sym.kabel     || 'NYM-J 3×1.5',
+      kabelHinweis: autoK?.kabelHinweis || 'NYM-J 3×1,5 / LS 10A B',
+      lsKurve:      'B',
+      kabelPosition:'unten',
+      kabelLaenge:  '',
+      kommentar:    'Verteilung: ' + _lv.modus,
+      count:        1,
+    };
+    state.symbols.push(s);
+    placed.push(s);
+  });
+
+  // Upload-Zone ausblenden
+  if (state.symbols.length > 0) {
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'none';
+  }
+
+  render();
+  closeLVModal();
+
+  const modusLabel = {
+    center: 'zentriert', raster: 'Raster', reihe: 'Reihe', rand: 'Rand', manuell: 'manuell'
+  };
+  setStatus(`✅ ${placed.length} Leuchten platziert (${modusLabel[_lv.modus]||_lv.modus}) · Stromkreis ${circuit}`);
+
+  // Reset für nächsten Einsatz
+  _lv.roomPts   = [];
+  _lv.positions = [];
+  _lv.roomRect  = null;
+  _lv.manualPts = [];
+}
+
+
 </script>
 </body>
 </html>
