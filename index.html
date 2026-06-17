@@ -253,6 +253,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   }
   .sym-mgr-card:hover { border-color:var(--bd2); }
   .sym-mgr-card.dragging { opacity:.5; border-color:var(--ac); border-style:dashed; z-index:50; }
+  #symBackupBtn.needs-backup { box-shadow:0 0 0 2px rgba(245,166,35,.5); animation:symBackupPulse 1.6s ease-in-out infinite; }
+  @keyframes symBackupPulse { 0%,100%{box-shadow:0 0 0 2px rgba(245,166,35,.5)} 50%{box-shadow:0 0 0 5px rgba(245,166,35,.15)} }
   .sym-mgr-card img, .sym-mgr-card svg { width:40px; height:40px; object-fit:contain; }
   .sym-mgr-card .sm-name { font-size:9px; color:var(--tx2); text-align:center; line-height:1.3; }
   .sym-mgr-card .sm-abbr { font-family:var(--mono); font-size:8px; color:var(--ac); font-weight:700; }
@@ -680,16 +682,21 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <!-- SYMBOLE MANAGER VIEW (inside main area) -->
   <div id="symboleView" style="display:none;flex:1;overflow:auto;padding:16px 20px;background:var(--bg);flex-direction:column;">
 
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
       <h2 style="font-size:14px;font-weight:700">🖼 Symbole verwalten</h2>
       <div style="font-size:11px;color:var(--tx3)">Lade deine eigenen DIN 18015 PNG/SVG Symbole hoch</div>
       <div class="hsp"></div>
-      <button class="btn bg" onclick="exportSymbolConfig()">⬇ Config exportieren</button>
+      <button class="btn ba" id="symBackupBtn" onclick="exportSymbolConfig()" title="Sichert alle eigenen Symbole + Sortierung als Datei">💾 Symbole sichern (Backup)</button>
       <label class="btn bg" style="cursor:pointer">
-        📥 Config importieren
+        📥 Backup wiederherstellen
         <input type="file" accept=".json" style="display:none" onchange="importSymbolConfig(event)">
       </label>
-      <button class="btn ba" onclick="resetToBuiltin()">↺ Standard zurücksetzen</button>
+      <button class="btn bg" onclick="resetToBuiltin()" style="color:var(--rd);border-color:var(--rd)">↺ Standard zurücksetzen</button>
+    </div>
+    <div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2);line-height:1.6">
+      ⚠️ <strong style="color:var(--ac)">Wichtig:</strong> Deine hochgeladenen Symbole werden nur in diesem Browser auf diesem Gerät gespeichert.
+      Wenn du eine neue Version dieser App öffnest (z.B. erneuter Download), sind sie dort <strong>nicht</strong> automatisch dabei.
+      Klicke vorher auf <strong>„💾 Symbole sichern"</strong> und danach in der neuen Version auf <strong>„📥 Backup wiederherstellen"</strong>, um nichts zu verlieren.
     </div>
 
     <!-- UPLOAD ZONE -->
@@ -1819,6 +1826,18 @@ let editingSymKey = null;
 let uploadQueue = [];      // Warteschlange für Mehrfach-Upload: [{file, dataUrl, name}, ...]
 let uploadQueueTotal = 0;  // Gesamtanzahl für Fortschrittsanzeige
 let symbolOrder = {};      // { kategorie: [key1, key2, ...] } — manuelle Sortierung per Drag&Drop
+let _hasUnsavedSymbolChanges = false; // true, wenn seit letztem Backup-Export neue Symbole/Sortierung hinzugekommen sind
+
+function markSymbolChangesUnsaved() {
+  _hasUnsavedSymbolChanges = true;
+  const btn = document.getElementById('symBackupBtn');
+  if (btn) btn.classList.add('needs-backup');
+}
+function markSymbolChangesSaved() {
+  _hasUnsavedSymbolChanges = false;
+  const btn = document.getElementById('symBackupBtn');
+  if (btn) btn.classList.remove('needs-backup');
+}
 let _symDrag = null;       // { key, cat } — aktuell gezogene Symbol-Karte
 
 function loadSymbolOrder() {
@@ -1846,6 +1865,7 @@ function persistSymbolOrderFromDOM(cat) {
   const keys = Array.from(grid.querySelectorAll('.sym-mgr-card[data-key]')).map(el => el.dataset.key);
   symbolOrder[cat] = keys;
   saveSymbolOrder();
+  markSymbolChangesUnsaved();
 }
 
 // Load saved custom symbols from localStorage on startup
@@ -1976,6 +1996,7 @@ function saveNewSymbol() {
   mergeCustomSymbols();
   renderSymbolManager();
   buildPalette();
+  markSymbolChangesUnsaved();
   setStatus('✅ Symbol "' + name + '" gespeichert!');
   // Nächstes Bild aus der Warteschlange (falls Mehrfach-Upload)
   pendingUpload = null;
@@ -2038,6 +2059,7 @@ function saveEditedSymbol() {
   saveCustomSymbols();
   mergeCustomSymbols();
   renderSymbolManager();
+  markSymbolChangesUnsaved();
   document.getElementById('symEditModal').classList.add('hid');
   editingSymKey = null;
   setStatus('✅ Symbol aktualisiert');
@@ -2053,6 +2075,7 @@ function deleteSymbol() {
   saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
+  markSymbolChangesUnsaved();
   document.getElementById('symEditModal').classList.add('hid');
   editingSymKey = null;
   setStatus('🗑 Symbol gelöscht');
@@ -2212,6 +2235,7 @@ function confirmDeleteSymbol(key) {
   saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
+  markSymbolChangesUnsaved();
   setStatus('🗑 Symbol gelöscht');
 }
 
@@ -2234,13 +2258,20 @@ function initSymUploadZone() {
 
 // ── EXPORT / IMPORT CONFIG ──
 function exportSymbolConfig() {
-  const data = { version:1, symbols: customSymbols, exported: new Date().toISOString() };
+  const data = {
+    version: 2,
+    symbols: customSymbols,
+    symbolOrder: symbolOrder,
+    exported: new Date().toISOString()
+  };
   const b = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(b);
-  a.download = 'meine-elektro-symbole.json';
+  const stamp = new Date().toISOString().slice(0,10);
+  a.download = 'meine-elektro-symbole_' + stamp + '.json';
   a.click();
-  setStatus('Symbol-Konfiguration exportiert');
+  markSymbolChangesSaved();
+  setStatus('✅ Symbol-Konfiguration gesichert — diese Datei vor dem nächsten Download der App aufbewahren!');
 }
 
 function importSymbolConfig(event) {
@@ -2251,11 +2282,27 @@ function importSymbolConfig(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (data.symbols) {
+        const incoming = Object.keys(data.symbols).length;
+        const existingKeys = Object.keys(customSymbols);
+        const conflicts = Object.keys(data.symbols).filter(k => existingKeys.includes(k));
+        if (conflicts.length && !confirm(
+          `${conflicts.length} Symbol(e) aus der Datei existieren bereits und werden überschrieben.\n\nTrotzdem importieren?`
+        )) { event.target.value=''; return; }
         Object.assign(customSymbols, data.symbols);
+        // Sortierreihenfolge mit übernehmen (Version 2+), bestehende Reihenfolge nicht komplett verwerfen
+        if (data.symbolOrder) {
+          for (const [cat, order] of Object.entries(data.symbolOrder)) {
+            symbolOrder[cat] = order;
+          }
+          saveSymbolOrder();
+        }
         saveCustomSymbols();
         mergeCustomSymbols();
         renderSymbolManager();
-        setStatus('✅ ' + Object.keys(data.symbols).length + ' Symbole importiert');
+        markSymbolChangesSaved();
+        setStatus('✅ ' + incoming + ' Symbole importiert (inkl. Sortierung)');
+      } else {
+        alert('Diese Datei enthält keine gültige Symbol-Konfiguration.');
       }
     } catch(err) { alert('Fehler beim Importieren: ' + err.message); }
   };
@@ -4197,16 +4244,12 @@ function drawSymbols() {
       ctx.strokeStyle='#f5a623'; ctx.lineWidth=2/state.zoom;
       ctx.setLineDash([4/state.zoom,2/state.zoom]); ctx.stroke(); ctx.setLineDash([]);
     }
-    // Shadow
-    ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=6/state.zoom;
-    // White circle background
-    ctx.beginPath(); ctx.arc(0,0,SZ/2,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,.97)'; ctx.fill();
-    ctx.shadowBlur=0;
-    ctx.strokeStyle=def.color; ctx.lineWidth=1.5/state.zoom; ctx.stroke();
+    // Leichter Schatten direkt unter dem Symbol (für Lesbarkeit auf jedem Untergrund, ohne Kreisform)
+    ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=4/state.zoom;
     // Draw SVG via offscreen (immer in hoher Basisauflösung gecached, dann auf SZ skaliert)
     const offsc = getSymbolCanvas(sym.type, def, 72);
     ctx.drawImage(offsc, -SZ/2, -SZ/2, SZ, SZ);
+    ctx.shadowBlur=0;
     // Label below
     ctx.font=`bold ${9/state.zoom}px IBM Plex Sans,sans-serif`;
     ctx.fillStyle = sel ? '#f5a623' : '#1a1a2e';
