@@ -37,7 +37,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .tab.act{color:var(--ac);border-bottom-color:var(--ac);}
 
 /* MAIN */
-.main{display:flex;flex:1;overflow:hidden;position:relative;}
+.main{display:flex;flex:1;overflow:hidden;}
 
 /* SYMBOL PALETTE */
 .palette{width:220px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
@@ -113,11 +113,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .sbar .hs{flex:1;}
 
 /* VIEWS */
-.view{
-  display:none;position:absolute;top:0;left:0;right:0;bottom:0;
-  overflow:auto;padding:16px;background:var(--bg);flex-direction:column;
-  z-index:10;
-}
+.view{display:none;flex:1;overflow:auto;padding:16px;background:var(--bg);}
 .view.act{display:flex;flex-direction:column;}
 
 /* STÜCKLISTE */
@@ -245,65 +241,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 .cat-add-btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(245,166,35,.05);}
 .cat-add-btn span{font-size:8px;font-weight:600;}
 
-/* ── KABELTRASSE ── */
-.kt-panel {
-  position:absolute; top:12px; left:12px; z-index:120;
-  background:var(--sf); border:1px solid var(--bd2); border-radius:8px;
-  padding:14px 16px; width:270px;
-  box-shadow:0 4px 24px rgba(0,0,0,.6); display:none;
-}
-.kt-panel h4 { font-size:13px;font-weight:700;color:#58a6ff;margin-bottom:10px;display:flex;align-items:center;gap:7px; }
-.kt-field { margin-bottom:7px; }
-.kt-field label { display:block;font-size:10px;color:var(--tx2);margin-bottom:3px; }
-.kt-field input,.kt-field select {
-  background:var(--sf2);border:1px solid var(--bd);color:var(--tx);
-  font-family:var(--sans);font-size:11px;padding:5px 8px;border-radius:3px;outline:none;width:100%;
-}
-.kt-field input:focus,.kt-field select:focus { border-color:#58a6ff; }
-.kt-acc-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px; }
-.kt-acc-btn {
-  background:var(--sf2);border:2px solid var(--bd);border-radius:6px;
-  padding:6px 3px;cursor:pointer;display:flex;flex-direction:column;
-  align-items:center;gap:2px;font-size:9px;color:var(--tx2);text-align:center;transition:all .15s;
-}
-.kt-acc-btn:hover { border-color:#58a6ff;color:#58a6ff; }
-.kt-acc-btn.sel  { border-color:#58a6ff;background:rgba(88,166,255,.15);color:#58a6ff; }
-.kt-acc-btn svg  { display:block; }
-#ktDrawBanner {
-  position:absolute;top:10px;left:50%;transform:translateX(-50%);
-  background:rgba(88,166,255,.95);color:#000;font-weight:700;
-  font-size:12px;padding:9px 22px;border-radius:24px;z-index:132;
-  pointer-events:none;white-space:nowrap;display:none;
-  box-shadow:0 2px 12px rgba(0,0,0,.4);
-}
-
-/* ── DIN 18015-2 ── */
-.din-stufe-card {
-  border:2px solid var(--bd); border-radius:8px; padding:12px 10px;
-  cursor:pointer; text-align:center; transition:all .15s; background:var(--sf2);
-}
-.din-stufe-card:hover { border-color:var(--gr); }
-.din-stufe-card.sel   { border-color:var(--gr); background:rgba(63,185,80,.1); }
-.din-stufe-nr   { font-size:18px; font-weight:700; color:var(--ac); }
-.din-stufe-name { font-size:11px; font-weight:600; color:var(--tx); margin:3px 0; }
-.din-stufe-desc { font-size:9px; color:var(--tx3); }
-.din-raum-tab {
-  font-size:10px; padding:4px 10px; border-radius:10px; cursor:pointer;
-  background:var(--sf2); border:1px solid var(--bd); color:var(--tx3); transition:all .15s;
-}
-.din-raum-tab:hover { border-color:var(--gr); color:var(--gr); }
-.din-raum-tab.sel { background:rgba(63,185,80,.15); border-color:var(--gr); color:var(--gr); font-weight:600; }
-.din-item {
-  display:flex; align-items:flex-start; gap:8px; padding:6px 0;
-  border-bottom:1px solid var(--bd); font-size:10px;
-}
-.din-item:last-child { border-bottom:none; }
-.din-item-icon { font-size:16px; flex-shrink:0; width:24px; text-align:center; }
-.din-item-body { flex:1; }
-.din-item-name { font-weight:600; color:var(--tx); margin-bottom:1px; }
-.din-item-detail { color:var(--tx2); font-family:var(--mono); font-size:9px; }
-.din-item-min { background:rgba(245,166,35,.15); border:1px solid rgba(245,166,35,.3); border-radius:3px; padding:1px 6px; font-size:9px; color:var(--ac); font-family:var(--mono); white-space:nowrap; }
-
 /* Touch drag ghost */
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);}
 
@@ -312,12 +249,20 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   .sym-mgr-card {
     background:var(--sf2); border:1px solid var(--bd); border-radius:6px;
     padding:8px 6px; display:flex; flex-direction:column; align-items:center; gap:5px;
-    position:relative; cursor:default;
+    position:relative; cursor:default; transition:border-color .15s, opacity .15s, transform .15s;
   }
   .sym-mgr-card:hover { border-color:var(--bd2); }
+  .sym-mgr-card.dragging { opacity:.5; border-color:var(--ac); border-style:dashed; z-index:50; }
   .sym-mgr-card img, .sym-mgr-card svg { width:40px; height:40px; object-fit:contain; }
   .sym-mgr-card .sm-name { font-size:9px; color:var(--tx2); text-align:center; line-height:1.3; }
   .sym-mgr-card .sm-abbr { font-family:var(--mono); font-size:8px; color:var(--ac); font-weight:700; }
+  .sym-mgr-card .sm-drag-handle {
+    position:absolute; bottom:0; right:0; font-size:13px; color:var(--tx3);
+    opacity:0; transition:opacity .15s; line-height:1; cursor:grab;
+    padding:6px 7px; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  .sym-mgr-card:hover .sm-drag-handle,
+  .sym-mgr-card.dragging .sm-drag-handle { opacity:.9; }
   .sym-mgr-card .sm-del {
     position:absolute; top:3px; right:3px; width:16px; height:16px;
     background:var(--rd); border:none; border-radius:3px; cursor:pointer;
@@ -332,13 +277,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     opacity:0; transition:opacity .15s;
   }
   .sym-mgr-card:hover .sm-edit { opacity:1; }
-  .sym-mgr-card .sm-rst {
-    position:absolute;top:20px;right:2px;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.3);
-    border-radius:3px;color:#58a6ff;cursor:pointer;font-size:9px;padding:1px 4px;opacity:0;transition:.15s;
-  }
-  .sym-mgr-card:hover .sm-rst { opacity:1; }
-  .sym-mgr-card .sm-edit { display:block !important; }
-  .sym-mgr-card .sm-del  { display:block !important; }
   .upload-sym-zone {
     border:2px dashed var(--bd2); border-radius:8px; padding:20px;
     text-align:center; cursor:pointer; transition:all .2s;
@@ -528,7 +466,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <optgroup label="── Sonstige ──">
           <option value="erdung">🟡🟢 PE grün-gelb</option>
           <option value="daten">💻 CAT6</option>
-          <option value="sat">📡 SAT Koax</option>
+          <option value="daten7">💻 CAT7</option>
+          <option value="sat">📡 Koax RG-6</option>
+          <option value="koax59">📡 Koax RG-59</option>
           <option value="telefon">📞 Telefon</option>
           <option value="bus">🔶 KNX/Bus</option>
           <option value="custom">✏️ Benutzerdefiniert</option>
@@ -543,10 +483,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf" style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
-      <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
-      <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
-      <button class="btn" style="background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.4);font-size:11px" onclick="openKTPanel()" title="Kabeltrasse zeichnen">🔲 Kabeltrasse</button>
-      <button class="btn" style="background:rgba(241,196,15,.2);color:#f1c40f;border:1px solid rgba(241,196,15,.4);font-size:11px" onclick="openLVModal()" title="Beleuchtung gleichmäßig im Raum verteilen">💡 Beleuchtung verteilen</button>
       <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ac);border:1px solid rgba(245,166,35,.4);font-size:11px" onclick="openWDModal()" title="Symbole an Linie gleichmäßig verteilen">📐 An Linie verteilen</button>
     </div>
     <div id="canvas-wrap">
@@ -569,106 +505,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <span id="scaleBarLabel">—</span>
       </div>
       <div class="calibrate-hint hid" id="calHint">📏 Klicke zwei Punkte für eine bekannte Distanz</div>
-
-      <!-- KABELTRASSE Draw Banner -->
-      <div id="ktDrawBanner">🔲 Kabeltrasse ziehen…</div>
-
-      <!-- KABELTRASSE Panel (links oben) -->
-      <div class="kt-panel" id="ktPanel">
-        <h4>🔲 Kabeltrasse
-          <button onclick="closeKTPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
-        </h4>
-
-        <!-- Maße -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-          <div class="kt-field">
-            <label>Breite (mm)</label>
-            <input type="number" id="ktBreite" value="100" min="20" max="600" step="10" oninput="ktPreviewUpdate()">
-          </div>
-          <div class="kt-field">
-            <label>Höhe / Tiefe (mm)</label>
-            <input type="number" id="ktHoehe" value="60" min="20" max="300" step="10" oninput="ktPreviewUpdate()">
-          </div>
-        </div>
-
-        <!-- Halterungsart -->
-        <div class="kt-field" style="margin-bottom:8px">
-          <label>Halterungsart</label>
-          <div class="kt-acc-grid" id="ktHalterungGrid">
-            <div class="kt-acc-btn sel" data-h="wand" onclick="ktSelHalterung('wand',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="18" width="24" height="4" rx="1" fill="#58a6ff"/><rect x="12" y="8" width="4" height="12" fill="#58a6ff"/><rect x="2" y="6" width="24" height="4" rx="1" fill="#334"/></svg>
-              <span>Wand</span>
-            </div>
-            <div class="kt-acc-btn" data-h="decke" onclick="ktSelHalterung('decke',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="6" width="24" height="4" rx="1" fill="#334"/><rect x="12" y="10" width="4" height="10" fill="#58a6ff"/><rect x="2" y="18" width="24" height="4" rx="1" fill="#58a6ff"/></svg>
-              <span>Decke</span>
-            </div>
-            <div class="kt-acc-btn" data-h="boden" onclick="ktSelHalterung('boden',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="20" width="24" height="4" rx="1" fill="#334"/><rect x="12" y="10" width="4" height="10" fill="#58a6ff"/><rect x="2" y="6" width="24" height="4" rx="1" fill="#58a6ff"/></svg>
-              <span>Boden</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Zubehör auf dieser Trasse -->
-        <div class="kt-field" style="margin-bottom:10px">
-          <label>Zubehör auf dieser Trasse</label>
-          <div class="kt-acc-grid">
-            <div class="kt-acc-btn" id="ktZubBogenL" onclick="ktToggleZub('bogenL',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><path d="M22 6 Q6 6 6 22" stroke="#58a6ff" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="2" y="20" width="10" height="5" rx="1" fill="#58a6ff"/></svg>
-              <span>Bogen L</span>
-            </div>
-            <div class="kt-acc-btn" id="ktZubBogenR" onclick="ktToggleZub('bogenR',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><path d="M6 6 Q22 6 22 22" stroke="#58a6ff" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="16" y="20" width="10" height="5" rx="1" fill="#58a6ff"/></svg>
-              <span>Bogen R</span>
-            </div>
-            <div class="kt-acc-btn" id="ktZubKreuz" onclick="ktToggleZub('kreuz',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="11" y="2" width="6" height="24" rx="1" fill="#58a6ff"/><rect x="2" y="11" width="24" height="6" rx="1" fill="#58a6ff"/></svg>
-              <span>Kreuz</span>
-            </div>
-            <div class="kt-acc-btn" id="ktZubT" onclick="ktToggleZub('t-stück',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="11" y="11" width="6" height="15" rx="1" fill="#58a6ff"/><rect x="2" y="4" width="24" height="6" rx="1" fill="#58a6ff"/></svg>
-              <span>T-Stück</span>
-            </div>
-            <div class="kt-acc-btn" id="ktZubDeckel" onclick="ktToggleZub('deckel',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="10" width="24" height="8" rx="2" fill="#58a6ff"/><rect x="4" y="8" width="20" height="3" rx="1" fill="#334"/></svg>
-              <span>Deckel</span>
-            </div>
-            <div class="kt-acc-btn" id="ktZubEnde" onclick="ktToggleZub('endstück',this)">
-              <svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="10" width="20" height="8" rx="2" fill="#58a6ff"/><rect x="22" y="8" width="4" height="12" rx="1" fill="#334"/></svg>
-              <span>Ende</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Halterungsabstand -->
-        <div class="kt-field" style="margin-bottom:10px">
-          <label>Halterungsabstand (m)</label>
-          <input type="number" id="ktHalterAbstand" value="1.5" min="0.5" max="5" step="0.5" style="width:90px">
-        </div>
-
-        <!-- Kabelausführung -->
-        <div class="kt-field" style="margin-bottom:10px">
-          <label>Kabelausführung (Einspeisung)</label>
-          <select id="ktKabelPos">
-            <option value="links">Links</option>
-            <option value="rechts">Rechts</option>
-            <option value="oben">Oben</option>
-            <option value="unten">Unten</option>
-          </select>
-        </div>
-
-        <div class="kt-field">
-          <label>Bezeichnung</label>
-          <input type="text" id="ktLabel" value="KT-1" placeholder="z.B. KT-1 EDV">
-        </div>
-
-        <div style="display:flex;gap:6px;margin-top:10px">
-          <button class="btn ba" style="flex:1" id="ktDrawBtn" onclick="ktStartDraw()">✏ Trasse zeichnen</button>
-          <button class="btn bg" onclick="closeKTPanel()">Abbrechen</button>
-        </div>
-        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:6px" id="ktStatus">Bereit</div>
-      </div>
 
       <!-- WD: Wand-Verteiler Banner -->
       <div id="wdDrawBanner">📐 Linie ziehen — Wand / Achse</div>
@@ -730,51 +566,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         </div>
       </div>
 
-      <!-- LV + WD + KT: Zeichnungs-Overlay-Canvases -->
+      <!-- LV + WD: Zeichnungs-Overlay-Canvas -->
       <canvas id="lvOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:110;display:none"></canvas>
       <canvas id="wdOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:111;display:none"></canvas>
-      <canvas id="ktOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:112;display:none"></canvas>
-
-      <!-- RAUM-ZEICHNEN Overlay Canvas -->
-      <canvas id="raumOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:113;display:none"></canvas>
-      <!-- RAUM Banner -->
-      <div id="raumDrawBanner" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(63,185,80,.95);color:#000;font-weight:700;font-size:12px;padding:9px 22px;border-radius:24px;z-index:134;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4)">⬜ Raum zeichnen…</div>
-      <!-- RAUM Panel (rechts, unter LV) -->
-      <div id="raumPanel" style="position:absolute;top:12px;left:300px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:250px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
-        <h4 style="font-size:13px;font-weight:700;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:7px">⬜ Raum definieren
-          <button onclick="closeRaumPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
-        </h4>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px">
-          <div class="kt-acc-btn sel" id="raumModeRect" onclick="raumSelMode('rect',this)" title="Viereck ziehen">
-            <svg width="28" height="28" viewBox="0 0 28 28"><rect x="4" y="6" width="20" height="16" rx="2" stroke="#3fb950" stroke-width="2" fill="none"/></svg>
-            <span>Viereck</span>
-          </div>
-          <div class="kt-acc-btn" id="raumModePoly" onclick="raumSelMode('poly',this)" title="Polygon klicken">
-            <svg width="28" height="28" viewBox="0 0 28 28"><polygon points="14,4 26,14 20,24 8,24 2,14" stroke="#3fb950" stroke-width="2" fill="none"/></svg>
-            <span>Polygon</span>
-          </div>
-          <div class="kt-acc-btn" id="raumModeFree" onclick="raumSelMode('free',this)" title="Freihand zeichnen">
-            <svg width="28" height="28" viewBox="0 0 28 28"><path d="M4 20 Q8 8 14 12 Q20 16 24 6" stroke="#3fb950" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-            <span>Freihand</span>
-          </div>
-        </div>
-        <div class="kt-field"><label>Raumname</label><input type="text" id="raumName" value="Wohnzimmer" placeholder="z.B. Küche"></div>
-        <div class="kt-field"><label>Farbe</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="raumColorPicker">
-            <div class="raum-col-btn" data-col="rgba(88,166,255,.12)" onclick="raumSelCol(this)" style="background:rgba(88,166,255,.3);border:2px solid #58a6ff;width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(63,185,80,.12)"  onclick="raumSelCol(this)" style="background:rgba(63,185,80,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(245,166,35,.12)" onclick="raumSelCol(this)" style="background:rgba(245,166,35,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(188,140,255,.12)"onclick="raumSelCol(this)" style="background:rgba(188,140,255,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(255,87,34,.10)"  onclick="raumSelCol(this)" style="background:rgba(255,87,34,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(200,200,200,.15)"onclick="raumSelCol(this)" style="background:rgba(200,200,200,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:5px;margin-top:8px">
-          <button class="btn ba" style="flex:1;font-size:11px" id="raumStartBtn" onclick="raumStartDraw()">✏ Zeichnen</button>
-          <button class="btn bg" style="font-size:11px" onclick="raumUndoLast()">↩</button>
-        </div>
-        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:5px" id="raumStatus">Modus wählen, dann zeichnen</div>
-      </div>
 
       <!-- LV: Hinweis-Banner oben -->
       <div id="lvDrawBanner">💡 Linie 1 ziehen — Raumbreite</div>
@@ -840,7 +634,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   </div>
 
   <!-- STROMKREISE VIEW -->
-  <div class="view" id="stromView">
+  <div class="view" id="stromView" style="display:none">
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <h2 style="font-size:14px;font-weight:700">⚡ Stromkreise</h2>
       <div class="hsp"></div>
@@ -850,7 +644,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   </div>
 
   <!-- STÜCKLISTE VIEW (inside main) -->
-  <div class="view" id="stView">
+  <div class="view" id="stView" style="display:none">
     <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="font-size:14px;font-weight:700">📦 Stückliste</h2>
       <select class="rp-sel" id="stFilterSK" onchange="renderStueckliste()" style="width:160px;font-size:11px">
@@ -870,8 +664,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     </table>
     <!-- Leitungen-Tabelle -->
     <div id="stWires" style="margin-top:16px"></div>
-    <!-- Kabeltrassen-Tabelle -->
-    <div id="stTrassen" style="margin-top:16px"></div>
     <!-- Verlegungsanalyse -->
     <div id="stAnalysis" style="margin-top:14px"></div>
     <!-- Zusammenfassung -->
@@ -885,8 +677,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <div style="color:var(--tx3);font-size:11px;text-align:center;padding:20px">Element auswählen</div>
     </div>
   </div>
-  <!-- SYMBOLE MANAGER VIEW (full width, next to main) -->
-  <div id="symboleView" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;padding:16px 20px;background:var(--bg);flex-direction:column;z-index:10;">
+  <!-- SYMBOLE MANAGER VIEW (inside main area) -->
+  <div id="symboleView" style="display:none;flex:1;overflow:auto;padding:16px 20px;background:var(--bg);flex-direction:column;">
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <h2 style="font-size:14px;font-weight:700">🖼 Symbole verwalten</h2>
@@ -972,6 +764,12 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
                 <option>NYY-J 5×10</option>
                 <option>H07V-K 1×6 grün-gelb (PE)</option>
                 <option>YCYM 2×2×0.8 (KNX)</option>
+                <option>Koax RG-6</option>
+                <option>Koax RG-59</option>
+                <option>CAT 6 U/UTP</option>
+                <option>CAT 6A S/FTP</option>
+                <option>CAT 7 S/FTP</option>
+                <option>CAT 7A S/FTP</option>
               </select>
             </div>
           </div>
@@ -1019,9 +817,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
 <!-- EDIT EXISTING SYMBOL MODAL -->
 <div class="modal-ov hid" id="symEditModal">
-  <div class="modal" style="width:440px">
-    <h3>✏️ Symbol bearbeiten / ersetzen</h3>
-    <div id="seModalHint"></div>
+  <div class="modal" style="width:420px">
+    <h3>✏️ Symbol bearbeiten</h3>
     <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
       <img id="seModalImg" src="" style="width:70px;height:70px;object-fit:contain;background:white;border-radius:4px;padding:6px;border:1px solid var(--bd);flex-shrink:0">
       <div style="flex:1">
@@ -1047,6 +844,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
             <select class="rp-sel" id="seModalKabel">
               <option>NYM-J 3×1.5</option><option>NYM-J 3×2.5</option>
               <option>NYM-J 5×1.5</option><option>NYM-J 5×2.5</option><option>NYM-J 5×6</option>
+              <option>NYY-J 3×2.5</option><option>NYY-J 5×6</option>
+              <option>Koax RG-6</option><option>Koax RG-59</option>
+              <option>CAT 6 U/UTP</option><option>CAT 6A S/FTP</option>
+              <option>CAT 7 S/FTP</option><option>CAT 7A S/FTP</option>
             </select>
           </div>
         </div>
@@ -1328,76 +1129,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 </div>
 
 
-<!-- DIN 18015-2 MODAL -->
-<div class="modal-ov hid" id="dinModal">
-  <div class="modal" style="width:680px;max-width:96vw;max-height:90vh;overflow-y:auto">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <span style="font-size:20px">📋</span>
-      <h3 style="margin:0;font-size:14px">DIN 18015-2 — Ausstattungsstufen</h3>
-      <div style="flex:1"></div>
-      <button class="btn bg" onclick="document.getElementById('dinModal').classList.add('hid')" style="font-size:11px">✕</button>
-    </div>
-
-    <!-- Stufe wählen -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px" id="dinStufeGrid">
-      <div class="din-stufe-card" data-s="1" onclick="dinSelStufe(1,this)">
-        <div class="din-stufe-nr">Stufe 1</div>
-        <div class="din-stufe-name">Mindestausstattung</div>
-        <div class="din-stufe-desc">Grundversorgung, Neubauten</div>
-      </div>
-      <div class="din-stufe-card" data-s="2" onclick="dinSelStufe(2,this)">
-        <div class="din-stufe-nr">Stufe 2</div>
-        <div class="din-stufe-name">Standardausstattung</div>
-        <div class="din-stufe-desc">Normaler Komfort, empfohlen</div>
-      </div>
-      <div class="din-stufe-card" data-s="3" onclick="dinSelStufe(3,this)">
-        <div class="din-stufe-nr">Stufe 3</div>
-        <div class="din-stufe-name">Komfortausstattung</div>
-        <div class="din-stufe-desc">Gehobener Komfort / Smart Home</div>
-      </div>
-    </div>
-
-    <!-- Raumauswahl -->
-    <div style="margin-bottom:12px">
-      <div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Raum wählen</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px" id="dinRaumTabs">
-        <div class="din-raum-tab sel" onclick="dinSelRaum('wohnzimmer',this)">Wohnzimmer</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('schlafzimmer',this)">Schlafzimmer</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('kueche',this)">Küche</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('bad',this)">Bad</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('wc',this)">WC</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('flur',this)">Flur/Diele</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('keller',this)">Keller</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('garage',this)">Garage</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('buero',this)">Büro/Arbeit</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('kinderzimmer',this)">Kinderzimmer</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('esszimmer',this)">Esszimmer</div>
-        <div class="din-raum-tab" onclick="dinSelRaum('hauswirtschaft',this)">Hauswirtschaft</div>
-      </div>
-    </div>
-
-    <!-- Anforderungsliste -->
-    <div id="dinListe" style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:12px;min-height:120px"></div>
-
-    <div style="margin-top:12px;font-size:9px;color:var(--tx3);font-family:var(--mono);line-height:1.6">
-      ℹ️ Angaben basieren auf DIN 18015-2:2021. Mindestanforderungen — regionale Abweichungen möglich. Keine Gewähr.
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px">
-      <button class="btn ba" style="flex:1" onclick="dinPlaceInPalette()">📦 Als Checkliste in Planung übernehmen</button>
-      <button class="btn bg" onclick="document.getElementById('dinModal').classList.add('hid')">Schließen</button>
-    </div>
-  </div>
-</div>
-
 <input type="file" id="fileIn" accept=".json" style="display:none" onchange="loadFromFile(event)">
 
 <script>
-// Global variable declarations
-var customSymbols = {};
-var symCache = {};
-var selectedWireId = null;
-var projData = {};
-
 // ═══════════════════════════════════════════════════
 //  SYMBOL DEFINITIONS — DIN 18015 Elektro
 // ═══════════════════════════════════════════════════
@@ -2052,9 +1786,8 @@ const SYMBOLS = {
 // ═══════════════════════════════════════════════════
 let state = {
   floorplan: null,       // { img, w, h }
-  symbols: [],           // placed symbols
+  symbols: [],           // placed symbols: { id, type, x, y, rotation, label, circuit, phase, nennstrom, kabel }
   wires: [],             // { id, points[], circuit, phase, kabel }
-  trassen: [],           // { id, points[], breite, hoehe, halterung, zubehör, label }
   circuits: [],          // auto-generated
   scale: null,           // px per meter
   calibrating: false,
@@ -2080,59 +1813,57 @@ const gid = () => 'e' + (nid++);
 // ═══════════════════════════════════════════════════
 
 // customSymbols: key -> { name, abbr, cat, phase, nennstrom, kabel, imgData, imgType }
-customSymbols = {};
-let pendingUpload = null;
+let customSymbols = {};
+let pendingUpload = null;  // { file, dataUrl, name }
 let editingSymKey = null;
+let uploadQueue = [];      // Warteschlange für Mehrfach-Upload: [{file, dataUrl, name}, ...]
+let uploadQueueTotal = 0;  // Gesamtanzahl für Fortschrittsanzeige
+let symbolOrder = {};      // { kategorie: [key1, key2, ...] } — manuelle Sortierung per Drag&Drop
+let _symDrag = null;       // { key, cat } — aktuell gezogene Symbol-Karte
 
-// Standard-Symbole die gelöscht/überschrieben wurden
-let deletedStdSymbols  = new Set(); // keys die aus SYMBOLS entfernt wurden
-let overriddenStdSymbols = {};       // key -> original SYMBOLS[key] backup
+function loadSymbolOrder() {
+  try {
+    const raw = localStorage.getItem('grundriss_symbol_order');
+    if (raw) symbolOrder = JSON.parse(raw);
+  } catch(e) { console.warn('Could not load symbol order:', e); }
+}
+function saveSymbolOrder() {
+  try { localStorage.setItem('grundriss_symbol_order', JSON.stringify(symbolOrder)); }
+  catch(e) { console.warn('Could not save symbol order:', e); }
+}
+// Sortiert eine Liste von [key,sym] Paaren einer Kategorie nach gespeicherter Reihenfolge
+function applySymbolOrder(cat, list) {
+  const order = symbolOrder[cat];
+  if (!order || !order.length) return list;
+  const idx = k => { const i = order.indexOf(k); return i === -1 ? 9999 : i; };
+  return [...list].sort((a, b) => idx(a[0]) - idx(b[0]));
+}
+// Speichert die aktuelle Reihenfolge der Karten einer Kategorie (nach Drag&Drop)
+function persistSymbolOrderFromDOM(cat) {
+  const catEncoded = encodeURIComponent(cat);
+  const grid = document.querySelector(`.sym-mgr-grid[data-cat="${catEncoded}"]`);
+  if (!grid) return;
+  const keys = Array.from(grid.querySelectorAll('.sym-mgr-card[data-key]')).map(el => el.dataset.key);
+  symbolOrder[cat] = keys;
+  saveSymbolOrder();
+}
 
-const LS_CUSTOM    = 'grundriss_custom_symbols';
-const LS_DELETED   = 'grundriss_deleted_std';
-const LS_OVERRIDES = 'grundriss_overrides';
-
+// Load saved custom symbols from localStorage on startup
 function loadCustomSymbols() {
   try {
-    // 1. Custom Symbole
-    const saved = localStorage.getItem(LS_CUSTOM);
-    if (saved) { customSymbols = JSON.parse(saved); }
-
-    // 2. Gelöschte Standard-Symbole
-    const del = localStorage.getItem(LS_DELETED);
-    if (del) {
-      const keys = JSON.parse(del);
-      deletedStdSymbols = new Set(keys);
-      for (const k of deletedStdSymbols) delete SYMBOLS[k];
+    const saved = localStorage.getItem('grundriss_custom_symbols');
+    if (saved) {
+      customSymbols = JSON.parse(saved);
+      // Merge into SYMBOLS
+      mergeCustomSymbols();
     }
-
-    // 3. Überschriebene Standard-Symbole (eigenes Bild statt Standard-SVG)
-    const ov = localStorage.getItem(LS_OVERRIDES);
-    if (ov) {
-      overriddenStdSymbols = JSON.parse(ov);
-      for (const [k, cs] of Object.entries(overriddenStdSymbols)) {
-        // Merge override into SYMBOLS — behält key, ersetzt Inhalt
-        SYMBOLS[k] = {
-          ...SYMBOLS[k],
-          ...cs,
-          isOverride: true,
-          svg: cs.imgData ? `<image href="${cs.imgData}" width="40" height="40"/>` : SYMBOLS[k]?.svg,
-        };
-        delete symCache[k];
-      }
-    }
-
-    // 4. Custom Symbole einbinden
-    mergeCustomSymbols();
-  } catch(e) { console.warn('loadCustomSymbols:', e); }
+  } catch(e) { console.warn('Could not load custom symbols:', e); }
 }
 
 function saveCustomSymbols() {
   try {
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(customSymbols));
-    localStorage.setItem(LS_DELETED, JSON.stringify([...deletedStdSymbols]));
-    localStorage.setItem(LS_OVERRIDES, JSON.stringify(overriddenStdSymbols));
-  } catch(e) { console.warn('saveCustomSymbols:', e); }
+    localStorage.setItem('grundriss_custom_symbols', JSON.stringify(customSymbols));
+  } catch(e) { console.warn('Could not save custom symbols:', e); }
 }
 
 function mergeCustomSymbols() {
@@ -2157,30 +1888,48 @@ function handleSymbolUpload(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
 
-  // Process each file one by one
-  let idx = 0;
-  function processNext() {
-    if (idx >= files.length) return;
-    const file = files[idx++];
+  // Alle Dateien einlesen und als Warteschlange aufbauen
+  uploadQueue = [];
+  uploadQueueTotal = files.length;
+  let loaded = 0;
+
+  files.forEach((file, idx) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      pendingUpload = {
+      uploadQueue[idx] = {
         file,
         dataUrl: e.target.result,
         name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
       };
-      showSymbolEditForm(pendingUpload);
+      loaded++;
+      if (loaded === files.length) {
+        // Alle eingelesen → erstes Symbol im Formular anzeigen
+        symUploadProcessNext();
+      }
     };
     reader.readAsDataURL(file);
-  }
-  processNext();
+  });
   event.target.value = '';
+}
+
+// Nimmt das nächste Bild aus der Warteschlange und zeigt das Bearbeitungsformular
+function symUploadProcessNext() {
+  if (!uploadQueue.length) {
+    pendingUpload = null;
+    document.getElementById('symEditForm').style.display = 'none';
+    return;
+  }
+  pendingUpload = uploadQueue.shift();
+  showSymbolEditForm(pendingUpload);
 }
 
 function showSymbolEditForm(upload) {
   document.getElementById('symEditForm').style.display = 'flex';
   document.getElementById('symPreviewImg').src = upload.dataUrl;
-  document.getElementById('symPreviewName').textContent = upload.file.name;
+  const remaining = uploadQueue.length;
+  const current = uploadQueueTotal - remaining;
+  const progressTxt = uploadQueueTotal > 1 ? ` (${current}/${uploadQueueTotal})` : '';
+  document.getElementById('symPreviewName').textContent = upload.file.name + progressTxt;
   const name = upload.name.charAt(0).toUpperCase() + upload.name.slice(1);
   document.getElementById('seBezeichnung').value = name;
   document.getElementById('seAbbr').value = name.substring(0,4).toUpperCase().replace(/\s/g,'');
@@ -2225,71 +1974,43 @@ function saveNewSymbol() {
   };
   saveCustomSymbols();
   mergeCustomSymbols();
-  cancelSymbolEdit();
   renderSymbolManager();
   buildPalette();
   setStatus('✅ Symbol "' + name + '" gespeichert!');
+  // Nächstes Bild aus der Warteschlange (falls Mehrfach-Upload)
+  pendingUpload = null;
+  if (uploadQueue.length) {
+    symUploadProcessNext();
+  } else {
+    document.getElementById('symEditForm').style.display = 'none';
+    document.getElementById('symFileInput').value = '';
+  }
 }
 
 function cancelSymbolEdit() {
   pendingUpload = null;
-  document.getElementById('symEditForm').style.display = 'none';
-  document.getElementById('symFileInput').value = '';
+  // Bei Mehrfach-Upload: Abbrechen überspringt nur das aktuelle Bild, nicht die ganze Warteschlange
+  if (uploadQueue.length) {
+    symUploadProcessNext();
+  } else {
+    document.getElementById('symEditForm').style.display = 'none';
+    document.getElementById('symFileInput').value = '';
+  }
 }
 
 // ── EDIT EXISTING ──
-// Backup von Original-Standard-Symbolen beim ersten Start
-function ensureSymbolsBackup() {
-  if (!window._SYMBOLS_ORIG) {
-    window._SYMBOLS_ORIG = {};
-    for (const [k,v] of Object.entries(SYMBOLS)) {
-      window._SYMBOLS_ORIG[k] = { ...v };
-    }
-  }
-}
-
 function openSymbolEdit(key) {
-  ensureSymbolsBackup();
-  editingSymKey = key;
-  const isStd = !customSymbols[key] && !overriddenStdSymbols[key];
-  // Daten: Custom > Override > Standard
-  const s = customSymbols[key] || overriddenStdSymbols[key] || SYMBOLS[key];
+  const s = customSymbols[key];
   if (!s) return;
-
-  const modal = document.getElementById('symEditModal');
-  const img   = document.getElementById('seModalImg');
-
-  // Bild anzeigen
-  if (s.imgData) {
-    img.src = s.imgData; img.style.display = 'block';
-  } else {
-    // Standard-Symbol: SVG als DataURL rendern
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="60" height="60" style="color:${s.color||'#555'}">${s.svg||''}</svg>`;
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
-    img.style.display = 'block';
-  }
-
-  document.getElementById('seModalName').value       = s.name || '';
-  document.getElementById('seModalAbbr').value       = s.abbr || '';
-  document.getElementById('seModalCat').value        = s.cat  || 'Sonstige';
-  document.getElementById('seModalPhase').value      = s.phase|| '';
-  document.getElementById('seModalNennstrom').value  = s.nennstrom || 16;
-  document.getElementById('seModalKabel').value      = s.kabel || 'NYM-J 3×1.5';
-
-  // Hinweis ob Standard oder Custom
-  const hintEl = document.getElementById('seModalHint');
-  if (hintEl) {
-    if (isStd) {
-      hintEl.innerHTML = '<div style="background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);border-radius:4px;padding:6px 8px;font-size:9px;color:#58a6ff;margin-bottom:8px">'
-        +'⚠️ <strong>Standard-Symbol:</strong> Änderungen werden dauerhaft gespeichert. Bild ersetzen lädt ein eigenes Symbol hoch. Original über ↺ wiederherstellbar.</div>';
-    } else if (overriddenStdSymbols[key]) {
-      hintEl.innerHTML = '<div style="background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);border-radius:4px;padding:6px 8px;font-size:9px;color:#58a6ff;margin-bottom:8px">'
-        +'↻ <strong>Ersetztes Standard-Symbol</strong> · <a href="#" onclick="event.preventDefault();resetStdSymbol(editingSymKey);document.getElementById(\'symEditModal\').classList.add(\'hid\')" style="color:#58a6ff;text-decoration:underline;cursor:pointer;font-size:9px">↺ Original wiederherstellen</a></div>';
-    } else {
-      hintEl.innerHTML = '';
-    }
-  }
-  modal.classList.remove('hid');
+  editingSymKey = key;
+  document.getElementById('seModalImg').src = s.imgData;
+  document.getElementById('seModalName').value = s.name;
+  document.getElementById('seModalAbbr').value = s.abbr;
+  document.getElementById('seModalCat').value = s.cat;
+  document.getElementById('seModalPhase').value = s.phase || '';
+  document.getElementById('seModalNennstrom').value = s.nennstrom || 16;
+  document.getElementById('seModalKabel').value = s.kabel || 'NYM-J 3×1.5';
+  document.getElementById('symEditModal').classList.remove('hid');
 }
 
 function replaceSymbolImage(event) {
@@ -2297,54 +2018,23 @@ function replaceSymbolImage(event) {
   if (!file || !editingSymKey) return;
   const reader = new FileReader();
   reader.onload = (e) => {
-    const imgData = e.target.result;
-    document.getElementById('seModalImg').src = imgData;
-    // Sofort in temporären Speicher
-    if (customSymbols[editingSymKey]) {
-      customSymbols[editingSymKey].imgData = imgData;
-    }
-    // Für Standard-Symbol: Override anlegen
-    if (!customSymbols[editingSymKey]) {
-      const orig = SYMBOLS[editingSymKey] || {};
-      overriddenStdSymbols[editingSymKey] = {
-        ...orig, imgData, imgType: file.name.endsWith('.svg') ? 'svg' : 'img',
-      };
-    }
-    if (typeof symCache !== 'undefined') delete symCache[editingSymKey];
+    customSymbols[editingSymKey].imgData = e.target.result;
+    document.getElementById('seModalImg').src = e.target.result;
+    delete symCache[editingSymKey];
   };
   reader.readAsDataURL(file);
   event.target.value = '';
 }
 
 function saveEditedSymbol() {
-  if (!editingSymKey) return;
-  const name      = document.getElementById('seModalName').value.trim();
-  const abbr      = document.getElementById('seModalAbbr').value.trim().toUpperCase();
-  const cat       = document.getElementById('seModalCat').value;
-  const phase     = document.getElementById('seModalPhase').value;
-  const nennstrom = parseInt(document.getElementById('seModalNennstrom').value) || 16;
-  const kabel     = document.getElementById('seModalKabel').value;
-
-  if (customSymbols[editingSymKey]) {
-    // Custom Symbol bearbeiten
-    const cs = customSymbols[editingSymKey];
-    cs.name = name; cs.abbr = abbr; cs.cat = cat;
-    cs.phase = phase; cs.nennstrom = nennstrom; cs.kabel = kabel;
-  } else {
-    // Standard-Symbol: Override anlegen oder aktualisieren
-    const orig = SYMBOLS[editingSymKey] || {};
-    if (!overriddenStdSymbols[editingSymKey]) {
-      overriddenStdSymbols[editingSymKey] = { ...orig };
-    }
-    overriddenStdSymbols[editingSymKey].name      = name;
-    overriddenStdSymbols[editingSymKey].abbr      = abbr;
-    overriddenStdSymbols[editingSymKey].cat       = cat;
-    overriddenStdSymbols[editingSymKey].phase     = phase;
-    overriddenStdSymbols[editingSymKey].nennstrom = nennstrom;
-    overriddenStdSymbols[editingSymKey].kabel     = kabel;
-    // Direkt in SYMBOLS übernehmen
-    SYMBOLS[editingSymKey] = { ...SYMBOLS[editingSymKey], name, abbr, cat, phase, nennstrom, kabel, isOverride: true };
-  }
+  if (!editingSymKey || !customSymbols[editingSymKey]) return;
+  const cs = customSymbols[editingSymKey];
+  cs.name      = document.getElementById('seModalName').value.trim();
+  cs.abbr      = document.getElementById('seModalAbbr').value.trim().toUpperCase();
+  cs.cat       = document.getElementById('seModalCat').value;
+  cs.phase     = document.getElementById('seModalPhase').value;
+  cs.nennstrom = parseInt(document.getElementById('seModalNennstrom').value) || 16;
+  cs.kabel     = document.getElementById('seModalKabel').value;
   saveCustomSymbols();
   mergeCustomSymbols();
   renderSymbolManager();
@@ -2355,20 +2045,17 @@ function saveEditedSymbol() {
 
 function deleteSymbol() {
   if (!editingSymKey) return;
-  const name = (customSymbols[editingSymKey]||overriddenStdSymbols[editingSymKey]||SYMBOLS[editingSymKey])?.name || editingSymKey;
-  if (!confirm('Symbol "'+name+'" aus Palette entfernen?')) return;
-  const isStd = !customSymbols[editingSymKey];
-  if (isStd) deletedStdSymbols.add(editingSymKey);
-  delete overriddenStdSymbols[editingSymKey];
+  const name = customSymbols[editingSymKey]?.name || editingSymKey;
+  if (!confirm(`Symbol "${name}" löschen?`)) return;
   delete customSymbols[editingSymKey];
   delete SYMBOLS[editingSymKey];
-  if (typeof symCache !== 'undefined') delete symCache[editingSymKey];
+  delete symCache[editingSymKey];
   saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   document.getElementById('symEditModal').classList.add('hid');
   editingSymKey = null;
-  setStatus('🗑 "'+name+'" entfernt — wiederherstellbar über Symbol-Manager');
+  setStatus('🗑 Symbol gelöscht');
 }
 
 // ── RENDER SYMBOL MANAGER GRID ──
@@ -2395,7 +2082,8 @@ function renderSymbolManager() {
   }
 
   let html = '';
-  for (const [cat, syms] of Object.entries(cats)) {
+  for (const [cat, symsRaw] of Object.entries(cats)) {
+    const syms = applySymbolOrder(cat, symsRaw);
     const customCount = syms.filter(([k]) => customSymbols[k]).length;
     // Kategorie-Header mit Plus-Button
     const catEncoded = encodeURIComponent(cat);
@@ -2404,35 +2092,29 @@ function renderSymbolManager() {
         ${esc(cat)}
         <span class="cat-badge">${syms.length} Symbole</span>
         ${customCount ? `<span class="cat-badge" style="background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.3);color:var(--gr)">${customCount} eigene</span>` : ''}
+        <span style="font-size:9px;color:var(--tx3);margin-left:auto;margin-right:6px">↕ Karten ziehen zum Sortieren</span>
         <button class="cat-add-btn-inline" onclick="symMgrAddToCat('${catEncoded}')"
           title="Neues Symbol in Kategorie ${esc(cat)} hinzufügen"
-          style="margin-left:auto;background:rgba(245,166,35,.1);border:1px dashed rgba(245,166,35,.5);border-radius:4px;padding:2px 10px;cursor:pointer;color:var(--ac);font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+          style="background:rgba(245,166,35,.1);border:1px dashed rgba(245,166,35,.5);border-radius:4px;padding:2px 10px;cursor:pointer;color:var(--ac);font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap;">
           + Symbol hinzufügen
         </button>
       </div>
-      <div class="sym-mgr-grid">`;
+      <div class="sym-mgr-grid" data-cat="${catEncoded}">`;
     for (const [key, sym] of syms) {
-      const isCustom   = !!customSymbols[key];
-      const isOverride = !!overriddenStdSymbols[key];
-      const isStd      = !isCustom && !isOverride;
-      const imgSrc     = sym.imgData || '';
+      const isCustom = !!customSymbols[key];
+      const imgSrc = sym.imgData || '';
       const svgContent = sym.svg || '';
       let preview = imgSrc
         ? `<img src="${imgSrc}" alt="${sym.name}" style="width:42px;height:42px;object-fit:contain">`
         : `<svg viewBox="0 0 40 40" width="42" height="42" style="color:${sym.color||'#555'}">${svgContent}</svg>`;
-      const badge = isCustom
-        ? '<div style="font-size:8px;color:var(--gr);margin-top:2px">● Eigenes</div>'
-        : isOverride
-          ? '<div style="font-size:8px;color:#58a6ff;margin-top:2px">↻ Ersetzt</div>'
-          : '<div style="font-size:8px;color:var(--tx3);margin-top:2px">○ Standard</div>';
-      html += `<div class="sym-mgr-card" title="${sym.name}">
-        <button class="sm-edit" onclick="openSymbolEdit('${key}')" title="${isStd?'Bearbeiten / Ersetzen':'Bearbeiten'}" style="display:block">✏</button>
-        <button class="sm-del" onclick="confirmDeleteSymbol('${key}')" title="Löschen" style="display:block">✕</button>
-        ${isOverride ? `<button class="sm-rst" onclick="resetStdSymbol('${key}')" title="Original wiederherstellen" style="position:absolute;top:18px;right:2px;background:none;border:none;cursor:pointer;font-size:10px;color:#58a6ff;padding:1px 3px">↺</button>` : ''}
+      html += `<div class="sym-mgr-card" title="${sym.name}" data-key="${key}" data-cat="${catEncoded}">
+        <span class="sm-drag-handle" title="Ziehen zum Sortieren" onpointerdown="symMgrDragStart(event,'${key}','${catEncoded}')">⠿</span>
+        ${isCustom ? `<button class="sm-edit" onclick="openSymbolEdit('${key}')" title="Bearbeiten">✏</button>` : ''}
+        ${isCustom ? `<button class="sm-del" onclick="confirmDeleteSymbol('${key}')" title="Löschen">✕</button>` : ''}
         ${preview}
         <div class="sm-abbr">${sym.abbr||''}</div>
         <div class="sm-name">${sym.name}</div>
-        ${badge}
+        ${isCustom ? '<div style="font-size:8px;color:var(--gr);margin-top:2px">● eigenes</div>' : '<div style="font-size:8px;color:var(--tx3);margin-top:2px">○ Standard</div>'}
       </div>`;
     }
     // Plus-Karte am Ende des Grids
@@ -2442,62 +2124,54 @@ function renderSymbolManager() {
       </div>`;
     html += '</div></div>';
   }
-  // ── Gelöschte Standard-Symbole (wiederherstellbar) ──
-  if (deletedStdSymbols.size > 0 && !catFilt && !search) {
-    html += '<div class="cat-section" style="margin-top:16px">'
-      +'<div class="cat-section-hdr" style="color:var(--tx3)">'
-      +'🗑 Aus Palette entfernte Standard-Symbole'
-      +'<span class="cat-badge">'+deletedStdSymbols.size+' Stk.</span>'
-      +'<button onclick="restoreAllStdSymbols()" style="margin-left:auto;background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.4);border-radius:4px;padding:2px 10px;cursor:pointer;color:#58a6ff;font-size:10px">↺ Alle wiederherstellen</button>'
-      +'</div><div class="sym-mgr-grid">';
-    for (const key of deletedStdSymbols) {
-      const origSym = window._SYMBOLS_ORIG && window._SYMBOLS_ORIG[key];
-      if (!origSym) continue;
-      const preview = origSym.imgData
-        ? '<img src="'+origSym.imgData+'" style="width:42px;height:42px;object-fit:contain">'
-        : '<svg viewBox="0 0 40 40" width="42" height="42" style="color:'+(origSym.color||'#555')+'">'+(origSym.svg||'')+'</svg>';
-      html += '<div class="sym-mgr-card" style="opacity:.55" title="'+esc(origSym.name)+'">'
-        +'<button class="sm-edit" onclick="restoreStdSymbol('+key+')" title="Wiederherstellen" style="background:rgba(88,166,255,.2);color:#58a6ff;border-color:#58a6ff">↺</button>'
-        +preview
-        +'<div class="sm-abbr">'+esc(origSym.abbr||'')+'</div>'
-        +'<div class="sm-name">'+esc(origSym.name)+'</div>'
-        +'<div style="font-size:8px;color:var(--tx3);margin-top:2px">entfernt</div>'
-        +'</div>';
-    }
-    html += '</div></div>';
-  }
-
   body.innerHTML = html;
 }
 
-function restoreStdSymbol(key) {
-  ensureSymbolsBackup();
-  if (!window._SYMBOLS_ORIG || !window._SYMBOLS_ORIG[key]) {
-    setStatus('Original-Daten nicht verfügbar — Seite neu laden'); return;
-  }
-  deletedStdSymbols.delete(key);
-  SYMBOLS[key] = { ...window._SYMBOLS_ORIG[key] };
-  if (typeof symCache !== 'undefined') delete symCache[key];
-  saveCustomSymbols();
-  renderSymbolManager();
-  buildPalette();
-  setStatus('↺ Symbol "' + SYMBOLS[key].name + '" wiederhergestellt');
-}
+// ── SORTIERUNG DER SYMBOL-KARTEN per Pointer Events (Maus + Touch) ──
+// Funktioniert sowohl mit Mauszeiger als auch auf Touch-Geräten (Tablet/Handy),
+// da Pointer Events beide Eingabearten einheitlich behandeln.
+function symMgrDragStart(e, key, catEncoded) {
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const card = handle.closest('.sym-mgr-card');
+  const grid = card.closest('.sym-mgr-grid');
+  if (!card || !grid) return;
 
-function restoreAllStdSymbols() {
-  if (!confirm('Alle entfernten Standard-Symbole wiederherstellen?')) return;
-  ensureSymbolsBackup();
-  for (const key of [...deletedStdSymbols]) {
-    if (window._SYMBOLS_ORIG && window._SYMBOLS_ORIG[key]) {
-      SYMBOLS[key] = { ...window._SYMBOLS_ORIG[key] };
-      if (typeof symCache !== 'undefined') delete symCache[key];
-    }
-  }
-  deletedStdSymbols.clear();
-  saveCustomSymbols();
-  renderSymbolManager();
-  buildPalette();
-  setStatus('↺ Alle Standard-Symbole wiederhergestellt');
+  _symDrag = { key, cat: catEncoded, card, grid, pointerId: e.pointerId };
+  card.classList.add('dragging');
+  card.setPointerCapture && card.setPointerCapture(e.pointerId);
+
+  const onMove = (ev) => {
+    if (!_symDrag || ev.pointerId !== _symDrag.pointerId) return;
+    // Element unter dem Zeiger ermitteln (außer der gezogenen Karte selbst)
+    card.style.pointerEvents = 'none';
+    const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
+    card.style.pointerEvents = '';
+    if (!elUnder) return;
+    const overCard = elUnder.closest('.sym-mgr-card');
+    if (!overCard || overCard === card) return;
+    const overGrid = overCard.closest('.sym-mgr-grid');
+    if (!overGrid || overGrid !== grid) return; // nur innerhalb derselben Kategorie sortieren
+    const rect = overCard.getBoundingClientRect();
+    const before = (ev.clientX - rect.left) < rect.width / 2;
+    if (before) grid.insertBefore(card, overCard);
+    else grid.insertBefore(card, overCard.nextSibling);
+  };
+
+  const onUp = (ev) => {
+    if (!_symDrag || ev.pointerId !== _symDrag.pointerId) return;
+    card.classList.remove('dragging');
+    try { card.releasePointerCapture(_symDrag.pointerId); } catch(err) {}
+    persistSymbolOrderFromDOM(decodeURIComponent(_symDrag.cat));
+    _symDrag = null;
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
 }
 
 // Öffnet Upload-Dialog mit Kategorie vorbelegt
@@ -2525,46 +2199,20 @@ function symMgrAddToCat(catEncoded) {
 let _pendingUploadCat = null;
 
 function confirmDeleteSymbol(key) {
-  const name = (customSymbols[key]||overriddenStdSymbols[key]||SYMBOLS[key])?.name || key;
-  const isStd = !customSymbols[key] && !overriddenStdSymbols[key];
-  const msg = isStd
-    ? `Standard-Symbol "${name}" dauerhaft aus der Palette entfernen?
-
-Es kann über "↺ Wiederherstellen" zurückgeholt werden.`
-    : `Symbol "${name}" löschen?`;
-  if (!confirm(msg)) return;
-
-  if (isStd || overriddenStdSymbols[key]) {
-    // Standard-Symbol: in deletedStdSymbols merken
-    deletedStdSymbols.add(key);
-    // Falls Override vorhanden auch entfernen
-    delete overriddenStdSymbols[key];
-  }
-  // Custom löschen falls vorhanden
+  const name = customSymbols[key]?.name || key;
+  if (!confirm(`Symbol "${name}" löschen?`)) return;
   delete customSymbols[key];
   delete SYMBOLS[key];
-  if (typeof symCache !== 'undefined') delete symCache[key];
-  saveCustomSymbols();
-  renderSymbolManager();
-  buildPalette();
-  setStatus('🗑 "' + name + '" aus Palette entfernt — über "Gelöschte anzeigen" wiederherstellbar');
-}
-
-function resetStdSymbol(key) {
-  // Override entfernen → Standard wiederherstellen
-  if (!confirm('Original-Symbol wiederherstellen?')) return;
-  delete overriddenStdSymbols[key];
-  delete customSymbols[key];
-  if (typeof symCache !== 'undefined') delete symCache[key];
-  // SYMBOLS[key] aus _SYMBOLS_ORIG wiederherstellen
-  if (window._SYMBOLS_ORIG && window._SYMBOLS_ORIG[key]) {
-    SYMBOLS[key] = { ...window._SYMBOLS_ORIG[key] };
+  delete symCache[key];
+  // Aus gespeicherter Sortierreihenfolge entfernen
+  for (const cat of Object.keys(symbolOrder)) {
+    symbolOrder[cat] = symbolOrder[cat].filter(k => k !== key);
   }
+  saveSymbolOrder();
   saveCustomSymbols();
-  mergeCustomSymbols();
   renderSymbolManager();
   buildPalette();
-  setStatus('↺ Original-Symbol wiederhergestellt');
+  setStatus('🗑 Symbol gelöscht');
 }
 
 // ── DRAG & DROP ON UPLOAD ZONE ──
@@ -2776,50 +2424,37 @@ async function createNewProject() {
 
   try {
     setFbStatus('syncing', 'Erstelle...');
-
-    // Grundriss sichern BEVOR State geleert wird
-    let floorplanData = null;
-    const keepFloorplan = state.floorplan && state.floorplan.img;
-    if (keepFloorplan) {
-      try {
-        const fc = document.createElement('canvas');
-        const maxD = 1600;
-        let fw = state.floorplan.w, fh = state.floorplan.h;
-        if (fw > maxD || fh > maxD) { const r2 = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r2); fh=Math.round(fh*r2); }
-        fc.width = fw; fc.height = fh;
-        fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-        floorplanData = fc.toDataURL('image/jpeg', 0.72);
-      } catch(fe) { console.warn('floorplan encode:', fe); }
-    }
-
-    const newDoc = {
+    const ref = await fbDb.collection(GRUNDRISS_COLLECTION).add({
       uid: currentUser.uid,
       name,
-      symbols: state.symbols||[],
-      wires:   state.wires||[],
-      trassen: state.trassen||[],
-      raeume:  state.raeume||[],
-      scale:   state.scale||null,
+      symbols: [],
+      wires: [],
+      scale: null,
       customSymbols: {},
-      symbolCount: (state.symbols||[]).length,
-      raumhoehe: state.raumhoehe||250,
+      symbolCount: 0,
+      raumhoehe: 250,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    if (floorplanData) newDoc.floorplanData = floorplanData;
-
-    const ref = await fbDb.collection(GRUNDRISS_COLLECTION).add(newDoc);
+    });
     currentProjectId = ref.id;
     if (nameEl) nameEl.value = '';
 
+    // Reset all state
+    state.symbols = []; state.wires = []; state.scale = null;
+    state.selectedId = null; state.floorplan = null;
+    state.raumhoehe = 250;
+    selectedWireId = null;
+
     document.getElementById('projName').value = name;
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'flex';
     const pm = document.getElementById('projMgrModal');
     if (pm) pm.classList.add('hid');
 
     render(); renderProps(null);
     listenToProject(ref.id);
-    setFbStatus('online', '✅ Projekt erstellt & gespeichert');
-    setStatus('✅ Projekt "' + name + '" erstellt — inkl. Grundriss gespeichert!');
+    setFbStatus('online', '✅ Projekt erstellt');
+    setStatus('✅ Projekt "' + name + '" erstellt — lade jetzt deinen Grundriss hoch!');
   } catch(e) {
     console.error('[Firebase] createProject:', e);
     let msg = e.message || String(e);
@@ -2836,8 +2471,6 @@ async function openProject(id, data) {
   // Load state
   state.symbols = data.symbols || [];
   state.wires   = data.wires   || [];
-  state.trassen = data.trassen || [];
-  state.raeume  = data.raeume  || [];
   state.scale   = data.scale   || null;
   // Restore custom symbols
   if (data.customSymbols) {
@@ -2927,9 +2560,9 @@ function listenToProject(id) {
 async function saveToCloud() {
   if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
   if (!currentProjectId) {
-    // Auto-create project with current state (inkl. Grundriss)
+    // Auto-create project
     await createNewProject();
-    return; // createNewProject speichert bereits alles
+    return;
   }
   setFbStatus('syncing', 'Speichert...');
   cloudSaveLock = Date.now() + 30000; // 30 sec lock — prevent snapshot overwrite
@@ -2978,24 +2611,12 @@ async function saveToCloud() {
       name: document.getElementById('projName').value || 'Projekt',
       symbols: symbolsToSave,
       wires: state.wires,
-      trassen: state.trassen||[],
       scale: state.scale || null,
       customSymbols: csToSave,
       symbolCount: state.symbols.length,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    // Grundriss IMMER mitschicken wenn vorhanden (nicht nur wenn frisch kodiert)
-    if (floorplanData) {
-      updateData.floorplanData = floorplanData;
-    } else if (state.floorplan && state.floorplan.img) {
-      // Fallback: nochmal versuchen zu kodieren
-      try {
-        const fc2 = document.createElement('canvas');
-        fc2.width = state.floorplan.w; fc2.height = state.floorplan.h;
-        fc2.getContext('2d').drawImage(state.floorplan.img, 0, 0);
-        updateData.floorplanData = fc2.toDataURL('image/jpeg', 0.72);
-      } catch(fe2) { /* skip */ }
-    }
+    if (floorplanData) updateData.floorplanData = floorplanData;
 
     await fbDb.collection(GRUNDRISS_COLLECTION).doc(currentProjectId).update(updateData);
     setFbStatus('online', 'Gespeichert ✓ ' + new Date().toLocaleTimeString('de-DE'));
@@ -3368,101 +2989,15 @@ window.addEventListener('load', () => {
   octx = overlay.getContext('2d');
   wrap = document.getElementById('canvas-wrap');
   resizeCanvas();
-  ensureSymbolsBackup();
   loadCustomSymbols();
+  loadSymbolOrder();
   buildPalette();
   initFirebase();
   setupEvents();
   initSymUploadZone();
-  // ── localStorage Backup wiederherstellen ──
-  localStateRestore();
   render();
   window.addEventListener('resize', resizeCanvas);
-  // ── Automatisches localStorage Backup alle 10 Sekunden ──
-  setInterval(localStateSave, 10000);
-  // ── Beim Schließen/Reload speichern ──
-  window.addEventListener('beforeunload', localStateSave);
 });
-
-const LS_KEY = 'anvolt_grundriss_v2';
-
-function localStateSave() {
-  try {
-    // Grundriss als kleine JPEG-Kopie
-    let fpData = null;
-    if (state.floorplan && state.floorplan.img) {
-      const fc = document.createElement('canvas');
-      const maxD = 1200;
-      let fw = state.floorplan.w, fh = state.floorplan.h;
-      if (fw > maxD || fh > maxD) { const r = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r); fh=Math.round(fh*r); }
-      fc.width = fw; fc.height = fh;
-      fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-      fpData = fc.toDataURL('image/jpeg', 0.65);
-    }
-    const backup = {
-      symbols:  state.symbols||[],
-      wires:    state.wires||[],
-      trassen:  state.trassen||[],
-      scale:    state.scale||null,
-      pan:      state.pan,
-      zoom:     state.zoom,
-      raumhoehe:state.raumhoehe||250,
-      projName: document.getElementById('projName')?.value||'',
-      floorplanData: fpData,
-      savedAt:  Date.now(),
-    };
-    const json = JSON.stringify(backup);
-    // Nur speichern wenn < 8MB (localStorage-Limit)
-    if (json.length < 8000000) {
-      localStorage.setItem(LS_KEY, json);
-    }
-  } catch(e) { console.warn('localStateSave:', e); }
-}
-
-function localStateRestore() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const d = JSON.parse(raw);
-    // Nur wiederherstellen wenn < 24h alt
-    if (!d.savedAt || Date.now() - d.savedAt > 86400000) return;
-    // Nicht überschreiben wenn Firebase bereits geladen hat
-    if (currentProjectId) return;
-
-    state.symbols  = d.symbols||[];
-    state.wires    = d.wires||[];
-    state.trassen  = d.trassen||[];
-    state.scale    = d.scale||null;
-    state.raumhoehe= d.raumhoehe||250;
-    if (d.pan)  state.pan  = d.pan;
-    if (d.zoom) state.zoom = d.zoom;
-    if (d.projName) {
-      const el = document.getElementById('projName');
-      if (el) el.value = d.projName;
-    }
-    // Grundriss wiederherstellen
-    if (d.floorplanData) {
-      const img = new Image();
-      img.onload = () => {
-        state.floorplan = { img, w: img.width, h: img.height };
-        const uz = document.getElementById('uploadZone');
-        if (uz) uz.style.display = 'none';
-        render();
-      };
-      img.src = d.floorplanData;
-    }
-    // nid counter
-    let maxId=0;
-    state.symbols.forEach(s=>{const n=parseInt((s.id||'e0').replace(/\D/g,''));if(n>maxId)maxId=n;});
-    nid = maxId+1;
-
-    if (state.symbols.length||state.wires.length) {
-      const uz=document.getElementById('uploadZone');
-      if(uz&&!d.floorplanData) uz.style.display='none';
-      setStatus('♻️ Letzter Stand wiederhergestellt (' + new Date(d.savedAt).toLocaleTimeString('de-DE') + ')');
-    }
-  } catch(e) { console.warn('localStateRestore:', e); }
-}
 
 function resizeCanvas() {
   const r = wrap.getBoundingClientRect();
@@ -3476,23 +3011,19 @@ function resizeCanvas() {
 // ═══════════════════════════════════════════════════
 function buildPalette(filter='') {
   const body = document.getElementById('palBody');
-  if (!body) return;
   body.innerHTML = '';
   const cats = {};
   for (const [key, sym] of Object.entries(SYMBOLS)) {
-    if (!sym || !sym.cat || !sym.name) continue;
     if (filter && !sym.name.toLowerCase().includes(filter.toLowerCase()) &&
         !sym.cat.toLowerCase().includes(filter.toLowerCase())) continue;
     if (!cats[sym.cat]) cats[sym.cat] = [];
     cats[sym.cat].push([key, sym]);
   }
   for (const [cat, syms] of Object.entries(cats)) {
-    // Kategorie-Header
     const catEl = document.createElement('div');
     catEl.className = 'pal-cat';
     catEl.textContent = cat;
     body.appendChild(catEl);
-    // Symbol-Grid
     const grid = document.createElement('div');
     grid.className = 'pal-grid';
     for (const [key, sym] of syms) {
@@ -3500,24 +3031,18 @@ function buildPalette(filter='') {
       btn.className = 'sym-btn';
       const preview = sym.imgData
         ? `<img src="${sym.imgData}" style="width:32px;height:32px;object-fit:contain" alt="${sym.name}">`
-        : `<svg viewBox="0 0 40 40" style="color:${sym.color||'#555'}">${sym.svg||''}</svg>`;
+        : `<svg viewBox="0 0 40 40" style="color:${sym.color}">${sym.svg}</svg>`;
       btn.innerHTML = `${preview}<span>${sym.name}</span>`;
       btn.draggable = true;
       btn.dataset.symkey = key;
-      btn.title = sym.name + (sym.abbr ? ' ['+sym.abbr+']' : '');
-      // Klick → Symbol platzieren (Mitte des Canvas)
-      btn.addEventListener('click', () => {
-        const cx = (canvas.width/2  - state.pan.x) / state.zoom;
-        const cy = (canvas.height/2 - state.pan.y) / state.zoom;
-        placeSymbol(key, cx, cy);
-      });
-      // Desktop Drag
+      // Desktop drag
       btn.addEventListener('dragstart', e => {
         e.dataTransfer.setData('symkey', key);
         e.dataTransfer.effectAllowed = 'copy';
       });
-      // Touch Drag
+      // Touch drag for iPad
       btn.addEventListener('touchstart', e => startTouchDrag(e, key), { passive: false });
+      body.appendChild(grid);
       grid.appendChild(btn);
     }
     body.appendChild(grid);
@@ -3638,17 +3163,13 @@ function clientToCanvas(cx, cy) {
 // Mouse
 function onMouseDown(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
+  // Beleuchtungsverteilung: Raumpunkte setzen
   if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
     if (lvHandleCanvasClick(pt)) return;
   }
   if (state.calibrating) { handleCalibrate(pt); return; }
   if (state.tool === 'wire') { handleWireClick(pt); return; }
   if (state.tool === 'measure') { handleMeasureClick(pt, e); return; }
-  // Kabeltrasse anklicken
-  if (state.tool === 'select') {
-    const kt = ktHitTest(pt.x, pt.y);
-    if (kt) { ktShowProps(kt); return; }
-  }
 
   // ── Priority 1: Wire point delete button ──
   const delPt = hitTestWirePointDelete(pt.x, pt.y);
@@ -4191,7 +3712,8 @@ function hitTest(x, y) {
   const R = 22;
   for (let i=state.symbols.length-1; i>=0; i--) {
     const s = state.symbols[i];
-    if (Math.hypot(x-s.x,y-s.y) < R/state.zoom*1.2) return s;
+    const sizeFactor = s.size || 1;
+    if (Math.hypot(x-s.x,y-s.y) < R*sizeFactor/state.zoom*1.2) return s;
   }
   return null;
 }
@@ -4223,13 +3745,12 @@ function render() {
   ctx.save();
   ctx.setTransform(state.zoom,0,0,state.zoom,state.pan.x,state.pan.y);
   drawBackground();
-  drawRaeume();
   drawFloorplan();
   drawWires();
   drawWireJunctions();
   drawCalPoints();
-  drawTrassen();
   drawSymbols();
+  // Beleuchtungsverteilung Overlay (3-Punkte)
   if (typeof lvDrawOverlay === 'function') lvDrawOverlay();
   ctx.restore();
   updateScaleBar();
@@ -4304,7 +3825,7 @@ function drawCalPoints() {
 
 
 // Wire types with colors and styles
-var WIRE_TYPES = {
+const WIRE_TYPES = {
   strom:       { label:'Strom NYM-J 3×1,5',        color:'#e74c3c', dash:[],    width:2.5, kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig',      lsA:16 },
   strom25:     { label:'Steckdose NYM-J 3×2,5 LS 16A', color:'#e67e22', dash:[],width:3,  kabel:'NYM-J 3×2.5',  adern:3, adernLabel:'3-adrig',      lsA:16, autoKabel:'steckdose' },
   beleuchtung: { label:'Beleuchtung NYM-J 3×1,5 LS 10A',color:'#f1c40f',dash:[],width:2.5,kabel:'NYM-J 3×1.5',  adern:3, adernLabel:'3-adrig',      lsA:10, autoKabel:'beleuchtung' },
@@ -4315,7 +3836,9 @@ var WIRE_TYPES = {
   erdung:      { label:'Erdungsleitung grün-gelb',  color:'#27ae60', dash:[],    width:2.5, kabel:'H07V-K 1×6 grün-gelb', adern:1, adernLabel:'PE grün-gelb', isErdung:true },
   erde:        { label:'Erdkabel (NYY-J)',          color:'#795548', dash:[],    width:3,   kabel:'NYY-J 5×6',    adern:5, adernLabel:'Erdkabel',     lsA:16 },
   daten:       { label:'Datenkabel (CAT6)',         color:'#9c27b0', dash:[6,3], width:2,   kabel:'CAT 6 U/UTP',  adern:8, adernLabel:'CAT6' },
+  daten7:      { label:'Datenkabel (CAT7)',         color:'#7b1fa2', dash:[6,3], width:2,   kabel:'CAT 7 S/FTP',  adern:8, adernLabel:'CAT7' },
   sat:         { label:'SAT-Kabel (Koax)',          color:'#1565c0', dash:[8,3], width:2,   kabel:'Koax RG-6',    adern:1, adernLabel:'Koax' },
+  koax59:      { label:'Koaxialkabel RG-59',        color:'#0d47a1', dash:[8,3], width:1.8, kabel:'Koax RG-59',   adern:1, adernLabel:'Koax RG-59' },
   telefon:     { label:'Telefonkabel',             color:'#607d8b', dash:[4,2], width:1.8, kabel:'J-Y(St)Y 2×2×0.6', adern:4, adernLabel:'Tel' },
   bus:         { label:'KNX/Bus-Kabel',            color:'#ff5722', dash:[3,2], width:1.8, kabel:'YCYM 2×2×0.8', adern:2, adernLabel:'TKNX' },
   custom:      { label:'Benutzerdefiniert',        color:'#27ae60', dash:[],    width:2,   kabel:'—',             adern:0, adernLabel:'' },
@@ -4342,9 +3865,9 @@ function getWireWidth(wire) {
 }
 
 
-selectedWireId = null;
-var draggingWire = null;   // { wireId, ptIdx, offX, offY }
-var hoveredWirePt = null;  // { wireId, ptIdx } for hover highlight
+let selectedWireId = null;
+let draggingWire = null;   // { wireId, ptIdx, offX, offY }
+let hoveredWirePt = null;  // { wireId, ptIdx } for hover highlight
 let addingMidPoint = null; // { wireId, segIdx, x, y } when clicking segment midpoint
 
 // Stromkreis-Farbpalette (für Kennzeichnung gleicher Stromkreise)
@@ -4659,11 +4182,12 @@ function deleteSelectedWire() {
 }
 
 function drawSymbols() {
-  const SZ = 36; // symbol size in world coords
+  const SZ_BASE = 36; // Basis-Symbolgröße in Welt-Koordinaten (bei size=1.0)
   for (const sym of state.symbols) {
     const def = SYMBOLS[sym.type];
     if (!def) continue;
     const sel = sym.id === state.selectedId;
+    const SZ = SZ_BASE * (sym.size || 1);
     ctx.save();
     ctx.translate(sym.x, sym.y);
     if (sym.rotation) ctx.rotate(sym.rotation * Math.PI/180);
@@ -4680,8 +4204,8 @@ function drawSymbols() {
     ctx.fillStyle='rgba(255,255,255,.97)'; ctx.fill();
     ctx.shadowBlur=0;
     ctx.strokeStyle=def.color; ctx.lineWidth=1.5/state.zoom; ctx.stroke();
-    // Draw SVG via offscreen
-    const offsc = getSymbolCanvas(sym.type, def, SZ);
+    // Draw SVG via offscreen (immer in hoher Basisauflösung gecached, dann auf SZ skaliert)
+    const offsc = getSymbolCanvas(sym.type, def, 72);
     ctx.drawImage(offsc, -SZ/2, -SZ/2, SZ, SZ);
     // Label below
     ctx.font=`bold ${9/state.zoom}px IBM Plex Sans,sans-serif`;
@@ -4761,7 +4285,7 @@ function drawSymbols() {
 }
 
 // Offscreen symbol canvas cache
-// symCache already declared above
+const symCache = {};
 function getSymbolCanvas(type, def, sz) {
   if (symCache[type]) return symCache[type];
   const oc = new OffscreenCanvas(sz, sz);
@@ -4802,7 +4326,7 @@ function renderProps(sym) {
   }
   const def = SYMBOLS[sym.type] || {};
   const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2','L2+L3'];
-  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 5×6','NHXMH-J 3×1.5'];
+  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 5×6','NHXMH-J 3×1.5','Koax RG-6','Koax RG-59','CAT 6 U/UTP','CAT 6A S/FTP','CAT 7 S/FTP','CAT 7A S/FTP'];
   body.innerHTML = `
     <div class="pg" style="margin-bottom:12px">
       <div class="pgt" style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-bottom:3px;border-bottom:1px solid var(--bd)">${def.name||sym.type}</div>
@@ -4824,6 +4348,13 @@ function renderProps(sym) {
       ` : ''}
       <div class="rp-row"><label class="rp-lbl">Drehung (°)</label>
         <input class="rp-input" type="number" value="${sym.rotation||0}" step="15" oninput="updSym('${sym.id}','rotation',+this.value);render()"></div>
+      <div class="rp-row"><label class="rp-lbl">Symbolgröße — <span style="color:var(--ac)" id="symSizeVal-${sym.id}">${Math.round((sym.size||1)*100)}%</span></label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="range" min="0.5" max="2.5" step="0.1" value="${sym.size||1}"
+            style="flex:1;accent-color:var(--ac)"
+            oninput="document.getElementById('symSizeVal-${sym.id}').textContent=Math.round(this.value*100)+'%'; updSym('${sym.id}','size',+this.value)">
+          <button class="btn bg" style="font-size:9px;padding:3px 6px" onclick="updSym('${sym.id}','size',1);renderProps(state.symbols.find(s=>s.id==='${sym.id}'))" title="Zurücksetzen">↺</button>
+        </div></div>
       <div class="rp-row"><label class="rp-lbl">Anzahl</label>
         <input class="rp-input" type="number" value="${sym.count||1}" min="1" oninput="updSym('${sym.id}','count',+this.value)"></div>
       <div class="rp-row"><label class="rp-lbl">Kommentar</label>
@@ -4881,7 +4412,7 @@ function renderWireProps(wire) {
   if (!body) return;
   const col = getWireColor(wire);
   const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2'];
-  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 3×2.5','NYY-J 3×6','NYY-J 5×2.5','NYY-J 5×6','NYY-J 5×10','H07V-K 1×6 grün-gelb','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8','NHXMH-J 3×1.5'];
+  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 3×2.5','NYY-J 3×6','NYY-J 5×2.5','NYY-J 5×6','NYY-J 5×10','H07V-K 1×6 grün-gelb','CAT 6 U/UTP','CAT 6A S/FTP','CAT 7 S/FTP','CAT 7A S/FTP','Koax RG-6','Koax RG-59','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8','NHXMH-J 3×1.5'];
   const verlegeArten = ['UP','AP','HR','EZ','ER','HD','FU','HW'];
   const verlegeNames = {'UP':'Unterputz','AP':'Aufputz','HR':'In Rohr','EZ':'Einziehen','ER':'Erdkabel','HD':'Hohldecke','FU':'Fußboden','HW':'Hohlwand'};
 
@@ -5260,72 +4791,6 @@ function renderStueckliste() {
   }
   body.innerHTML = rows || '<tr><td colspan="9" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Elemente platziert</td></tr>';
 
-  // ── Kabeltrassen Tabelle ──
-  const stTrassenEl = document.getElementById('stTrassen');
-  if (stTrassenEl && state.trassen && state.trassen.length) {
-    // Aggregate Zubehör
-    const ktAgg = {
-      gesamtM: 0, halterungen: 0,
-      bogenL: 0, bogenR: 0, kreuz: 0, tStueck: 0, deckel: 0, endstueck: 0
-    };
-    const ktRows = state.trassen.map((kt,i) => {
-      const lenM = kt.laenge_m || 0;
-      const abst = parseFloat(kt.halterAbstand || 1.5);
-      const nHalt = abst > 0 ? Math.ceil(lenM / abst) : 0;
-      const zub = kt.zubehoer || [];
-      ktAgg.gesamtM    += lenM;
-      ktAgg.halterungen += nHalt;
-      if (zub.includes('bogenL'))   ktAgg.bogenL++;
-      if (zub.includes('bogenR'))   ktAgg.bogenR++;
-      if (zub.includes('kreuz'))    ktAgg.kreuz++;
-      if (zub.includes('t-stück'))  ktAgg.tStueck++;
-      if (zub.includes('deckel'))   ktAgg.deckel += Math.ceil(lenM);
-      if (zub.includes('endstück')) ktAgg.endstueck++;
-      return '<tr>'
-        +'<td class="mono">'+(i+1)+'</td>'
-        +'<td><strong>'+esc(kt.label||'KT-'+(i+1))+'</strong></td>'
-        +'<td class="mono">'+kt.breite+'×'+kt.hoehe+' mm</td>'
-        +'<td class="mono" style="color:#58a6ff">'+lenM.toFixed(1)+' m</td>'
-        +'<td class="mono">'+esc(kt.halterung||'Wand')+'</td>'
-        +'<td class="mono">'+nHalt+' Stk.</td>'
-        +'<td style="font-size:9px">'+zub.map(z=>esc(z)).join(', ')+'</td>'
-        +'</tr>';
-    }).join('');
-
-    const ktSumRow = '<tr style="font-weight:700;background:var(--sf)">'
-      +'<td colspan="3" style="text-align:right;padding:5px 8px;font-size:10px">GESAMT</td>'
-      +'<td class="mono" style="color:#58a6ff">'+ktAgg.gesamtM.toFixed(1)+' m</td>'
-      +'<td></td>'
-      +'<td class="mono">'+ktAgg.halterungen+' Stk.</td>'
-      +'<td style="font-size:9px;font-family:var(--mono)">'
-      +(ktAgg.bogenL?'Bogen-L: '+ktAgg.bogenL+' ':'' )
-      +(ktAgg.bogenR?'Bogen-R: '+ktAgg.bogenR+' ':'' )
-      +(ktAgg.kreuz?'Kreuz: '+ktAgg.kreuz+' ':'' )
-      +(ktAgg.tStueck?'T: '+ktAgg.tStueck+' ':'' )
-      +(ktAgg.deckel?'Deckel: '+ktAgg.deckel+'m ':'' )
-      +(ktAgg.endstueck?'Ende: '+ktAgg.endstueck:'')
-      +'</td></tr>';
-
-    stTrassenEl.innerHTML = '<div style="font-size:10px;font-weight:700;color:#58a6ff;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">🔲 Kabeltrassen</div>'
-      +'<table class="stbl">'
-      +'<thead><tr><th>#</th><th>Bezeichnung</th><th>Querschnitt</th><th>Länge</th><th>Halterung</th><th>Halter Anz.</th><th>Zubehör</th></tr></thead>'
-      +'<tbody>'+ktRows+'</tbody>'
-      +'<tfoot>'+ktSumRow+'</tfoot>'
-      +'</table>'
-      +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:10px 12px;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--tx2);line-height:1.9">'
-      +'<strong style="color:#58a6ff">📦 Zubehör-Gesamtbedarf:</strong><br>'
-      +(ktAgg.halterungen?'Halterungen (Wand/Decke): <strong>'+ktAgg.halterungen+' Stk.</strong><br>':'')
-      +(ktAgg.bogenL?'Bögen links: <strong>'+ktAgg.bogenL+' Stk.</strong><br>':'')
-      +(ktAgg.bogenR?'Bögen rechts: <strong>'+ktAgg.bogenR+' Stk.</strong><br>':'')
-      +(ktAgg.kreuz?'Kreuze: <strong>'+ktAgg.kreuz+' Stk.</strong><br>':'')
-      +(ktAgg.tStueck?'T-Stücke: <strong>'+ktAgg.tStueck+' Stk.</strong><br>':'')
-      +(ktAgg.deckel?'Deckel: <strong>'+ktAgg.deckel+' m</strong><br>':'')
-      +(ktAgg.endstueck?'Endstücke: <strong>'+ktAgg.endstueck+' Stk.</strong>':'')
-      +'</div>';
-  } else if (stTrassenEl) {
-    stTrassenEl.innerHTML = '';
-  }
-
   // ── Leitungen Tabelle ──
   // Manuelle Zuleitungslängen aus Symbolen einberechnen
   for (const s of syms) {
@@ -5586,41 +5051,18 @@ function renderSummaryHTML(sd, forPrint=false) {
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════
 function switchTab(tab) {
-  // Tabs markieren
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
-  const tabEl = document.getElementById('tab-'+tab);
-  if (tabEl) tabEl.classList.add('act');
-
-  // Alle Views ausblenden
-  const views = ['planView','stromView','stView','symboleView'];
-  views.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-
-  // Palette + rpanel nur im Plan-Tab
-  const palette = document.getElementById('palette');
-  const rpanel  = document.getElementById('rpanel');
-  if (palette) palette.style.display = tab==='plan' ? 'flex' : 'none';
-  if (rpanel)  rpanel.style.display  = tab==='plan' ? 'flex' : 'none';
-
-  // Aktive View einblenden
-  if (tab === 'plan') {
-    const el = document.getElementById('planView');
-    if (el) el.style.display = 'flex';
-  } else if (tab === 'stromkreise') {
-    const el = document.getElementById('stromView');
-    if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
-    renderStromkreise();
-  } else if (tab === 'stueckliste') {
-    const el = document.getElementById('stView');
-    if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
-    renderStueckliste();
-  } else if (tab === 'symbole') {
-    const el = document.getElementById('symboleView');
-    if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
-    renderSymbolManager();
-  }
+  document.getElementById('tab-'+tab).classList.add('act');
+  document.getElementById('planView').style.display = tab==='plan'?'flex':'none';
+  document.getElementById('palette').style.display = tab==='plan'?'flex':'none';
+  if (tab!=='plan') { document.getElementById('rpanel').style.display='none'; } else { document.getElementById('rpanel').style.display='flex'; }
+  document.getElementById('rpanel').style.display = tab==='plan'?'flex':'none';
+  document.getElementById('stromView').style.display = tab==='stromkreise'?'flex':'none';
+  document.getElementById('stView').style.display = tab==='stueckliste'?'flex':'none';
+  document.getElementById('symboleView').style.display = tab==='symbole'?'flex':'none';
+  if (tab==='symbole') renderSymbolManager();
+  if (tab==='stueckliste') renderStueckliste();
+  if (tab==='stromkreise') renderStromkreise();
 }
 
 // ═══════════════════════════════════════════════════
@@ -5737,7 +5179,7 @@ function zFit() {
 //  UNDO
 // ═══════════════════════════════════════════════════
 function saveUndo() {
-  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[] }));
+  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires }));
   if (state.undoStack.length > 50) state.undoStack.shift();
 }
 function undoAction() {
@@ -5754,7 +5196,7 @@ function undoAction() {
 function clearAll() {
   if (!confirm('Alles löschen? (Grundriss bleibt erhalten)')) return;
   saveUndo();
-  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = []; state.selectedId = null;
+  state.symbols = []; state.wires = []; state.selectedId = null;
   render(); renderProps(null); setStatus('Alle Elemente gelöscht');
 }
 
@@ -5856,7 +5298,7 @@ function exportCSV() {
 // ═══════════════════════════════════════════════════
 //  PROJEKTDATEN
 // ═══════════════════════════════════════════════════
-projData = {};
+let projData = {};
 
 function showProjDataModal() {
   // Pre-fill
@@ -5906,138 +5348,149 @@ function saveProjData() {
 function exportFloorplanPDF() {
   const pn = document.getElementById('projName').value;
   const pd = projData;
-
-  // Grundriss als Bild exportieren
+  
+  // Export canvas as image
   const exportCanvas = document.createElement('canvas');
   exportCanvas.width = canvas.width;
   exportCanvas.height = canvas.height;
   const ectx = exportCanvas.getContext('2d');
+  // White background
   ectx.fillStyle = 'white';
   ectx.fillRect(0,0,exportCanvas.width, exportCanvas.height);
   ectx.drawImage(canvas, 0, 0);
   const imgData = exportCanvas.toDataURL('image/png');
 
+  // Stückliste rendern damit byType/byKabel aktuell ist
   renderStueckliste();
-  setTimeout(function() {
-    // Zusammenfassungs-Daten
+  setTimeout(()=>{
+    // Daten berechnen
     const _symsAll = state.symbols;
     const _wiresAll = state.wires;
     const _byType={}, _byKabel={};
-    for(var si=0;si<_symsAll.length;si++){
-      var s=_symsAll[si], n=SYMBOLS[s.type]&&SYMBOLS[s.type].name||s.type;
-      _byType[n]=(_byType[n]||0)+(s.count||1);
-    }
-    for(var si2=0;si2<_symsAll.length;si2++){
-      var s2=_symsAll[si2];
-      if(s2.kabelLaenge&&parseFloat(s2.kabelLaenge)>0){
-        var k2=s2.kabel||'NYM-J 3x1.5';
-        _byKabel[k2]=(_byKabel[k2]||0)+parseFloat(s2.kabelLaenge);
+    for(const s of _symsAll){ const n=SYMBOLS[s.type]?.name||s.type; _byType[n]=(_byType[n]||0)+(s.count||1); }
+    for(const s of _symsAll){ if(s.kabelLaenge&&parseFloat(s.kabelLaenge)>0){const k=s.kabel||'NYM-J 3×1.5';_byKabel[k]=(_byKabel[k]||0)+parseFloat(s.kabelLaenge);} }
+    for(const w of _wiresAll){ _byKabel[w.kabel||'—']=(_byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
+    const _wTotal = _wiresAll.reduce((a,w)=>a+parseFloat(w.laenge_m||0),0);
+    const sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
+    const summaryHTML = renderSummaryHTML(sd, true); // forPrint=true → helle Farben
+
+    const tbl = document.getElementById('stBody')?.parentElement?.outerHTML||'';
+    const w = window.open('','_blank');
+    const heute = new Date().toLocaleDateString('de-DE');
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+    <title>${pn} — Elektroplan</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#222}
+      .page{padding:14mm 12mm;}
+      .header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:12px;display:flex;gap:20px;align-items:flex-start}
+      .hdr-logo{font-size:18px;font-weight:700;color:#f5a623;white-space:nowrap}
+      .hdr-info{flex:1}
+      .hdr-info h1{font-size:16px;margin:0 0 3px;color:#222}
+      .hdr-info p{font-size:10px;color:#555;margin:0}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px;padding:10px}
+      .info-sec h3{font-size:9px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px;letter-spacing:.5px}
+      .info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:2px 0;font-size:9px}
+      .info-row strong{color:#222}
+      .plan-img{width:100%;border:1px solid #ccc;border-radius:3px;margin-bottom:12px;page-break-after:always}
+      .pg-break{page-break-before:always}
+      table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
+      th{background:#f5a623;color:white;padding:4px 7px;text-align:left;font-size:9px}
+      td{border:1px solid #e0e0e0;padding:3px 7px}
+      tr:nth-child(even) td{background:#fafafa}
+      tfoot td{background:#f8f8f8;font-weight:700;border-top:2px solid #ccc}
+      h3.sec{font-size:11px;font-weight:700;color:#f5a623;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #f5a623}
+      .footer{border-top:1px solid #ddd;margin-top:12px;padding-top:6px;font-size:8px;color:#999;display:flex;justify-content:space-between}
+      @media print{
+        .page{padding:8mm}
+        .pg-break{page-break-before:always}
       }
-    }
-    for(var wi=0;wi<_wiresAll.length;wi++){
-      var w2=_wiresAll[wi];
-      _byKabel[w2.kabel||'—']=(_byKabel[w2.kabel||'—']||0)+parseFloat(w2.laenge_m||0);
-    }
-    var _wTotal = _wiresAll.reduce(function(a,w){return a+parseFloat(w.laenge_m||0);},0);
-    var sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
-    var summaryHTML = renderSummaryHTML(sd, true);
+    </style>
+    </head><body>
+    <div class="page">
+      <div class="header">
+        <div class="hdr-logo">⚡ Elektroplan</div>
+        <div class="hdr-info">
+          <h1>${pn}</h1>
+          <p>Gewerk: ${pd.gewerk||'Elektroinstallation'} &nbsp;|&nbsp; Erstellt: ${heute} &nbsp;|&nbsp; Auftrag: ${pd.auftragsnr||'—'}</p>
+        </div>
+      </div>
 
-    var tbl = (document.getElementById('stBody')&&document.getElementById('stBody').parentElement&&document.getElementById('stBody').parentElement.outerHTML)||'';
-    var heute = new Date().toLocaleDateString('de-DE');
+      <!-- Projektdaten -->
+      <div class="info-grid">
+        <div class="info-sec">
+          <h3>👤 Kundendaten</h3>
+          <div class="info-row"><span>Name:</span><strong>${pd.kundenname||'—'}</strong></div>
+          <div class="info-row"><span>Firma:</span><strong>${pd.firma||'—'}</strong></div>
+          <div class="info-row"><span>Telefon:</span><strong>${pd.telefon||'—'}</strong></div>
+          <div class="info-row"><span>E-Mail:</span><strong>${pd.email||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>📍 Projektadresse</h3>
+          <div class="info-row"><span>Straße:</span><strong>${pd.strasse||'—'}</strong></div>
+          <div class="info-row"><span>Ort:</span><strong>${pd.ort||'—'}</strong></div>
+          <div class="info-row"><span>Etage:</span><strong>${pd.etage||'—'}</strong></div>
+          <div class="info-row"><span>Gebäudetyp:</span><strong>${pd.gebaeude||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>🏗 Auftragsdaten</h3>
+          <div class="info-row"><span>Auftragsnummer:</span><strong>${pd.auftragsnr||'—'}</strong></div>
+          <div class="info-row"><span>Auftraggeber:</span><strong>${pd.auftraggeber||'—'}</strong></div>
+          <div class="info-row"><span>Erstellt von:</span><strong>${pd.planer||'—'}</strong></div>
+          <div class="info-row"><span>Ausführung:</span><strong>${pd.ausfuehrung||'—'}</strong></div>
+        </div>
+        <div class="info-sec">
+          <h3>📝 Notizen</h3>
+          <div style="font-size:9px;color:#555;line-height:1.5">${(pd.notizen||'—').replace(/\n/g,'<br>')}</div>
+        </div>
+      </div>
 
-    // Leitungszeilen
-    var wireRows = _wiresAll.map(function(ww,wi2){
-      return '<tr>'
-        +'<td>'+(wi2+1)+'</td>'
-        +'<td style="font-family:monospace">'+(ww.circuit||'—')+'</td>'
-        +'<td>'+((WIRE_TYPES[ww.wireType]&&WIRE_TYPES[ww.wireType].label)||ww.wireType||'Strom')+'</td>'
-        +'<td style="font-family:monospace">'+(ww.phase||'L1')+'</td>'
-        +'<td style="font-family:monospace">'+(ww.kabel||'—')+'</td>'
-        +'<td>'+(ww.adernLabel||'')+'</td>'
-        +'<td>'+(ww.verlegeart||'—')+(ww.trasseHoehe?' '+ww.trasseHoehe+'cm':'')+'</td>'
-        +'<td style="font-family:monospace;font-weight:700">'+(ww.laenge_m?ww.laenge_m+'m':'—')+'</td>'
-        +'</tr>';
-    }).join('');
+      <!-- Grundrissplan -->
+      <h3 class="sec">Grundrissplan</h3>
+      <img src="${imgData}" class="plan-img">
 
-    var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
-      +'<title>'+pn+' — Elektroplan</title>'
-      +'<style>'
-      +'*{box-sizing:border-box}'
-      +'body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#222}'
-      +'.page{padding:14mm 12mm}'
-      +'.header{border-bottom:3px solid #f5a623;padding-bottom:10px;margin-bottom:12px;display:flex;gap:20px;align-items:flex-start}'
-      +'.hdr-logo{font-size:18px;font-weight:700;color:#f5a623;white-space:nowrap}'
-      +'.hdr-info{flex:1}'
-      +'.hdr-info h1{font-size:16px;margin:0 0 3px;color:#222}'
-      +'.hdr-info p{font-size:10px;color:#555;margin:0}'
-      +'.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px;padding:10px}'
-      +'.info-sec h3{font-size:9px;font-weight:700;color:#f5a623;text-transform:uppercase;margin:0 0 5px}'
-      +'.info-row{display:flex;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding:2px 0;font-size:9px}'
-      +'.info-row strong{color:#222}'
-      +'.plan-img{width:100%;border:1px solid #ccc;border-radius:3px;margin-bottom:12px}'
-      +'.pg-break{page-break-before:always;padding-top:14mm}'
-      +'table{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}'
-      +'th{background:#f5a623;color:white;padding:4px 7px;text-align:left;font-size:9px}'
-      +'td{border:1px solid #e0e0e0;padding:3px 7px}'
-      +'tr:nth-child(even) td{background:#fafafa}'
-      +'tfoot td{background:#f8f8f8;font-weight:700;border-top:2px solid #ccc}'
-      +'h3.sec{font-size:11px;font-weight:700;color:#f5a623;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #f5a623}'
-      +'.footer{border-top:1px solid #ddd;margin-top:12px;padding-top:6px;font-size:8px;color:#999;display:flex;justify-content:space-between}'
-      +'@media print{.page{padding:8mm}.pg-break{page-break-before:always}}'
-      +'</style></head><body>'
-      +'<div class="page">'
-      +'<div class="header">'
-      +'<div class="hdr-logo">&#9889; Elektroplan</div>'
-      +'<div class="hdr-info"><h1>'+pn+'</h1>'
-      +'<p>Gewerk: '+(pd.gewerk||'Elektroinstallation')+' &nbsp;|&nbsp; Erstellt: '+heute+' &nbsp;|&nbsp; Auftrag: '+(pd.auftragsnr||'—')+'</p>'
-      +'</div></div>'
-      +'<div class="info-grid">'
-      +'<div class="info-sec"><h3>Kundendaten</h3>'
-      +'<div class="info-row"><span>Name:</span><strong>'+(pd.kundenname||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Firma:</span><strong>'+(pd.firma||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Telefon:</span><strong>'+(pd.telefon||'—')+'</strong></div>'
-      +'<div class="info-row"><span>E-Mail:</span><strong>'+(pd.email||'—')+'</strong></div>'
-      +'</div>'
-      +'<div class="info-sec"><h3>Projektadresse</h3>'
-      +'<div class="info-row"><span>Strasse:</span><strong>'+(pd.strasse||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Ort:</span><strong>'+(pd.ort||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Etage:</span><strong>'+(pd.etage||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Gebaeudetyp:</span><strong>'+(pd.gebaeude||'—')+'</strong></div>'
-      +'</div>'
-      +'<div class="info-sec"><h3>Auftragsdaten</h3>'
-      +'<div class="info-row"><span>Auftragsnummer:</span><strong>'+(pd.auftragsnr||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Auftraggeber:</span><strong>'+(pd.auftraggeber||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Erstellt von:</span><strong>'+(pd.planer||'—')+'</strong></div>'
-      +'<div class="info-row"><span>Ausfuehrung:</span><strong>'+(pd.ausfuehrung||'—')+'</strong></div>'
-      +'</div>'
-      +'<div class="info-sec"><h3>Notizen</h3>'
-      +'<div style="font-size:9px;color:#555;line-height:1.5">'+(pd.notizen||'—').replace(/\n/g,'<br>')+'</div>'
-      +'</div></div>'
-      +'<h3 class="sec">Grundrissplan</h3>'
-      +'<img src="'+imgData+'" class="plan-img">'
-      +'<div class="pg-break">'
-      +'<h3 class="sec">Stueckliste — Geraete</h3>'
-      +tbl
-      +'<h3 class="sec" style="margin-top:14px">Leitungsverzeichnis</h3>'
-      +'<table><thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Laenge</th></tr></thead>'
-      +'<tbody>'+wireRows+'</tbody>'
-      +'<tfoot><tr><td colspan="7" style="text-align:right">GESAMT LEITUNGEN</td>'
-      +'<td style="font-family:monospace;color:#27ae60">'+_wTotal.toFixed(1)+'m</td></tr></tfoot></table>'
-      +'<h3 class="sec" style="margin-top:14px">Zusammenfassung &amp; Kabelmengen</h3>'
-      +summaryHTML
-      +'</div>'
-      +'<div class="footer">'
-      +'<span>&#9889; Elektro-Grundriss Planer — Anvolt GmbH</span>'
-      +'<span>'+pn+' &nbsp;|&nbsp; Erstellt: '+heute+'</span>'
-      +'<span>Seite 1</span>'
-      +'</div></div>'
-      +'<script>window.print();<\/script>'
-      +'</body></html>';
+      <!-- Geräte-Stückliste -->
+      <div class="pg-break">
+        <h3 class="sec">📦 Stückliste — Geräte</h3>
+        ${tbl}
 
-    var w = window.open('','_blank');
-    w.document.write(html);
+        <!-- Leitungen -->
+        <h3 class="sec" style="margin-top:14px">⚡ Leitungsverzeichnis</h3>
+        <table>
+          <thead><tr><th>#</th><th>Stromkreis</th><th>Typ</th><th>Phase</th><th>Kabeltyp</th><th>Adern</th><th>Verlegeart</th><th>Länge</th></tr></thead>
+          <tbody>
+            ${_wiresAll.map((ww,wi)=>`<tr>
+              <td>${wi+1}</td>
+              <td style="font-family:monospace">${ww.circuit||'—'}</td>
+              <td>${(WIRE_TYPES[ww.wireType]||{label:ww.wireType||'Strom'}).label}</td>
+              <td style="font-family:monospace">${ww.phase||'L1'}</td>
+              <td style="font-family:monospace">${ww.kabel||'—'}</td>
+              <td>${ww.adernLabel||''}</td>
+              <td>${ww.verlegeart||'—'}${ww.trasseHoehe?' '+ww.trasseHoehe+'cm':''}</td>
+              <td style="font-family:monospace;font-weight:700">${ww.laenge_m?ww.laenge_m+'m':'—'}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr>
+            <td colspan="7" style="text-align:right">GESAMT LEITUNGEN</td>
+            <td style="font-family:monospace;color:#27ae60">${_wTotal.toFixed(1)} m</td>
+          </tr></tfoot>
+        </table>
+
+        <!-- Zusammenfassung -->
+        <h3 class="sec" style="margin-top:14px">📊 Zusammenfassung &amp; Kabelmengen</h3>
+        ${summaryHTML}
+      </div>
+
+      <div class="footer">
+        <span>⚡ Elektro-Grundriss Planer — Anvolt GmbH</span>
+        <span>${pn} &nbsp;|&nbsp; Erstellt: ${heute}</span>
+        <span>Seite 1</span>
+      </div>
+    </div>
+    <\x73cript>window.print();<\/script>
+    </body></html>`);
     w.document.close();
-  }, 200);
+  },200);
 }
 
 // ═══════════════════════════════════════════════════
@@ -6362,7 +5815,7 @@ const LV_SYMBOL_TYPES = [
 ];
 
 // ── State ──
-var _lv = {
+let _lv = {
   active:   false,  // Zeichenmodus läuft
   step:     1,      // 1=Typ  2=Zeichnen  3=Verteilen
   symKey:  'deckenleuchte',
@@ -6882,7 +6335,7 @@ const WD_CATS = [
   'KNX / Smarthome','Sonstige'
 ];
 
-var _wd = {
+let _wd = {
   step:    1,
   cat:     'Steckdosen',
   symKey:  null,      // gewählter Symbol-Key
@@ -7224,862 +6677,6 @@ function wdPlace(){
   _wd.line=null; _wd.positions=[];
   closeWDModal(); render();
   setStatus(`✅ ${placed.length}× ${SYMBOLS[_wd.symKey]?.name||_wd.symKey} platziert · Stromkreis ${_wd.circuit}`);
-}
-
-// ═══════════════════════════════════════════════════
-//  KABELTRASSE — Zeichnen & Verwalten
-// ═══════════════════════════════════════════════════
-
-var _kt = {
-  drawing:      false,
-  dragStart:    null,
-  dragCur:      null,
-  halterung:    'wand',
-  zubehoer:     [],       // ['bogenL','bogenR','kreuz','t-stück','deckel','endstück']
-  selectedId:   null,
-};
-
-// ── Panel ──
-function openKTPanel() {
-  document.getElementById('ktPanel').style.display = 'block';
-  document.getElementById('ktStatus').textContent = 'Bereit — Trasse zeichnen klicken';
-  ktPreviewUpdate();
-}
-function closeKTPanel() {
-  document.getElementById('ktPanel').style.display = 'none';
-  ktStopDraw();
-}
-
-// ── Halterung wählen ──
-function ktSelHalterung(val, el) {
-  _kt.halterung = val;
-  document.querySelectorAll('#ktHalterungGrid .kt-acc-btn').forEach(b => b.classList.remove('sel'));
-  el.classList.add('sel');
-}
-
-// ── Zubehör togglen ──
-function ktToggleZub(val, el) {
-  el.classList.toggle('sel');
-  if (_kt.zubehoer.includes(val)) {
-    _kt.zubehoer = _kt.zubehoer.filter(z => z !== val);
-  } else {
-    _kt.zubehoer.push(val);
-  }
-}
-
-function ktPreviewUpdate() { /* live update if needed */ }
-
-// ── Zeichnen starten ──
-function ktStartDraw() {
-  _kt.drawing = true;
-  document.getElementById('ktDrawBanner').style.display = 'block';
-  document.getElementById('ktDrawBanner').textContent = '🔲 Kabeltrasse ziehen — Start → Ende';
-  document.getElementById('ktStatus').textContent = 'Auf Grundriss klicken + ziehen…';
-  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
-
-  const ov = document.getElementById('ktOverlayCanvas');
-  const wr = document.getElementById('canvas-wrap');
-  ov.width  = wr.clientWidth;
-  ov.height = wr.clientHeight;
-  ov.style.display = 'block';
-  ov.style.pointerEvents = 'auto';
-
-  if (ov._ktBound) return;
-  ov._ktBound = true;
-
-  function wp(e) {
-    const r   = ov.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return {
-      x: (src.clientX - r.left  - state.pan.x) / state.zoom,
-      y: (src.clientY - r.top   - state.pan.y) / state.zoom,
-    };
-  }
-
-  function onDown(e) {
-    if (!_kt.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    _kt.dragStart = wp(e);
-    _kt.dragCur   = wp(e);
-  }
-  function onMove(e) {
-    if (!_kt.drawing || !_kt.dragStart) return;
-    e.preventDefault(); e.stopPropagation();
-    _kt.dragCur = wp(e);
-    ktRedrawOverlay();
-  }
-  function onUp(e) {
-    if (!_kt.drawing || !_kt.dragStart) return;
-    e.preventDefault(); e.stopPropagation();
-    const src = e.changedTouches ? e.changedTouches[0] : e;
-    const r   = ov.getBoundingClientRect();
-    const end = {
-      x: (src.clientX - r.left  - state.pan.x) / state.zoom,
-      y: (src.clientY - r.top   - state.pan.y) / state.zoom,
-    };
-    const len = Math.hypot(end.x - _kt.dragStart.x, end.y - _kt.dragStart.y);
-    if (len > 10 / state.zoom) {
-      ktFinalize(_kt.dragStart, end);
-    }
-    _kt.dragStart = null; _kt.dragCur = null;
-    ktRedrawOverlay();
-  }
-  ov.addEventListener('mousedown',  onDown, {passive:false});
-  ov.addEventListener('mousemove',  onMove, {passive:false});
-  ov.addEventListener('mouseup',    onUp,   {passive:false});
-  ov.addEventListener('mouseleave', onUp,   {passive:false});
-  ov.addEventListener('touchstart', onDown, {passive:false});
-  ov.addEventListener('touchmove',  onMove, {passive:false});
-  ov.addEventListener('touchend',   onUp,   {passive:false});
-}
-
-function ktStopDraw() {
-  _kt.drawing = false;
-  _kt.dragStart = null; _kt.dragCur = null;
-  document.getElementById('ktDrawBanner').style.display = 'none';
-  document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
-  const ov = document.getElementById('ktOverlayCanvas');
-  if (ov) { ov.style.display='none'; ov.getContext('2d').clearRect(0,0,ov.width,ov.height); }
-}
-
-// ── Trasse finalisieren ──
-function ktFinalize(start, end) {
-  saveUndo();
-  const lenPx = Math.hypot(end.x-start.x, end.y-start.y);
-  const lenM  = state.scale ? lenPx / state.scale : lenPx / 50;
-  const label = document.getElementById('ktLabel').value || ('KT-'+(state.trassen.length+1));
-  const breite = parseInt(document.getElementById('ktBreite').value)||100;
-  const hoehe  = parseInt(document.getElementById('ktHoehe').value)||60;
-  const abst   = parseFloat(document.getElementById('ktHalterAbstand').value)||1.5;
-  const kpos   = document.getElementById('ktKabelPos').value||'links';
-
-  const kt = {
-    id:          gid(),
-    label,
-    points:      [ start, end ],
-    breite,
-    hoehe,
-    halterung:   _kt.halterung,
-    zubehoer:    [..._kt.zubehoer],
-    halterAbstand: abst,
-    kabelPos:    kpos,
-    laenge_m:    Math.round(lenM * 10) / 10,
-  };
-  state.trassen.push(kt);
-  _kt.selectedId = kt.id;
-
-  ktStopDraw();
-  render();
-  document.getElementById('ktStatus').textContent =
-    '✅ Trasse ' + label + ' — ' + kt.laenge_m + 'm — erneut klicken für weitere';
-  setStatus('✅ Kabeltrasse ' + label + ' platziert (' + kt.laenge_m + 'm)');
-}
-
-// ── Overlay zeichnen (während Drag) ──
-function ktRedrawOverlay() {
-  const ov = document.getElementById('ktOverlayCanvas');
-  if (!ov) return;
-  const oc = ov.getContext('2d');
-  oc.clearRect(0, 0, ov.width, ov.height);
-  if (!_kt.dragStart || !_kt.dragCur) return;
-  const breite = parseInt(document.getElementById('ktBreite').value)||100;
-  const hoehe  = parseInt(document.getElementById('ktHoehe').value)||60;
-
-  oc.save();
-  oc.setTransform(state.zoom, 0, 0, state.zoom, state.pan.x, state.pan.y);
-
-  // Linie ziehen
-  const A = _kt.dragStart, B = _kt.dragCur;
-  const dx = B.x-A.x, dy = B.y-A.y;
-  const len = Math.hypot(dx,dy);
-  if (len < 1) { oc.restore(); return; }
-
-  const nx = -dy/len, ny = dx/len;
-  const wPx = (breite/1000) * (state.scale||50);
-  const hPx = (hoehe/1000)  * (state.scale||50);
-  const w2 = Math.max(4/state.zoom, wPx/2);
-
-  // Trassenkörper
-  oc.beginPath();
-  oc.moveTo(A.x + nx*w2, A.y + ny*w2);
-  oc.lineTo(B.x + nx*w2, B.y + ny*w2);
-  oc.lineTo(B.x - nx*w2, B.y - ny*w2);
-  oc.lineTo(A.x - nx*w2, A.y - ny*w2);
-  oc.closePath();
-  oc.fillStyle   = 'rgba(88,166,255,.18)';
-  oc.strokeStyle = '#58a6ff';
-  oc.lineWidth   = 2/state.zoom;
-  oc.fill(); oc.stroke();
-
-  // Mittellinie (gestrichelt)
-  oc.strokeStyle = 'rgba(88,166,255,.5)';
-  oc.lineWidth   = 1/state.zoom;
-  oc.setLineDash([6/state.zoom, 4/state.zoom]);
-  oc.beginPath(); oc.moveTo(A.x,A.y); oc.lineTo(B.x,B.y); oc.stroke();
-  oc.setLineDash([]);
-
-  // Maß-Label
-  const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
-  if (state.scale) {
-    const m = (len/state.scale).toFixed(1);
-    oc.fillStyle = '#58a6ff';
-    oc.font = 'bold '+(12/state.zoom)+'px IBM Plex Mono,monospace';
-    oc.textAlign = 'center';
-    oc.fillText(m+'m  '+breite+'×'+hoehe+'mm', mx, my - w2 - 6/state.zoom);
-    oc.textAlign = 'left';
-  }
-
-  // Kabelausführungs-Pfeil
-  const kpos = document.getElementById('ktKabelPos').value||'links';
-  ktDrawKabelPfeil(oc, A, B, kpos);
-
-  oc.restore();
-}
-
-function ktDrawKabelPfeil(oc, A, B, kpos) {
-  // Pfeil am Startpunkt in Richtung kpos
-  const dx = B.x-A.x, dy = B.y-A.y;
-  const len = Math.hypot(dx,dy);
-  const tx = dx/len, ty = dy/len; // Trassenvektorrichtung
-  const nx = -ty, ny = tx;        // Normalvektor
-
-  let ax, ay;
-  const arrLen = 20/state.zoom;
-  if (kpos === 'links')  { ax = A.x - nx*arrLen; ay = A.y - ny*arrLen; }
-  else if (kpos === 'rechts') { ax = A.x + nx*arrLen; ay = A.y + ny*arrLen; }
-  else if (kpos === 'oben')   { ax = A.x; ay = A.y - arrLen; }
-  else                        { ax = A.x; ay = A.y + arrLen; }
-
-  oc.save();
-  oc.strokeStyle = '#f5a623'; oc.fillStyle = '#f5a623';
-  oc.lineWidth = 2/state.zoom;
-  oc.setLineDash([4/state.zoom,3/state.zoom]);
-  oc.beginPath(); oc.moveTo(A.x,A.y); oc.lineTo(ax,ay); oc.stroke();
-  oc.setLineDash([]);
-  // Pfeilspitze
-  const adx = ax-A.x, ady = ay-A.y;
-  const al  = Math.hypot(adx,ady)||1;
-  const adir = {x:adx/al, y:ady/al};
-  const arw = 5/state.zoom;
-  oc.beginPath();
-  oc.moveTo(ax, ay);
-  oc.lineTo(ax - adir.x*arw + adir.y*arw, ay - adir.y*arw - adir.x*arw);
-  oc.lineTo(ax - adir.x*arw - adir.y*arw, ay - adir.y*arw + adir.x*arw);
-  oc.closePath(); oc.fill();
-  oc.restore();
-}
-
-// ── Kabeltrassen auf Hauptcanvas zeichnen ──
-function drawTrassen() {
-  if (!state.trassen || !state.trassen.length) return;
-
-  for (const kt of state.trassen) {
-    if (!kt.points || kt.points.length < 2) continue;
-    const A = kt.points[0], B = kt.points[kt.points.length-1];
-    const dx = B.x-A.x, dy = B.y-A.y;
-    const len = Math.hypot(dx,dy);
-    if (len < 1) continue;
-    const nx = -dy/len, ny = dx/len;
-
-    const isSel = (_kt.selectedId === kt.id);
-    const wPx = state.scale
-      ? Math.max(4/state.zoom, (kt.breite/1000)*state.scale/2)
-      : Math.max(4/state.zoom, kt.breite/20/state.zoom);
-    const col = isSel ? '#f5a623' : '#58a6ff';
-
-    // Trassenkörper
-    ctx.beginPath();
-    ctx.moveTo(A.x + nx*wPx, A.y + ny*wPx);
-    ctx.lineTo(B.x + nx*wPx, B.y + ny*wPx);
-    ctx.lineTo(B.x - nx*wPx, B.y - ny*wPx);
-    ctx.lineTo(A.x - nx*wPx, A.y - ny*wPx);
-    ctx.closePath();
-    ctx.fillStyle   = isSel ? 'rgba(245,166,35,.15)' : 'rgba(88,166,255,.12)';
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = (isSel ? 2.5 : 1.8) / state.zoom;
-    ctx.fill(); ctx.stroke();
-
-    // Mittellinie
-    ctx.save();
-    ctx.strokeStyle = isSel ? 'rgba(245,166,35,.6)' : 'rgba(88,166,255,.4)';
-    ctx.lineWidth   = 1/state.zoom;
-    ctx.setLineDash([6/state.zoom, 4/state.zoom]);
-    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-
-    // Halterungen entlang der Trasse
-    const lenM   = kt.laenge_m || (state.scale ? len/state.scale : len/50);
-    const abst   = parseFloat(kt.halterAbstand||1.5);
-    const absPx  = state.scale ? abst*state.scale : abst*50;
-    const nHalt  = abst > 0 ? Math.ceil(len/absPx) : 0;
-    for (let i=0; i<nHalt; i++) {
-      const t   = (i+0.5) / nHalt;
-      const hx  = A.x + t*dx, hy  = A.y + t*dy;
-      // Halterungssymbol: kleines T
-      ctx.save();
-      ctx.strokeStyle = col; ctx.lineWidth = 1.5/state.zoom;
-      ctx.beginPath();
-      ctx.moveTo(hx - nx*wPx*1.2, hy - ny*wPx*1.2);
-      ctx.lineTo(hx + nx*wPx*1.2, hy + ny*wPx*1.2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(hx, hy, 2.5/state.zoom, 0, Math.PI*2);
-      ctx.fillStyle = col; ctx.fill();
-      ctx.restore();
-    }
-
-    // Bezeichnung
-    const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
-    ctx.save();
-    ctx.fillStyle = col;
-    ctx.font = 'bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      (kt.label||'KT') + '  ' + kt.breite + '×' + kt.hoehe + 'mm  ' + kt.laenge_m + 'm',
-      mx, my - wPx - 5/state.zoom
-    );
-    ctx.textAlign = 'left';
-    ctx.restore();
-
-    // Kabelausführungs-Pfeil (wie bei Symbolen)
-    ctx.save();
-    ctx.setTransform(state.zoom,0,0,state.zoom,state.pan.x,state.pan.y);
-    const tmpOc = { save:ctx.save.bind(ctx), restore:ctx.restore.bind(ctx),
-      strokeStyle:col, fillStyle:col, lineWidth:0, setLineDash:ctx.setLineDash.bind(ctx),
-      beginPath:ctx.beginPath.bind(ctx), moveTo:ctx.moveTo.bind(ctx), lineTo:ctx.lineTo.bind(ctx),
-      stroke:ctx.stroke.bind(ctx), fill:ctx.fill.bind(ctx), closePath:ctx.closePath.bind(ctx) };
-    ctx.restore();
-    // Draw inline
-    if (kt.kabelPos) {
-      const kp = kt.kabelPos;
-      const nrmX = nx, nrmY = ny;
-      const arrL  = 18/state.zoom;
-      const arW   = 5/state.zoom;
-      let pax=A.x, pay=A.y;
-      if      (kp==='links')  { pax = A.x - nrmX*arrL; pay = A.y - nrmY*arrL; }
-      else if (kp==='rechts') { pax = A.x + nrmX*arrL; pay = A.y + nrmY*arrL; }
-      else if (kp==='oben')   { pax = A.x; pay = A.y - arrL; }
-      else                    { pax = A.x; pay = A.y + arrL; }
-      const acol = isSel ? '#f5a623' : '#27ae60';
-      ctx.save();
-      ctx.strokeStyle = acol; ctx.fillStyle = acol;
-      ctx.lineWidth = 1.8/state.zoom;
-      ctx.setLineDash([3/state.zoom,2/state.zoom]);
-      ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(pax,pay); ctx.stroke();
-      ctx.setLineDash([]);
-      const adx2=pax-A.x, ady2=pay-A.y, al2=Math.hypot(adx2,ady2)||1;
-      const adir2={x:adx2/al2,y:ady2/al2};
-      ctx.beginPath();
-      ctx.moveTo(pax,pay);
-      ctx.lineTo(pax-adir2.x*arW+adir2.y*arW, pay-adir2.y*arW-adir2.x*arW);
-      ctx.lineTo(pax-adir2.x*arW-adir2.y*arW, pay-adir2.y*arW+adir2.x*arW);
-      ctx.closePath(); ctx.fill();
-      ctx.font = (7/state.zoom)+'px IBM Plex Mono,monospace';
-      ctx.fillStyle = acol; ctx.textAlign='center';
-      ctx.fillText('Einsp. '+kp, (A.x+pax)/2, (A.y+pay)/2 - 5/state.zoom);
-      ctx.textAlign='left';
-      ctx.restore();
-    }
-
-    // Zubehör-Symbole am Endpunkt
-    if (kt.zubehoer && kt.zubehoer.length) {
-      ctx.save();
-      const R = 8/state.zoom;
-      ctx.fillStyle = col; ctx.font = (8/state.zoom)+'px monospace';
-      ctx.textAlign = 'center';
-      kt.zubehoer.forEach((z,zi) => {
-        const icon = {bogenL:'↙',bogenR:'↘',kreuz:'✛','t-stück':'⊤',deckel:'▬',endstück:'|'}[z]||'?';
-        ctx.fillText(icon, B.x + (zi-kt.zubehoer.length/2+0.5)*14/state.zoom, B.y - wPx - 8/state.zoom);
-      });
-      ctx.textAlign='left';
-      ctx.restore();
-    }
-
-    // Klick-Selektion: Highlight-Rand
-    if (isSel) {
-      ctx.beginPath();
-      ctx.moveTo(A.x+nx*wPx, A.y+ny*wPx);
-      ctx.lineTo(B.x+nx*wPx, B.y+ny*wPx);
-      ctx.lineTo(B.x-nx*wPx, B.y-ny*wPx);
-      ctx.lineTo(A.x-nx*wPx, A.y-ny*wPx);
-      ctx.closePath();
-      ctx.strokeStyle='#f5a623'; ctx.lineWidth=3/state.zoom; ctx.stroke();
-    }
-  }
-}
-
-// ── Trasse anklicken (in onMouseDown integriert) ──
-function ktHitTest(wx, wy) {
-  if (!state.trassen) return null;
-  for (let i=state.trassen.length-1; i>=0; i--) {
-    const kt = state.trassen[i];
-    if (!kt.points||kt.points.length<2) continue;
-    const A=kt.points[0], B=kt.points[kt.points.length-1];
-    const dx=B.x-A.x, dy=B.y-A.y;
-    const len=Math.hypot(dx,dy);
-    if(len<1) continue;
-    // Projektion des Punktes auf Linie
-    const t=Math.max(0,Math.min(1,((wx-A.x)*dx+(wy-A.y)*dy)/(len*len)));
-    const px=A.x+t*dx, py=A.y+t*dy;
-    const dist=Math.hypot(wx-px,wy-py);
-    const wPx=state.scale?(kt.breite/1000)*state.scale/2+6/state.zoom:kt.breite/18/state.zoom;
-    if(dist<wPx+8/state.zoom) return kt;
-  }
-  return null;
-}
-
-function ktShowProps(kt) {
-  _kt.selectedId = kt.id;
-  const body = document.getElementById('rpBody');
-  if (!body) return;
-  const lenM = kt.laenge_m||0;
-  const abst = parseFloat(kt.halterAbstand||1.5);
-  const nHalt = abst>0 ? Math.ceil(lenM/abst) : 0;
-
-  const zubItems = ['bogenL','bogenR','kreuz','t-stück','deckel','endstück'];
-  const zubBtns = zubItems.map(z => {
-    const sel = (kt.zubehoer||[]).includes(z);
-    const icons = {bogenL:'↙ Bogen L',bogenR:'↘ Bogen R',kreuz:'✛ Kreuz','t-stück':'⊤ T-Stück',deckel:'▬ Deckel',endstück:'| Ende'};
-    return '<button class="btn bg" style="font-size:10px;'+(sel?'background:rgba(88,166,255,.2);border-color:#58a6ff;color:#58a6ff;':'')+'" '
-      +'onclick="ktToggleZubProp(\''+kt.id+'\',\''+z+'\',this)">'+icons[z]+'</button>';
-  }).join('');
-
-  body.innerHTML = '<div class="pg">'
-    +'<div class="pgt" style="color:#58a6ff">🔲 Kabeltrasse</div>'
-    +'<div class="rp-row"><label class="rp-lbl">Bezeichnung</label>'
-    +'<input class="rp-input" value="'+esc(kt.label||'')+'" oninput="ktUpdProp(\''+kt.id+'\',\'label\',this.value)"></div>'
-    +'<div class="rp-row"><label class="rp-lbl">Breite (mm)</label>'
-    +'<input class="rp-input" type="number" value="'+(kt.breite||100)+'" oninput="ktUpdProp(\''+kt.id+'\',\'breite\',+this.value)" style="width:80px"></div>'
-    +'<div class="rp-row"><label class="rp-lbl">Höhe / Tiefe (mm)</label>'
-    +'<input class="rp-input" type="number" value="'+(kt.hoehe||60)+'" oninput="ktUpdProp(\''+kt.id+'\',\'hoehe\',+this.value)" style="width:80px"></div>'
-    +'<div class="rp-row"><label class="rp-lbl">Halterungsart</label>'
-    +'<select class="rp-sel" onchange="ktUpdProp(\''+kt.id+'\',\'halterung\',this.value)">'
-    +['wand','decke','boden'].map(h=>'<option'+(h===kt.halterung?' selected':'')+'>'+h+'</option>').join('')
-    +'</select></div>'
-    +'<div class="rp-row"><label class="rp-lbl">Halterungsabstand (m)</label>'
-    +'<input class="rp-input" type="number" step="0.5" value="'+(kt.halterAbstand||1.5)+'" oninput="ktUpdProp(\''+kt.id+'\',\'halterAbstand\',+this.value)" style="width:70px"></div>'
-    +'<div class="rp-row"><label class="rp-lbl">Kabelausführung</label>'
-    +'<select class="rp-sel" onchange="ktUpdProp(\''+kt.id+'\',\'kabelPos\',this.value)">'
-    +['links','rechts','oben','unten'].map(p=>'<option'+(p===kt.kabelPos?' selected':'')+'>'+p+'</option>').join('')
-    +'</select></div>'
-    +'<div class="rp-divider"></div>'
-    +'<div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Zubehör</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'+zubBtns+'</div>'
-    +'<div class="rp-divider"></div>'
-    +'<div class="rp-stat">Länge: <span style="color:#58a6ff">'+lenM.toFixed(1)+' m</span></div>'
-    +'<div class="rp-stat">Halterungen: <span>'+nHalt+' Stk. (alle '+abst+'m)</span></div>'
-    +'<div class="rp-stat">Zubehör: <span>'+(kt.zubehoer&&kt.zubehoer.length?kt.zubehoer.join(', '):'—')+'</span></div>'
-    +'<div class="rp-divider"></div>'
-    +'<button class="btn" style="width:100%;background:var(--rd);color:white;font-size:11px" '
-    +'onclick="ktDelete(\''+kt.id+'\')">🗑 Trasse löschen</button>'
-    +'</div>';
-  render();
-}
-
-function ktUpdProp(id, key, val) {
-  const kt = state.trassen.find(k=>k.id===id);
-  if (!kt) return;
-  kt[key] = val; render();
-  ktShowProps(kt);
-}
-
-function ktToggleZubProp(id, zub, el) {
-  const kt = state.trassen.find(k=>k.id===id);
-  if (!kt) return;
-  if (!kt.zubehoer) kt.zubehoer=[];
-  if (kt.zubehoer.includes(zub)) kt.zubehoer=kt.zubehoer.filter(z=>z!==zub);
-  else kt.zubehoer.push(zub);
-  render();
-  ktShowProps(kt);
-}
-
-function ktDelete(id) {
-  saveUndo();
-  state.trassen = state.trassen.filter(k=>k.id!==id);
-  _kt.selectedId = null;
-  document.getElementById('rpBody').innerHTML = '<div style="color:var(--tx3);font-size:11px;text-align:center;padding:20px">Element auswählen</div>';
-  render();
-  setStatus('Kabeltrasse gelöscht');
-}
-
-// ═══════════════════════════════════════════════════
-//  DIN 18015-2 AUSSTATTUNGSSTUFEN
-// ═══════════════════════════════════════════════════
-
-const DIN_STUFEN = {
-  // [Stufe1_min, Stufe2_empf, Stufe3_komfort]
-  wohnzimmer: [
-    { icon:'🔌', name:'Steckdosen', s1:'3 Steckdosen (mind. 2 an je 2 Wänden)', s2:'6–8 Steckdosen', s3:'8–12 + USB, Doppel-Steckdosen', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtungsauslass', s1:'1 Deckenauslass', s2:'2–3 Auslässe', s3:'3–5 Auslässe + dimmbar', sym:'deckenleuchte' },
-    { icon:'📡', name:'Antenne/Sat', s1:'1 Antennenauslass', s2:'1 Antennen + 1 SAT', s3:'2 Antennen + 2 SAT + Kabel-TV', sym:'antennensteckdose' },
-    { icon:'🌐', name:'Datennetz', s1:'—', s2:'1 Netzwerkauslass', s3:'2 Netzwerk + WLAN-AP', sym:'datensteckdose' },
-    { icon:'🔘', name:'Schalter/Dimmer', s1:'1 Wechselschalter', s2:'Wechselschalter + Dimmer', s3:'Tasterdimmer / KNX', sym:'dimmer' },
-  ],
-  schlafzimmer: [
-    { icon:'🔌', name:'Steckdosen', s1:'2 Steckdosen (je 1 Seite Bett)', s2:'4–6 Steckdosen', s3:'6–8 + USB je Bettseite', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtungsauslass', s1:'1 Deckenauslass', s2:'2 Auslässe', s3:'3 Auslässe + Bettleseleuchte', sym:'deckenleuchte' },
-    { icon:'🌐', name:'Datennetz', s1:'—', s2:'1 Netzwerkauslass', s3:'2 Netzwerk + TV-Auslass', sym:'datensteckdose' },
-    { icon:'🔘', name:'Schalter', s1:'1 Schalter', s2:'Wechselschalter (Tür + Bett)', s3:'Tasterschalter je Bettseite', sym:'wechselschalter' },
-  ],
-  kueche: [
-    { icon:'🔌', name:'Arbeitssteckdosen', s1:'3 Steckdosen Arbeitsplatte', s2:'6 Steckdosen Arbeitsplatte', s3:'8+ Steckdosen + Einzelabsicherung', sym:'steckdose_1' },
-    { icon:'⚡', name:'Herd/Backofen', s1:'1× CEE 32A oder 3× 16A', s2:'1× CEE 32A dediziert', s3:'1× CEE 32A + Absicherung separat', sym:'backofen' },
-    { icon:'🔌', name:'Geschirrspüler', s1:'1 Schuko 16A', s2:'1 Schuko 16A abgesichert', s3:'Fest, FI-geschützt', sym:'geschirrspueler' },
-    { icon:'🔌', name:'Kühlschrank', s1:'1 Schuko 16A', s2:'1 Schuko 16A', s3:'Fest, eigener Stromkreis', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Deckenauslass', s2:'2 Auslässe (Decke + Arbeitsplatte)', s3:'3 Auslässe + Unterbaubeleuchtung', sym:'deckenleuchte' },
-    { icon:'🔌', name:'Dunstabzug', s1:'1 Schuko', s2:'1 Schuko abgesichert', s3:'Fest, eigener SK', sym:'steckdose_1' },
-  ],
-  bad: [
-    { icon:'🔌', name:'Steckdosen (IP44)', s1:'1 Schuko außerhalb Zone 1', s2:'2 Schuko Zone 3', s3:'3 Schuko + FI 30mA', sym:'steckdose_ip44' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Deckenauslass IP44', s2:'2 Auslässe (Spiegel + Decke)', s3:'3 Auslässe + Spiegelheizung', sym:'deckenleuchte' },
-    { icon:'🔌', name:'Waschmaschine', s1:'1 Schuko 16A (FI)', s2:'1 Schuko 16A (FI 30mA)', s3:'Fest + FI 30mA, eigener SK', sym:'waschmaschine' },
-    { icon:'⚡', name:'Boiler / Durchlauferhitzer', s1:'1 Zuleitung', s2:'Fest angeschlossen, 16–32A', s3:'Fest + Überwachung', sym:'boiler' },
-    { icon:'🔘', name:'Schalter (IP44)', s1:'1 Schalter außerhalb', s2:'2 Schalter (Tür + Spiegel)', s3:'Dimmer + Lüftersteuerung', sym:'ausschalter' },
-  ],
-  wc: [
-    { icon:'💡', name:'Beleuchtung', s1:'1 Deckenauslass', s2:'2 Auslässe', s3:'2 Auslässe + Nachtlicht', sym:'deckenleuchte' },
-    { icon:'🔘', name:'Schalter', s1:'1 Schalter', s2:'1 Schalter', s3:'Bewegungsmelder', sym:'bewegungsmelder_licht' },
-    { icon:'🔌', name:'Steckdose', s1:'—', s2:'1 Schuko (FI)', s3:'1 Schuko (FI 30mA)', sym:'steckdose_ip44' },
-  ],
-  flur: [
-    { icon:'🔌', name:'Steckdosen', s1:'1 Steckdose', s2:'2 Steckdosen', s3:'3 Steckdosen + USB', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass', s2:'2 Auslässe', s3:'3 Auslässe + dimmbar', sym:'deckenleuchte' },
-    { icon:'🔔', name:'Klingel/Türkommunikation', s1:'1 Klingeltaster', s2:'1 Klingel + Sprechanlage', s3:'Video-Türsprechanlage', sym:'klingel_taster' },
-    { icon:'🔘', name:'Schalter (Wechsel)', s1:'Wechselschalter', s2:'Wechsel- + Kreuzschalter', s3:'Bewegungsmelder / KNX', sym:'wechselschalter' },
-  ],
-  keller: [
-    { icon:'🔌', name:'Steckdosen', s1:'2 Steckdosen', s2:'4 Steckdosen', s3:'6 Steckdosen + CEE', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass je Raum', s2:'2 Auslässe', s3:'3 Auslässe + Bewegungsmelder', sym:'deckenleuchte' },
-    { icon:'⚡', name:'Heizung/Pumpe', s1:'Zuleitung Heizungsraum', s2:'2 Auslässe Heizung', s3:'Mess-, Steuer-, Regeltechnik', sym:'steckdose_1' },
-  ],
-  garage: [
-    { icon:'🔌', name:'Steckdosen', s1:'1 Schuko', s2:'2 Schuko + 1 CEE 16A', s3:'4 Schuko + CEE 32A + E-Auto', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass', s2:'2 Auslässe', s3:'3 Auslässe + Außenleuchte', sym:'deckenleuchte' },
-    { icon:'⚡', name:'E-Mobilität', s1:'—', s2:'Vorbereitung E-Auto (Leerrohr)', s3:'Wallbox 11kW (CEE 32A)', sym:'cee32' },
-  ],
-  buero: [
-    { icon:'🔌', name:'Steckdosen', s1:'3 Steckdosen', s2:'6 Steckdosen', s3:'8+ Steckdosen + USV-Vorbereitung', sym:'steckdose_1' },
-    { icon:'🌐', name:'Datennetz', s1:'1 Netzwerk', s2:'2–4 Netzwerk + Telefon', s3:'4+ Netzwerk + WLAN-AP', sym:'datensteckdose' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass', s2:'2 Auslässe + Stehleuchte', s3:'3 Auslässe + Arbeitsplatzbeleuchtung', sym:'deckenleuchte' },
-    { icon:'📡', name:'Antenne/TV', s1:'—', s2:'1 Antennenauslass', s3:'2 Antennen + Medienanlage', sym:'antennensteckdose' },
-  ],
-  kinderzimmer: [
-    { icon:'🔌', name:'Steckdosen', s1:'2 Steckdosen (kindergesichert)', s2:'4 Steckdosen', s3:'6 Steckdosen + USB', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Deckenauslass', s2:'2 Auslässe', s3:'3 Auslässe + Nachtlicht', sym:'deckenleuchte' },
-    { icon:'🌐', name:'Datennetz', s1:'—', s2:'1 Netzwerk', s3:'2 Netzwerk + WLAN-AP', sym:'datensteckdose' },
-    { icon:'🔘', name:'Schalter', s1:'1 Schalter (niedrig)', s2:'Wechselschalter', s3:'Dimmer / Fernbedienung', sym:'dimmer' },
-  ],
-  esszimmer: [
-    { icon:'🔌', name:'Steckdosen', s1:'2 Steckdosen', s2:'4 Steckdosen', s3:'6 Steckdosen + Bodensteckdose', sym:'steckdose_1' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass (über Tisch)', s2:'2 Auslässe', s3:'3 Auslässe + Pendelleuchte dimmbar', sym:'deckenleuchte' },
-    { icon:'🔘', name:'Dimmer', s1:'1 Schalter', s2:'1 Dimmer', s3:'2 Dimmer / KNX', sym:'dimmer' },
-  ],
-  hauswirtschaft: [
-    { icon:'🔌', name:'Steckdosen', s1:'2 Steckdosen', s2:'4 Steckdosen', s3:'6 Steckdosen', sym:'steckdose_1' },
-    { icon:'🔌', name:'Waschmaschine', s1:'1 Schuko 16A (FI)', s2:'1 Schuko FI + Trockner', s3:'Fest + FI + eigene SK', sym:'waschmaschine' },
-    { icon:'🔌', name:'Trockner', s1:'1 Schuko', s2:'1 Schuko 16A', s3:'Fest 16A oder CEE', sym:'trockner' },
-    { icon:'💡', name:'Beleuchtung', s1:'1 Auslass', s2:'2 Auslässe', s3:'3 Auslässe', sym:'deckenleuchte' },
-  ],
-};
-
-var _din = { stufe: 1, raum: 'wohnzimmer' };
-
-function openDINModal() {
-  document.getElementById('dinModal').classList.remove('hid');
-  // Mark Stufe 1 selected
-  document.querySelectorAll('.din-stufe-card').forEach(c2=>{
-    c2.classList.toggle('sel', parseInt(c2.dataset.s)===_din.stufe);
-  });
-  dinRenderListe();
-}
-
-function dinSelStufe(n, el) {
-  _din.stufe = n;
-  document.querySelectorAll('.din-stufe-card').forEach(c2=>c2.classList.remove('sel'));
-  el.classList.add('sel');
-  dinRenderListe();
-}
-
-function dinSelRaum(raum, el) {
-  _din.raum = raum;
-  document.querySelectorAll('.din-raum-tab').forEach(t=>t.classList.remove('sel'));
-  el.classList.add('sel');
-  dinRenderListe();
-}
-
-function dinRenderListe() {
-  const el  = document.getElementById('dinListe');
-  const items = DIN_STUFEN[_din.raum]||[];
-  const s   = _din.stufe;
-  const sKey = s===1?'s1':s===2?'s2':'s3';
-  const sLabel = s===1?'Stufe 1 (Mindest)':s===2?'Stufe 2 (Standard)':'Stufe 3 (Komfort)';
-
-  if (!items.length) { el.innerHTML='<div style="color:var(--tx3);padding:12px">Keine Daten für diesen Raum</div>'; return; }
-
-  el.innerHTML = '<div style="font-size:9px;font-weight:700;color:var(--gr);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">'+sLabel+' — '+_din.raum.charAt(0).toUpperCase()+_din.raum.slice(1)+'</div>'
-    + items.map(item => {
-      const txt = item[sKey]||'—';
-      const na = txt==='—';
-      return '<div class="din-item" style="'+(na?'opacity:.4':'')+'">'+
-        '<span class="din-item-icon">'+item.icon+'</span>'+
-        '<div class="din-item-body">'+
-          '<div class="din-item-name">'+esc(item.name)+'</div>'+
-          '<div class="din-item-detail">'+esc(txt)+'</div>'+
-        '</div>'+
-        '<span class="din-item-min">'+esc(txt.split(' ')[0])+'</span>'+
-      '</div>';
-    }).join('');
-}
-
-function dinPlaceInPalette() {
-  // Highlight passende Symbole in Palette — zeige Status
-  const items = (DIN_STUFEN[_din.raum]||[]).filter(i=>i[_din.stufe===1?'s1':_din.stufe===2?'s2':'s3']!=='—');
-  setStatus('📋 DIN 18015 ' + _din.raum + ' Stufe '+_din.stufe+' — '+items.length+' Positionen — Symbole aus Palette ziehen');
-  document.getElementById('dinModal').classList.add('hid');
-  // Filter Palette
-  const filterEl = document.getElementById('palSearch');
-  if (filterEl) { filterEl.value=''; buildPalette(); }
-}
-
-// ═══════════════════════════════════════════════════
-//  RAUM DEFINIEREN — Zeichnen auf Grundriss
-// ═══════════════════════════════════════════════════
-
-var _raum = {
-  mode:    'rect',   // rect | poly | free
-  color:   'rgba(88,166,255,.12)',
-  drawing: false,
-  rects:   [],       // state.raeume
-  // rect drag
-  dragStart: null, dragCur: null,
-  // poly points
-  polyPts: [],
-  // free path
-  freePath: [],
-};
-
-// state.raeume für Speicherung
-if (!state.raeume) state.raeume = [];
-
-function openRaumPanel() {
-  document.getElementById('raumPanel').style.display = 'block';
-}
-function closeRaumPanel() {
-  document.getElementById('raumPanel').style.display = 'none';
-  raumStopDraw();
-}
-
-function raumSelMode(mode, el) {
-  _raum.mode = mode;
-  document.querySelectorAll('#raumPanel .kt-acc-btn').forEach(b=>b.classList.remove('sel'));
-  el.classList.add('sel');
-}
-
-function raumSelCol(el) {
-  _raum.color = el.dataset.col;
-  document.querySelectorAll('.raum-col-btn').forEach(b=>b.style.border='2px solid var(--bd)');
-  el.style.border = '2px solid #3fb950';
-}
-
-function raumStartDraw() {
-  _raum.drawing  = true;
-  _raum.polyPts  = [];
-  _raum.freePath = [];
-  _raum.dragStart= null; _raum.dragCur = null;
-  document.getElementById('raumDrawBanner').style.display = 'block';
-  document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
-
-  const txt = _raum.mode==='rect'?'⬜ Viereck ziehen':
-              _raum.mode==='poly'?'⬜ Ecken klicken — Doppelklick zum Schließen':
-              '⬜ Freihand zeichnen — loslassen zum Schließen';
-  document.getElementById('raumDrawBanner').textContent = txt;
-  document.getElementById('raumStatus').textContent = txt;
-
-  const ov = document.getElementById('raumOverlayCanvas');
-  const wr = document.getElementById('canvas-wrap');
-  ov.width  = wr.clientWidth; ov.height = wr.clientHeight;
-  ov.style.display = 'block'; ov.style.pointerEvents = 'auto';
-
-  if (ov._raumBound) { raumRedraw(); return; }
-  ov._raumBound = true;
-
-  function wp(e){
-    const r=ov.getBoundingClientRect(), src=e.touches?e.touches[0]:e;
-    return{x:(src.clientX-r.left-state.pan.x)/state.zoom, y:(src.clientY-r.top-state.pan.y)/state.zoom};
-  }
-
-  // RECT
-  ov.addEventListener('mousedown', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'){ _raum.dragStart=p; _raum.dragCur=p; }
-    else if(_raum.mode==='free'){ _raum.freePath=[p]; }
-    else if(_raum.mode==='poly'){ _raum.polyPts.push(p); raumRedraw(); }
-  },{passive:false});
-
-  ov.addEventListener('mousemove', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart){ _raum.dragCur=p; raumRedraw(); }
-    else if(_raum.mode==='free'&&_raum.freePath.length){ _raum.freePath.push(p); raumRedraw(); }
-  },{passive:false});
-
-  ov.addEventListener('mouseup', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart){
-      raumFinalize('rect',[_raum.dragStart,p]);
-      _raum.dragStart=null; _raum.dragCur=null;
-    } else if(_raum.mode==='free'&&_raum.freePath.length>3){
-      raumFinalize('free',_raum.freePath);
-      _raum.freePath=[];
-    }
-    raumRedraw();
-  },{passive:false});
-
-  ov.addEventListener('dblclick', e=>{
-    if(!_raum.drawing||_raum.mode!=='poly') return;
-    e.preventDefault(); e.stopPropagation();
-    if(_raum.polyPts.length>=3){
-      raumFinalize('poly',_raum.polyPts);
-      _raum.polyPts=[];
-      raumRedraw();
-    }
-  },{passive:false});
-
-  // Touch
-  ov.addEventListener('touchstart', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect') _raum.dragStart=p;
-    else if(_raum.mode==='free') _raum.freePath=[p];
-    else _raum.polyPts.push(p);
-    raumRedraw();
-  },{passive:false});
-  ov.addEventListener('touchmove', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart) _raum.dragCur=p;
-    else if(_raum.mode==='free'&&_raum.freePath.length) _raum.freePath.push(p);
-    raumRedraw();
-  },{passive:false});
-  ov.addEventListener('touchend', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    if(_raum.mode==='rect'&&_raum.dragStart){
-      raumFinalize('rect',[_raum.dragStart,_raum.dragCur||_raum.dragStart]);
-      _raum.dragStart=null; _raum.dragCur=null;
-    } else if(_raum.mode==='free'&&_raum.freePath.length>3){
-      raumFinalize('free',_raum.freePath);
-      _raum.freePath=[];
-    }
-    raumRedraw();
-  },{passive:false});
-
-  raumRedraw();
-}
-
-function raumFinalize(type, pts) {
-  const name = document.getElementById('raumName').value||'Raum';
-  if(!state.raeume) state.raeume=[];
-  const r = { id:gid(), type, pts, name, color:_raum.color };
-  // Fläche berechnen
-  if(type==='rect'&&pts.length===2){
-    const w=Math.abs(pts[1].x-pts[0].x), h=Math.abs(pts[1].y-pts[0].y);
-    if(state.scale) r.flaeche = (w*h/(state.scale*state.scale)).toFixed(1);
-  }
-  state.raeume.push(r);
-  render();
-  document.getElementById('raumStatus').textContent = '✅ Raum "'+name+'" angelegt';
-  setStatus('✅ Raum "'+name+'" definiert');
-}
-
-function raumStopDraw() {
-  _raum.drawing=false; _raum.polyPts=[]; _raum.freePath=[]; _raum.dragStart=null; _raum.dragCur=null;
-  document.getElementById('raumDrawBanner').style.display='none';
-  document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
-  const ov=document.getElementById('raumOverlayCanvas');
-  if(ov){ov.style.display='none';ov.getContext('2d').clearRect(0,0,ov.width,ov.height);}
-}
-
-function raumUndoLast() {
-  if(!state.raeume||!state.raeume.length) return;
-  saveUndo();
-  state.raeume.pop();
-  render();
-  setStatus('Letzten Raum gelöscht');
-}
-
-function raumRedraw() {
-  const ov=document.getElementById('raumOverlayCanvas');
-  if(!ov) return;
-  const oc=ov.getContext('2d');
-  oc.clearRect(0,0,ov.width,ov.height);
-  if(!_raum.drawing&&!_raum.polyPts.length) return;
-  oc.save();
-  oc.setTransform(state.zoom,0,0,state.zoom,state.pan.x,state.pan.y);
-  oc.strokeStyle='#3fb950'; oc.lineWidth=2/state.zoom;
-  oc.fillStyle='rgba(63,185,80,.15)';
-
-  if(_raum.mode==='rect'&&_raum.dragStart&&_raum.dragCur){
-    const x1=Math.min(_raum.dragStart.x,_raum.dragCur.x), y1=Math.min(_raum.dragStart.y,_raum.dragCur.y);
-    const w=Math.abs(_raum.dragCur.x-_raum.dragStart.x), h=Math.abs(_raum.dragCur.y-_raum.dragStart.y);
-    oc.beginPath(); oc.rect(x1,y1,w,h); oc.fill(); oc.stroke();
-    if(state.scale){
-      const wm=(w/state.scale).toFixed(1), hm=(h/state.scale).toFixed(1);
-      oc.fillStyle='#3fb950'; oc.font='bold '+(12/state.zoom)+'px IBM Plex Mono,monospace'; oc.textAlign='center';
-      oc.fillText(wm+'m × '+hm+'m ='+(w/state.scale*h/state.scale).toFixed(1)+'m²', x1+w/2, y1+h/2);
-      oc.textAlign='left';
-    }
-  } else if(_raum.mode==='poly'&&_raum.polyPts.length){
-    oc.beginPath(); oc.moveTo(_raum.polyPts[0].x,_raum.polyPts[0].y);
-    _raum.polyPts.forEach(p=>oc.lineTo(p.x,p.y)); oc.stroke();
-    _raum.polyPts.forEach(p=>{oc.beginPath();oc.arc(p.x,p.y,4/state.zoom,0,Math.PI*2);oc.fillStyle='#3fb950';oc.fill();});
-  } else if(_raum.mode==='free'&&_raum.freePath.length>1){
-    oc.beginPath(); oc.moveTo(_raum.freePath[0].x,_raum.freePath[0].y);
-    _raum.freePath.forEach(p=>oc.lineTo(p.x,p.y)); oc.stroke();
-  }
-  oc.restore();
-}
-
-// ── Räume auf Hauptcanvas zeichnen (in drawBackground aufrufen) ──
-function drawRaeume() {
-  if(!state.raeume||!state.raeume.length) return;
-  for(const r of state.raeume){
-    if(!r.pts||!r.pts.length) continue;
-    ctx.save();
-    ctx.strokeStyle='rgba(63,185,80,.5)';
-    ctx.lineWidth=1.5/state.zoom;
-    ctx.setLineDash([4/state.zoom,3/state.zoom]);
-    ctx.fillStyle=r.color||'rgba(63,185,80,.08)';
-    if(r.type==='rect'&&r.pts.length===2){
-      const x1=Math.min(r.pts[0].x,r.pts[1].x), y1=Math.min(r.pts[0].y,r.pts[1].y);
-      const w=Math.abs(r.pts[1].x-r.pts[0].x), h=Math.abs(r.pts[1].y-r.pts[0].y);
-      ctx.beginPath(); ctx.rect(x1,y1,w,h); ctx.fill(); ctx.stroke();
-      // Label
-      ctx.setLineDash([]);
-      ctx.fillStyle='rgba(63,185,80,.8)'; ctx.font='bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';
-      ctx.textAlign='center';
-      ctx.fillText(r.name+(r.flaeche?' ('+r.flaeche+'m²)':''), x1+w/2, y1+h/2);
-      ctx.textAlign='left';
-    } else if(r.type==='poly'||r.type==='free'){
-      ctx.beginPath(); ctx.moveTo(r.pts[0].x,r.pts[0].y);
-      r.pts.forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      const cx=r.pts.reduce((a,p)=>a+p.x,0)/r.pts.length;
-      const cy=r.pts.reduce((a,p)=>a+p.y,0)/r.pts.length;
-      ctx.setLineDash([]);
-      ctx.fillStyle='rgba(63,185,80,.8)'; ctx.font='bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';
-      ctx.textAlign='center'; ctx.fillText(r.name, cx, cy); ctx.textAlign='left';
-    }
-    ctx.restore();
-  }
 }
 
 
