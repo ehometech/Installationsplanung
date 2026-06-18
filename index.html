@@ -490,6 +490,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf" style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
+      <button class="btn" style="background:rgba(241,196,15,.2);color:#f1c40f;border:1px solid rgba(241,196,15,.4);font-size:11px" onclick="openLVModal()" title="Beleuchtung gleichmäßig im Raum verteilen">💡 Beleuchtung verteilen</button>
       <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ac);border:1px solid rgba(245,166,35,.4);font-size:11px" onclick="openWDModal()" title="Symbole an Linie gleichmäßig verteilen">📐 An Linie verteilen</button>
     </div>
     <div id="canvas-wrap">
@@ -4094,7 +4095,6 @@ function drawSnapHint() {
   ctx.lineWidth = 2.5 / state.zoom;
   ctx.setLineDash([6/state.zoom, 4/state.zoom]);
   if (s.axis === 'h') {
-    // horizontale Wandlinie: kleine Markierungslinie um den Snap-Punkt
     ctx.beginPath();
     ctx.moveTo(s.x - 26/state.zoom, s.y);
     ctx.lineTo(s.x + 26/state.zoom, s.y);
@@ -5488,7 +5488,6 @@ function detectWallEdges(img) {
     }
 
     // Zeilen/Spalten mit auffällig hohem Dunkel-Anteil = wahrscheinlich Wandlinie.
-    // Schwelle relativ zum Durchschnitt, damit es auch bei hellen/dunklen Plänen funktioniert.
     const ROW_MIN_RATIO = 0.12; // mind. 12% der Zeile dunkel
     const COL_MIN_RATIO = 0.12;
 
@@ -5562,8 +5561,7 @@ function detectWallEdges(img) {
 }
 
 // Liefert für einen Punkt (Welt-Koordinaten) die nächste passende Wandkante zurück,
-// wenn sie innerhalb der Toleranz liegt — sonst null. Toleranz ist zoom-abhängig,
-// damit der Fang bei jedem Zoomlevel ungefähr gleich "fühlt" (in Bildschirmpixeln).
+// wenn sie innerhalb der Toleranz liegt — sonst null.
 function findNearestWallSnap(x, y) {
   if (!state.snapEnabled || !wallEdgesReady) return null;
   const TOL = 14 / state.zoom; // Toleranz in Welt-Koordinaten
@@ -5708,12 +5706,10 @@ function zFit() {
 // ═══════════════════════════════════════════════════
 //  ÄNDERUNGSHISTORIE (erweitertes Undo mit Zeitsprung)
 // ═══════════════════════════════════════════════════
-// state.undoStack enthält jetzt vollständige History-Einträge:
+// state.undoStack enthält vollständige History-Einträge:
 // { ts: timestamp, label: string, snapshot: {symbols, wires, raeume} }
 // Statt destruktiv zu poppen, springt undoAction() einen Eintrag zurück und
 // jumpToHistoryEntry(idx) erlaubt den direkten Sprung zu jedem beliebigen Punkt.
-// Der "aktuelle" Stand wird beim allerersten saveUndo()-Aufruf nach Laden/Reset
-// implizit als Eintrag 0 ("Ausgangszustand") mitgeführt.
 let historyCursor = -1; // Index im undoStack, auf dem wir uns gerade befinden (-1 = aktuellster/Live-Stand)
 
 function saveUndo(label) {
