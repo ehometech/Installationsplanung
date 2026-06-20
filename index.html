@@ -742,25 +742,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <!-- RAUM Banner -->
       <div id="raumDrawBanner" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(63,185,80,.95);color:#000;font-weight:700;font-size:12px;padding:9px 22px;border-radius:24px;z-index:134;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4)">⬜ Raum zeichnen…</div>
       <!-- RAUM Panel (rechts, unter LV) -->
-      <div id="raumPanel" style="position:absolute;top:12px;left:300px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:250px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
+      <div id="raumPanel" style="position:absolute;top:12px;left:300px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:230px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
         <h4 style="font-size:13px;font-weight:700;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:7px">⬜ Raum definieren
           <button onclick="closeRaumPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
         </h4>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px">
-          <div class="kt-acc-btn sel" id="raumModeRect" onclick="raumSelMode('rect',this)" title="Viereck ziehen">
-            <svg width="28" height="28" viewBox="0 0 28 28"><rect x="4" y="6" width="20" height="16" rx="2" stroke="#3fb950" stroke-width="2" fill="none"/></svg>
-            <span>Viereck</span>
-          </div>
-          <div class="kt-acc-btn" id="raumModePoly" onclick="raumSelMode('poly',this)" title="Polygon klicken">
-            <svg width="28" height="28" viewBox="0 0 28 28"><polygon points="14,4 26,14 20,24 8,24 2,14" stroke="#3fb950" stroke-width="2" fill="none"/></svg>
-            <span>Polygon</span>
-          </div>
-          <div class="kt-acc-btn" id="raumModeFree" onclick="raumSelMode('free',this)" title="Freihand zeichnen">
-            <svg width="28" height="28" viewBox="0 0 28 28"><path d="M4 20 Q8 8 14 12 Q20 16 24 6" stroke="#3fb950" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-            <span>Freihand</span>
-          </div>
-        </div>
-        <div class="kt-field"><label>Raumname</label><input type="text" id="raumName" value="Wohnzimmer" placeholder="z.B. Küche"></div>
         <div class="kt-field"><label>Farbe</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap" id="raumColorPicker">
             <div class="raum-col-btn" data-col="rgba(88,166,255,.12)" onclick="raumSelCol(this)" style="background:rgba(88,166,255,.3);border:2px solid #58a6ff;width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
@@ -771,12 +756,23 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
             <div class="raum-col-btn" data-col="rgba(200,200,200,.15)"onclick="raumSelCol(this)" style="background:rgba(200,200,200,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
           </div>
         </div>
-        <div style="display:flex;gap:5px;margin-top:8px">
-          <button class="btn ba" style="flex:1;font-size:11px" id="raumStartBtn" onclick="raumStartDraw()">✏ Zeichnen</button>
+        <div style="display:flex;gap:5px;margin-top:10px">
+          <button class="btn ba" style="flex:1;font-size:11px" id="raumStartBtn" onclick="raumStartDraw()">✏ Punkte setzen</button>
           <button class="btn bg" style="font-size:11px" onclick="raumUndoLast()">↩</button>
         </div>
-        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:5px" id="raumStatus">Modus wählen, dann zeichnen</div>
+        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:5px" id="raumStatus">Ecken anklicken, Doppelklick zum Schließen</div>
       </div>
+
+      <!-- Raum-Namenseingabe: erscheint nach Schließen des Polygons -->
+      <div id="raumNamePanel" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:130;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,.6);min-width:260px">
+        <div style="font-size:11px;font-weight:700;color:#3fb950;margin-bottom:8px">⬜ Raum benennen</div>
+        <input class="rp-input" id="raumNameInput" placeholder="z.B. Wohnzimmer" style="margin-bottom:8px;width:100%;box-sizing:border-box">
+        <div style="display:flex;gap:6px">
+          <button class="btn ba" style="flex:1" onclick="confirmRaumName()">✓ Raum speichern</button>
+          <button class="btn bg" onclick="cancelRaumNaming()">Abbrechen</button>
+        </div>
+      </div>
+
 
       <!-- LV: Hinweis-Banner oben -->
       <div id="lvDrawBanner">💡 Linie 1 ziehen — Raumbreite</div>
@@ -4225,7 +4221,8 @@ function hitTest(x, y) {
   const R = 22;
   for (let i=state.symbols.length-1; i>=0; i--) {
     const s = state.symbols[i];
-    if (Math.hypot(x-s.x,y-s.y) < R/state.zoom*1.2) return s;
+    const r = R * (s.size || 1);
+    if (Math.hypot(x-s.x,y-s.y) < r/state.zoom*1.2) return s;
   }
   return null;
 }
@@ -4721,10 +4718,11 @@ function deleteSelectedWire() {
 }
 
 function drawSymbols() {
-  const SZ = 36; // symbol size in world coords
+  const SZ_BASE = 36; // symbol size in world coords (bei size=1)
   for (const sym of state.symbols) {
     const def = SYMBOLS[sym.type];
     if (!def) continue;
+    const SZ = SZ_BASE * (sym.size || 1);
     const sel = sym.id === state.selectedId;
     ctx.save();
     ctx.translate(sym.x, sym.y);
@@ -4825,18 +4823,21 @@ function drawSymbols() {
 // Offscreen symbol canvas cache
 // symCache already declared above
 function getSymbolCanvas(type, def, sz) {
+  // Fixe, hohe Basisauflösung cachen — Skalierung auf die Ziel-SZ erfolgt beim Zeichnen via drawImage.
+  // So bleiben unterschiedliche Symbolgrößen (sym.size) für denselben Typ scharf, ohne mehrfach zu cachen.
+  const BASE = 72;
   if (symCache[type]) return symCache[type];
-  const oc = new OffscreenCanvas(sz, sz);
+  const oc = new OffscreenCanvas(BASE, BASE);
   const oc2 = oc.getContext('2d');
 
   if (def.imgData) {
     // Image-based custom symbol
     const img = new Image();
     img.onload = () => {
-      oc2.clearRect(0, 0, sz, sz);
-      const scale = Math.min(sz/img.width, sz/img.height);
+      oc2.clearRect(0, 0, BASE, BASE);
+      const scale = Math.min(BASE/img.width, BASE/img.height);
       const w2 = img.width*scale, h2 = img.height*scale;
-      oc2.drawImage(img, (sz-w2)/2, (sz-h2)/2, w2, h2);
+      oc2.drawImage(img, (BASE-w2)/2, (BASE-h2)/2, w2, h2);
     };
     img.src = def.imgData;
   } else {
@@ -4844,7 +4845,7 @@ function getSymbolCanvas(type, def, sz) {
     const blob = new Blob([`<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="color:${def.color}">${def.svg}</svg>`], {type:'image/svg+xml'});
     const url = URL.createObjectURL(blob);
     const img = new Image();
-    img.onload = () => { oc2.drawImage(img,0,0,sz,sz); URL.revokeObjectURL(url); };
+    img.onload = () => { oc2.drawImage(img,0,0,BASE,BASE); URL.revokeObjectURL(url); };
     img.src = url;
   }
 
@@ -4886,6 +4887,13 @@ function renderProps(sym) {
       ` : ''}
       <div class="rp-row"><label class="rp-lbl">Drehung (°)</label>
         <input class="rp-input" type="number" value="${sym.rotation||0}" step="15" oninput="updSym('${sym.id}','rotation',+this.value);render()"></div>
+      <div class="rp-row"><label class="rp-lbl">Symbolgröße — <span style="color:var(--ac)" id="symSizeVal-${sym.id}">${Math.round((sym.size||1)*100)}%</span></label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="range" min="0.5" max="2.5" step="0.1" value="${sym.size||1}"
+            style="flex:1"
+            oninput="document.getElementById('symSizeVal-${sym.id}').textContent=Math.round(this.value*100)+'%'; updSym('${sym.id}','size',+this.value)">
+          <button class="btn bg" style="font-size:9px;padding:3px 6px" onclick="updSym('${sym.id}','size',1);renderProps(state.symbols.find(s=>s.id==='${sym.id}'))" title="Zurücksetzen">↺</button>
+        </div></div>
       <div class="rp-row"><label class="rp-lbl">Anzahl</label>
         <input class="rp-input" type="number" value="${sym.count||1}" min="1" oninput="updSym('${sym.id}','count',+this.value)"></div>
       <div class="rp-row"><label class="rp-lbl">Kommentar</label>
@@ -8141,16 +8149,10 @@ function dinPlaceInPalette() {
 // ═══════════════════════════════════════════════════
 
 var _raum = {
-  mode:    'rect',   // rect | poly | free
   color:   'rgba(88,166,255,.12)',
   drawing: false,
-  rects:   [],       // state.raeume
-  // rect drag
-  dragStart: null, dragCur: null,
   // poly points
   polyPts: [],
-  // free path
-  freePath: [],
 };
 
 // state.raeume für Speicherung
@@ -8164,12 +8166,6 @@ function closeRaumPanel() {
   raumStopDraw();
 }
 
-function raumSelMode(mode, el) {
-  _raum.mode = mode;
-  document.querySelectorAll('#raumPanel .kt-acc-btn').forEach(b=>b.classList.remove('sel'));
-  el.classList.add('sel');
-}
-
 function raumSelCol(el) {
   _raum.color = el.dataset.col;
   document.querySelectorAll('.raum-col-btn').forEach(b=>b.style.border='2px solid var(--bd)');
@@ -8177,16 +8173,12 @@ function raumSelCol(el) {
 }
 
 function raumStartDraw() {
-  _raum.drawing  = true;
-  _raum.polyPts  = [];
-  _raum.freePath = [];
-  _raum.dragStart= null; _raum.dragCur = null;
+  _raum.drawing = true;
+  _raum.polyPts = [];
   document.getElementById('raumDrawBanner').style.display = 'block';
   document.getElementById('canvas-wrap').classList.add('lv-draw-mode');
 
-  const txt = _raum.mode==='rect'?'⬜ Viereck ziehen':
-              _raum.mode==='poly'?'⬜ Ecken klicken — Doppelklick zum Schließen':
-              '⬜ Freihand zeichnen — loslassen zum Schließen';
+  const txt = '⬜ Ecken anklicken — Doppelklick oder ersten Punkt erneut anklicken zum Schließen';
   document.getElementById('raumDrawBanner').textContent = txt;
   document.getElementById('raumStatus').textContent = txt;
 
@@ -8203,46 +8195,28 @@ function raumStartDraw() {
     return{x:(src.clientX-r.left-state.pan.x)/state.zoom, y:(src.clientY-r.top-state.pan.y)/state.zoom};
   }
 
-  // RECT
+  function tryCloseAtPoint(p) {
+    if (_raum.polyPts.length >= 3) {
+      const p0 = _raum.polyPts[0];
+      const distToFirst = Math.hypot(p.x - p0.x, p.y - p0.y) * state.zoom;
+      if (distToFirst <= 12) { raumFinishPoly(); return true; }
+    }
+    return false;
+  }
+
   ov.addEventListener('mousedown', e=>{
     if(!_raum.drawing) return;
     e.preventDefault(); e.stopPropagation();
     const p=wp(e);
-    if(_raum.mode==='rect'){ _raum.dragStart=p; _raum.dragCur=p; }
-    else if(_raum.mode==='free'){ _raum.freePath=[p]; }
-    else if(_raum.mode==='poly'){ _raum.polyPts.push(p); raumRedraw(); }
-  },{passive:false});
-
-  ov.addEventListener('mousemove', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart){ _raum.dragCur=p; raumRedraw(); }
-    else if(_raum.mode==='free'&&_raum.freePath.length){ _raum.freePath.push(p); raumRedraw(); }
-  },{passive:false});
-
-  ov.addEventListener('mouseup', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart){
-      raumFinalize('rect',[_raum.dragStart,p]);
-      _raum.dragStart=null; _raum.dragCur=null;
-    } else if(_raum.mode==='free'&&_raum.freePath.length>3){
-      raumFinalize('free',_raum.freePath);
-      _raum.freePath=[];
-    }
+    if (tryCloseAtPoint(p)) return;
+    _raum.polyPts.push(p);
     raumRedraw();
   },{passive:false});
 
   ov.addEventListener('dblclick', e=>{
-    if(!_raum.drawing||_raum.mode!=='poly') return;
+    if(!_raum.drawing) return;
     e.preventDefault(); e.stopPropagation();
-    if(_raum.polyPts.length>=3){
-      raumFinalize('poly',_raum.polyPts);
-      _raum.polyPts=[];
-      raumRedraw();
-    }
+    if(_raum.polyPts.length>=3){ raumFinishPoly(); }
   },{passive:false});
 
   // Touch
@@ -8250,52 +8224,51 @@ function raumStartDraw() {
     if(!_raum.drawing) return;
     e.preventDefault(); e.stopPropagation();
     const p=wp(e);
-    if(_raum.mode==='rect') _raum.dragStart=p;
-    else if(_raum.mode==='free') _raum.freePath=[p];
-    else _raum.polyPts.push(p);
-    raumRedraw();
-  },{passive:false});
-  ov.addEventListener('touchmove', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    const p=wp(e);
-    if(_raum.mode==='rect'&&_raum.dragStart) _raum.dragCur=p;
-    else if(_raum.mode==='free'&&_raum.freePath.length) _raum.freePath.push(p);
-    raumRedraw();
-  },{passive:false});
-  ov.addEventListener('touchend', e=>{
-    if(!_raum.drawing) return;
-    e.preventDefault(); e.stopPropagation();
-    if(_raum.mode==='rect'&&_raum.dragStart){
-      raumFinalize('rect',[_raum.dragStart,_raum.dragCur||_raum.dragStart]);
-      _raum.dragStart=null; _raum.dragCur=null;
-    } else if(_raum.mode==='free'&&_raum.freePath.length>3){
-      raumFinalize('free',_raum.freePath);
-      _raum.freePath=[];
-    }
+    if (tryCloseAtPoint(p)) return;
+    _raum.polyPts.push(p);
     raumRedraw();
   },{passive:false});
 
   raumRedraw();
 }
 
-function raumFinalize(type, pts) {
-  const name = document.getElementById('raumName').value||'Raum';
-  if(!state.raeume) state.raeume=[];
-  const r = { id:gid(), type, pts, name, color:_raum.color };
-  // Fläche berechnen
-  if(type==='rect'&&pts.length===2){
-    const w=Math.abs(pts[1].x-pts[0].x), h=Math.abs(pts[1].y-pts[0].y);
-    if(state.scale) r.flaeche = (w*h/(state.scale*state.scale)).toFixed(1);
+// Polygon ist fertig geklickt (Schließen per Doppelklick / Erstpunkt-Klick) →
+// Zeichnen pausieren und Namenseingabe-Panel einblenden
+function raumFinishPoly() {
+  if (_raum.polyPts.length < 3) {
+    setStatus('Mindestens 3 Punkte nötig, um einen Raum zu definieren');
+    return;
   }
+  document.getElementById('raumDrawBanner').style.display = 'none';
+  document.getElementById('raumNamePanel').style.display = 'block';
+  const input = document.getElementById('raumNameInput');
+  input.value = '';
+  input.focus();
+}
+
+// Name bestätigt → Raum endgültig speichern
+function confirmRaumName() {
+  const name = (document.getElementById('raumNameInput').value || '').trim() || 'Raum ' + (state.raeume.length + 1);
+  if (!state.raeume) state.raeume = [];
+  const r = { id: gid(), type: 'poly', pts: _raum.polyPts.slice(), name, color: _raum.color };
   state.raeume.push(r);
+  saveUndo();
   render();
+  document.getElementById('raumNamePanel').style.display = 'none';
   document.getElementById('raumStatus').textContent = '✅ Raum "'+name+'" angelegt';
   setStatus('✅ Raum "'+name+'" definiert');
+  raumStopDraw();
+}
+
+// Namenseingabe abgebrochen → Punkte verwerfen, zurück zum Zeichnen-Panel
+function cancelRaumNaming() {
+  document.getElementById('raumNamePanel').style.display = 'none';
+  _raum.polyPts = [];
+  raumStopDraw();
 }
 
 function raumStopDraw() {
-  _raum.drawing=false; _raum.polyPts=[]; _raum.freePath=[]; _raum.dragStart=null; _raum.dragCur=null;
+  _raum.drawing = false; _raum.polyPts = [];
   document.getElementById('raumDrawBanner').style.display='none';
   document.getElementById('canvas-wrap').classList.remove('lv-draw-mode');
   const ov=document.getElementById('raumOverlayCanvas');
@@ -8321,23 +8294,15 @@ function raumRedraw() {
   oc.strokeStyle='#3fb950'; oc.lineWidth=2/state.zoom;
   oc.fillStyle='rgba(63,185,80,.15)';
 
-  if(_raum.mode==='rect'&&_raum.dragStart&&_raum.dragCur){
-    const x1=Math.min(_raum.dragStart.x,_raum.dragCur.x), y1=Math.min(_raum.dragStart.y,_raum.dragCur.y);
-    const w=Math.abs(_raum.dragCur.x-_raum.dragStart.x), h=Math.abs(_raum.dragCur.y-_raum.dragStart.y);
-    oc.beginPath(); oc.rect(x1,y1,w,h); oc.fill(); oc.stroke();
-    if(state.scale){
-      const wm=(w/state.scale).toFixed(1), hm=(h/state.scale).toFixed(1);
-      oc.fillStyle='#3fb950'; oc.font='bold '+(12/state.zoom)+'px IBM Plex Mono,monospace'; oc.textAlign='center';
-      oc.fillText(wm+'m × '+hm+'m ='+(w/state.scale*h/state.scale).toFixed(1)+'m²', x1+w/2, y1+h/2);
-      oc.textAlign='left';
-    }
-  } else if(_raum.mode==='poly'&&_raum.polyPts.length){
+  if(_raum.polyPts.length){
     oc.beginPath(); oc.moveTo(_raum.polyPts[0].x,_raum.polyPts[0].y);
     _raum.polyPts.forEach(p=>oc.lineTo(p.x,p.y)); oc.stroke();
     _raum.polyPts.forEach(p=>{oc.beginPath();oc.arc(p.x,p.y,4/state.zoom,0,Math.PI*2);oc.fillStyle='#3fb950';oc.fill();});
-  } else if(_raum.mode==='free'&&_raum.freePath.length>1){
-    oc.beginPath(); oc.moveTo(_raum.freePath[0].x,_raum.freePath[0].y);
-    _raum.freePath.forEach(p=>oc.lineTo(p.x,p.y)); oc.stroke();
+    // Ersten Punkt hervorheben (Klick-Ziel zum Schließen)
+    if (_raum.polyPts.length>=3) {
+      oc.strokeStyle='rgba(63,185,80,.6)'; oc.lineWidth=1.5/state.zoom;
+      oc.beginPath(); oc.arc(_raum.polyPts[0].x,_raum.polyPts[0].y,10/state.zoom,0,Math.PI*2); oc.stroke();
+    }
   }
   oc.restore();
 }
