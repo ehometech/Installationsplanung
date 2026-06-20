@@ -4851,16 +4851,12 @@ function drawSymbols() {
       ctx.fill();
       ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 1.5/state.zoom; ctx.stroke();
     }
-    // Shadow
-    ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=6/state.zoom;
-    // White circle background
-    ctx.beginPath(); ctx.arc(0,0,SZ/2,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,.97)'; ctx.fill();
-    ctx.shadowBlur=0;
-    ctx.strokeStyle=def.color; ctx.lineWidth=1.5/state.zoom; ctx.stroke();
+    // Shadow (direkt unter dem Symbol, ohne Kreis-Hintergrund)
+    ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=4/state.zoom;
     // Draw SVG via offscreen
     const offsc = getSymbolCanvas(sym.type, def, SZ);
     ctx.drawImage(offsc, -SZ/2, -SZ/2, SZ, SZ);
+    ctx.shadowBlur=0;
     // Label below
     ctx.font=`bold ${9/state.zoom}px IBM Plex Sans,sans-serif`;
     ctx.fillStyle = sel ? '#f5a623' : '#1a1a2e';
