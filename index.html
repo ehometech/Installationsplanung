@@ -2075,6 +2075,12 @@ let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
 const gid = () => 'e' + (nid++);
 
+// ── Symbol-Drehung per Dreh-Griff ──
+const ROTATE_HANDLE_OFFSET = 22; // Abstand des Griffs vom Symbolrand, in Bildschirm-px
+const ROTATE_HANDLE_RADIUS = 6;  // Klickradius des Griffs, in Bildschirm-px
+let rotatingId = null; // id des Symbols, das gerade per Griff gedreht wird (null = keins)
+
+
 
 // ═══════════════════════════════════════════════════
 //  CUSTOM SYMBOL MANAGER
@@ -3602,6 +3608,17 @@ function setupEvents() {
   canvas.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('dblclick', onDblClick);
+  // Absicherung: falls die Maus beim Drehen den Canvas verlässt und außerhalb losgelassen wird
+  window.addEventListener('mouseup', () => {
+    if (rotatingId) {
+      const sym = state.symbols.find(s => s.id === rotatingId);
+      if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
+      rotatingId = null;
+      canvas.style.cursor = 'default';
+      render();
+      renderProps(sym);
+    }
+  });
   canvas.addEventListener('contextmenu', e => {
     e.preventDefault();
     const pt = clientToCanvas(e.clientX, e.clientY);
@@ -3699,6 +3716,16 @@ function onMouseDown(e) {
     render(); return;
   }
 
+  // ── Priority 3b: Dreh-Griff am ausgewählten Symbol ──
+  const rotHit = hitTestRotateHandle(pt.x, pt.y);
+  if (rotHit) {
+    saveUndo();
+    rotatingId = rotHit.id;
+    canvas.style.cursor = 'grabbing';
+    render();
+    return;
+  }
+
   // ── Priority 4: Symbol hit ──
   const hit = hitTest(pt.x, pt.y);
   if (hit) {
@@ -3754,6 +3781,21 @@ function onMouseMove(e) {
     }
     render(); return;
   }
+  // ── Symbol-Drehung per Griff ──
+  if (rotatingId) {
+    cancelLongPress();
+    const sym = state.symbols.find(s => s.id === rotatingId);
+    if (sym) {
+      // Winkel vom Symbol-Zentrum zum Cursor, +90° weil "oben" (-90°) der Null-Punkt des Griffs ist
+      let ang = Math.atan2(pt.y - sym.y, pt.x - sym.x) * 180/Math.PI + 90;
+      if (e.shiftKey) ang = Math.round(ang / 15) * 15; // Einrasten alle 15° bei gedrückter Umschalttaste
+      ang = ((ang % 360) + 360) % 360; // auf 0–360° normalisieren
+      sym.rotation = ang;
+      render();
+      renderProps(sym);
+    }
+    return;
+  }
   if (state.dragging) {
     cancelLongPress();
     const sym = state.symbols.find(s => s.id === state.dragging.id);
@@ -3793,10 +3835,23 @@ function onMouseMove(e) {
     renderCalPreview(pt);
   }
   // Hover cursor
-  canvas.style.cursor = hitTest(pt.x, pt.y) ? 'pointer' : (state.tool==='wire'?'crosshair':'default');
+  if (hitTestRotateHandle(pt.x, pt.y)) {
+    canvas.style.cursor = 'grab';
+  } else {
+    canvas.style.cursor = hitTest(pt.x, pt.y) ? 'pointer' : (state.tool==='wire'?'crosshair':'default');
+  }
 }
 function onMouseUp(e) {
   cancelLongPress();
+  if (rotatingId) {
+    const sym = state.symbols.find(s => s.id === rotatingId);
+    if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
+    rotatingId = null;
+    canvas.style.cursor = 'default';
+    render();
+    renderProps(sym);
+    return;
+  }
   if (_wireActive) {
     const pt = clientToCanvas(e.clientX, e.clientY);
     endWireDraw(pt);
@@ -3888,6 +3943,14 @@ function onTouchStart(e) {
       }
       render(); return;
     }
+    // Dreh-Griff am ausgewählten Symbol
+    const rotHitT = hitTestRotateHandle(pt.x, pt.y);
+    if (rotHitT) {
+      saveUndo();
+      rotatingId = rotHitT.id;
+      render();
+      return;
+    }
     const hit = hitTest(pt.x, pt.y);
     if (hit) {
       selectSymbol(hit.id);
@@ -3946,6 +4009,18 @@ function onTouchMoveCanvas(e) {
       }
       render(); return;
     }
+    if (rotatingId) {
+      cancelLongPress();
+      const sym = state.symbols.find(s => s.id === rotatingId);
+      if (sym) {
+        let ang = Math.atan2(pt.y - sym.y, pt.x - sym.x) * 180/Math.PI + 90;
+        ang = ((ang % 360) + 360) % 360;
+        sym.rotation = ang;
+        render();
+        renderProps(sym);
+      }
+      return;
+    }
     if (state.dragging) {
       cancelLongPress();
       const sym = state.symbols.find(s => s.id === state.dragging.id);
@@ -3965,6 +4040,14 @@ function onTouchMoveCanvas(e) {
 }
 function onTouchEndCanvas(e) {
   cancelLongPress();
+  if (rotatingId) {
+    const sym = state.symbols.find(s => s.id === rotatingId);
+    if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
+    rotatingId = null;
+    render();
+    renderProps(sym);
+    return;
+  }
   if (_wireActive) {
     const t = e.changedTouches[0];
     if (t) endWireDraw(clientToCanvas(t.clientX, t.clientY));
@@ -4226,6 +4309,28 @@ function hitTest(x, y) {
   }
   return null;
 }
+
+// Berechnet die Weltkoordinate des Dreh-Griffs für ein Symbol (berücksichtigt
+// dessen aktuelle Größe und Rotation — der Griff sitzt immer "oben" relativ zum Symbol).
+function rotateHandlePos(sym) {
+  const SZ_BASE = 36;
+  const SZ = SZ_BASE * (sym.size || 1);
+  const dist = SZ/2 + ROTATE_HANDLE_OFFSET/state.zoom;
+  const ang = ((sym.rotation||0) - 90) * Math.PI/180; // -90: "oben" ist Standard-Null-Richtung
+  return { x: sym.x + Math.cos(ang)*dist, y: sym.y + Math.sin(ang)*dist };
+}
+
+// Prüft ob ein Weltpunkt nah genug am Dreh-Griff des aktuell ausgewählten Symbols liegt
+function hitTestRotateHandle(x, y) {
+  if (!state.selectedId) return null;
+  const sym = state.symbols.find(s => s.id === state.selectedId);
+  if (!sym) return null;
+  const hp = rotateHandlePos(sym);
+  const r = (ROTATE_HANDLE_RADIUS + 6) / state.zoom; // etwas großzügigere Trefferzone als die sichtbare Größe
+  if (Math.hypot(x-hp.x, y-hp.y) < r) return sym;
+  return null;
+}
+
 function selectSymbol(id) {
   state.selectedId = id;
   const sym = state.symbols.find(s=>s.id===id);
@@ -4732,6 +4837,19 @@ function drawSymbols() {
       ctx.beginPath(); ctx.arc(0,0,SZ/2+4/state.zoom,0,Math.PI*2);
       ctx.strokeStyle='#f5a623'; ctx.lineWidth=2/state.zoom;
       ctx.setLineDash([4/state.zoom,2/state.zoom]); ctx.stroke(); ctx.setLineDash([]);
+      // Dreh-Griff: kleiner Punkt am oberen Rand, verbunden per dünner Linie.
+      // Liegt im bereits rotierten Koordinatensystem → dreht sich sichtbar mit dem Symbol mit.
+      const handleDist = SZ/2 + ROTATE_HANDLE_OFFSET/state.zoom;
+      ctx.beginPath();
+      ctx.moveTo(0, -SZ/2-4/state.zoom);
+      ctx.lineTo(0, -handleDist);
+      ctx.strokeStyle = 'rgba(245,166,35,.7)'; ctx.lineWidth = 1.5/state.zoom;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -handleDist, ROTATE_HANDLE_RADIUS/state.zoom, 0, Math.PI*2);
+      ctx.fillStyle = rotatingId === sym.id ? '#fff' : '#f5a623';
+      ctx.fill();
+      ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 1.5/state.zoom; ctx.stroke();
     }
     // Shadow
     ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=6/state.zoom;
