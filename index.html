@@ -507,6 +507,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="startCalibrate()" title="Maßstab kalibrieren" id="btnCal">📏</button>
       <span style="font-size:10px;color:var(--tx3);font-family:var(--mono)" id="scaleLabel">Kein Maßstab</span>
       <div class="vs"></div>
+      <button class="tool-btn act" onclick="toggleSnap()" title="Andockhilfe an Wandkanten (ein/aus)" id="btnSnap">🧲</button>
+      <div class="vs"></div>
       <button class="tool-btn" onclick="undoAction()" title="Rückgängig">↩</button>
       <button class="tool-btn" onclick="clearAll()" title="Alles löschen">🗑</button>
       <div class="vs"></div>
@@ -876,6 +878,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <div id="stAnalysis" style="margin-top:14px"></div>
     <!-- Zusammenfassung -->
     <div id="stSummary" style="margin-top:14px"></div>
+    <!-- Räume: Geräte & Kabellänge -->
+    <div id="stRaeume" style="margin-top:14px"></div>
   </div>
 
   <!-- RIGHT PROPERTIES PANEL -->
@@ -2069,6 +2073,7 @@ let state = {
   wirePoints: [],
   undoStack: [],
   raumhoehe: 250,
+  snapEnabled: true,     // Intelligente Andockhilfe an Wandkanten ein/aus
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -2851,6 +2856,7 @@ async function openProject(id, data) {
       state.floorplan = { img, w: img.width, h: img.height };
       document.getElementById('uploadZone').style.display = 'none';
       zFit(); render();
+      detectWallEdges(img);
     };
     img.src = data.floorplanData;
   } else {
@@ -2918,6 +2924,7 @@ function listenToProject(id) {
           const uz = document.getElementById('uploadZone');
           if (uz) uz.style.display = 'none';
           render();
+          detectWallEdges(img);
         };
         img.src = d.floorplanData;
       }
@@ -3456,6 +3463,7 @@ function localStateRestore() {
         const uz = document.getElementById('uploadZone');
         if (uz) uz.style.display = 'none';
         render();
+        detectWallEdges(img);
       };
       img.src = d.floorplanData;
     }
@@ -3753,7 +3761,12 @@ function onMouseMove(e) {
   if (state.dragging) {
     cancelLongPress();
     const sym = state.symbols.find(s => s.id === state.dragging.id);
-    if (sym) { sym.x = pt.x - state.dragging.offX; sym.y = pt.y - state.dragging.offY; render(); }
+    if (sym) {
+      const rawX = pt.x - state.dragging.offX, rawY = pt.y - state.dragging.offY;
+      const snapped = applySymbolSnap(rawX, rawY);
+      sym.x = snapped.x; sym.y = snapped.y;
+      render();
+    }
     return;
   }
   // ── Wire point hover highlight ──
@@ -3818,7 +3831,11 @@ function onMouseUp(e) {
     canvas.style.cursor = 'default';
     render(); return;
   }
-  if (state.dragging) { saveUndo(); state.dragging = null; }
+  if (state.dragging) {
+    saveUndo();
+    state.dragging = null;
+    if (activeSnapHint) { activeSnapHint = null; render(); }
+  }
   state.panning = false; state.panStart = null;
 }
 function onWheel(e) {
@@ -3936,7 +3953,12 @@ function onTouchMoveCanvas(e) {
     if (state.dragging) {
       cancelLongPress();
       const sym = state.symbols.find(s => s.id === state.dragging.id);
-      if (sym) { sym.x = pt.x - state.dragging.offX; sym.y = pt.y - state.dragging.offY; render(); }
+      if (sym) {
+        const rawX = pt.x - state.dragging.offX, rawY = pt.y - state.dragging.offY;
+        const snapped = applySymbolSnap(rawX, rawY);
+        sym.x = snapped.x; sym.y = snapped.y;
+        render();
+      }
     } else if (state.panning && touchPanStart) {
       state.pan.x = t.clientX - touchPanStart.x;
       state.pan.y = t.clientY - touchPanStart.y;
@@ -3975,7 +3997,11 @@ function onTouchEndCanvas(e) {
     draggingWire = null;
     render(); state.panning=false; touchPanStart=null; return;
   }
-  if (state.dragging) { saveUndo(); state.dragging = null; }
+  if (state.dragging) {
+    saveUndo();
+    state.dragging = null;
+    if (activeSnapHint) { activeSnapHint = null; render(); }
+  }
   state.panning = false; touchPanStart = null;
 }
 
@@ -4238,9 +4264,37 @@ function render() {
   drawCalPoints();
   drawTrassen();
   drawSymbols();
+  drawSnapHint();
   if (typeof lvDrawOverlay === 'function') lvDrawOverlay();
   ctx.restore();
   updateScaleBar();
+}
+
+// Hebt die Wandkante hervor, an der ein gezogenes Symbol aktuell gefangen ("gesnapt") ist
+function drawSnapHint() {
+  if (!activeSnapHint || !state.dragging) return;
+  const s = activeSnapHint;
+  ctx.save();
+  ctx.strokeStyle = '#3fb950';
+  ctx.lineWidth = 2.5 / state.zoom;
+  ctx.setLineDash([6/state.zoom, 4/state.zoom]);
+  if (s.axis === 'h') {
+    ctx.beginPath();
+    ctx.moveTo(s.x - 26/state.zoom, s.y);
+    ctx.lineTo(s.x + 26/state.zoom, s.y);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y - 26/state.zoom);
+    ctx.lineTo(s.x, s.y + 26/state.zoom);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 5/state.zoom, 0, Math.PI*2);
+  ctx.fillStyle = '#3fb950';
+  ctx.fill();
+  ctx.restore();
 }
 
 // Draw junction dots where wires connect to each other
@@ -5417,6 +5471,42 @@ function renderStueckliste() {
     const sd = buildSummaryData(syms, wires, byType, byKabel, wireFilterTotal);
     sumEl.innerHTML = renderSummaryHTML(sd, false);
   }
+
+  // ── Räume: Geräte & Kabellänge ──
+  const raeumeEl = document.getElementById('stRaeume');
+  if (raeumeEl) {
+    if (state.raeume && state.raeume.length) {
+      const raeumeRows = state.raeume.map(r => {
+        const info = raumKabelInfo(r);
+        const typCounts = {};
+        for (const rs of info.syms) {
+          const rdef = SYMBOLS[rs.type]||{name:rs.type};
+          const rlabel = rdef.name||rs.type;
+          typCounts[rlabel] = (typCounts[rlabel]||0) + (rs.count||1);
+        }
+        const typStr = Object.entries(typCounts).map(([k,c])=>`${k} (${c})`).join(', ') || '—';
+        return `<tr>
+          <td style="font-weight:700">${esc(r.name)}</td>
+          <td class="mono">${info.syms.length}</td>
+          <td class="mono" style="color:var(--ac)">${info.laengeGesamt.toFixed(1)}m</td>
+          <td class="mono">${esc(info.stromkreise.join(', ')||'—')}</td>
+          <td>${esc(typStr)}</td>
+        </tr>`;
+      }).join('');
+      raeumeEl.innerHTML = `
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">⬜ Räume — Geräte &amp; Kabellänge</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="text-align:left;color:var(--tx3);border-bottom:1px solid var(--bd)">
+              <th style="padding:4px 6px">Raum</th><th style="padding:4px 6px">Geräte</th><th style="padding:4px 6px">Kabellänge</th><th style="padding:4px 6px">Stromkreise</th><th style="padding:4px 6px">Gerätetypen</th>
+            </tr></thead>
+            <tbody>${raeumeRows}</tbody>
+          </table>
+        </div>`;
+    } else {
+      raeumeEl.innerHTML = '';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -5644,6 +5734,155 @@ function setTool(t) {
 }
 
 // ═══════════════════════════════════════════════════
+//  INTELLIGENTE ANDOCKHILFE (SNAP) — Wandkanten-Erkennung
+// ═══════════════════════════════════════════════════
+// Analysiert das Grundrissbild einmalig beim Laden und extrahiert achsenparallele
+// Kanten (horizontale + vertikale Liniensegmente), die typischerweise Wänden in
+// einem Bauplan entsprechen. Beim Ziehen eines Symbols wird die Position auf die
+// nächstgelegene Kante "gefangen" (Fang/Snap), wenn sie innerhalb einer Toleranz liegt.
+let wallEdges = { h: [], v: [] }; // h: [{y, x1, x2}], v: [{x, y1, y2}] — in Welt-Koordinaten (Bildpixel)
+let wallEdgesReady = false;
+
+function detectWallEdges(img) {
+  wallEdgesReady = false;
+  wallEdges = { h: [], v: [] };
+  try {
+    const maxDim = 900;
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const aw = Math.max(1, Math.round(img.width * scale));
+    const ah = Math.max(1, Math.round(img.height * scale));
+
+    const oc = document.createElement('canvas');
+    oc.width = aw; oc.height = ah;
+    const octx2 = oc.getContext('2d', { willReadFrequently: true });
+    octx2.drawImage(img, 0, 0, aw, ah);
+    const data = octx2.getImageData(0, 0, aw, ah).data;
+
+    const gray = new Float32Array(aw * ah);
+    for (let i = 0; i < aw * ah; i++) {
+      const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
+      gray[i] = 0.299*r + 0.587*g + 0.114*b;
+    }
+
+    const DARK_THRESHOLD = 150;
+    const rowDarkRatio = new Float32Array(ah);
+    for (let y = 0; y < ah; y++) {
+      let dark = 0;
+      for (let x = 0; x < aw; x++) if (gray[y*aw+x] < DARK_THRESHOLD) dark++;
+      rowDarkRatio[y] = dark / aw;
+    }
+    const colDarkRatio = new Float32Array(aw);
+    for (let x = 0; x < aw; x++) {
+      let dark = 0;
+      for (let y = 0; y < ah; y++) if (gray[y*aw+x] < DARK_THRESHOLD) dark++;
+      colDarkRatio[x] = dark / ah;
+    }
+
+    const ROW_MIN_RATIO = 0.12;
+    const COL_MIN_RATIO = 0.12;
+
+    function extractRuns(ratios, minRatio, axisLen) {
+      const runs = [];
+      let start = -1;
+      for (let i = 0; i < axisLen; i++) {
+        if (ratios[i] >= minRatio) {
+          if (start === -1) start = i;
+        } else if (start !== -1) {
+          runs.push([start, i-1]);
+          start = -1;
+        }
+      }
+      if (start !== -1) runs.push([start, axisLen-1]);
+      return runs;
+    }
+
+    const rowRuns = extractRuns(rowDarkRatio, ROW_MIN_RATIO, ah);
+    const colRuns = extractRuns(colDarkRatio, COL_MIN_RATIO, aw);
+
+    const invScale = 1 / scale;
+    for (const [y0, y1] of rowRuns) {
+      const yMid = Math.round((y0 + y1) / 2);
+      let segStart = -1;
+      for (let x = 0; x <= aw; x++) {
+        const isDark = x < aw && gray[yMid*aw+x] < DARK_THRESHOLD;
+        if (isDark) { if (segStart === -1) segStart = x; }
+        else if (segStart !== -1) {
+          const segLen = x - segStart;
+          if (segLen >= aw * 0.04) {
+            wallEdges.h.push({
+              y: yMid * invScale,
+              x1: segStart * invScale,
+              x2: (x-1) * invScale
+            });
+          }
+          segStart = -1;
+        }
+      }
+    }
+    for (const [x0, x1] of colRuns) {
+      const xMid = Math.round((x0 + x1) / 2);
+      let segStart = -1;
+      for (let y = 0; y <= ah; y++) {
+        const isDark = y < ah && gray[y*aw+xMid] < DARK_THRESHOLD;
+        if (isDark) { if (segStart === -1) segStart = y; }
+        else if (segStart !== -1) {
+          const segLen = y - segStart;
+          if (segLen >= ah * 0.04) {
+            wallEdges.v.push({
+              x: xMid * invScale,
+              y1: segStart * invScale,
+              y2: (y-1) * invScale
+            });
+          }
+          segStart = -1;
+        }
+      }
+    }
+
+    wallEdgesReady = (wallEdges.h.length + wallEdges.v.length) > 0;
+    console.log('[Snap] Wandkanten erkannt:', wallEdges.h.length, 'horizontal,', wallEdges.v.length, 'vertikal');
+  } catch (e) {
+    console.warn('[Snap] Wandkanten-Erkennung fehlgeschlagen:', e);
+    wallEdgesReady = false;
+  }
+}
+
+function findNearestWallSnap(x, y) {
+  if (!state.snapEnabled || !wallEdgesReady) return null;
+  const TOL = 14 / state.zoom;
+  let best = null, bestDist = TOL;
+
+  for (const h of wallEdges.h) {
+    if (x < h.x1 - TOL || x > h.x2 + TOL) continue;
+    const d = Math.abs(y - h.y);
+    if (d < bestDist) { bestDist = d; best = { x, y: h.y, axis: 'h' }; }
+  }
+  for (const v of wallEdges.v) {
+    if (y < v.y1 - TOL || y > v.y2 + TOL) continue;
+    const d = Math.abs(x - v.x);
+    if (d < bestDist) { bestDist = d; best = { x: v.x, y, axis: 'v' }; }
+  }
+  return best;
+}
+
+function toggleSnap() {
+  state.snapEnabled = !state.snapEnabled;
+  const btn = document.getElementById('btnSnap');
+  if (btn) btn.classList.toggle('act', state.snapEnabled);
+  setStatus(state.snapEnabled
+    ? '🧲 Andockhilfe (Wandfang) aktiviert' + (wallEdgesReady ? '' : ' — noch kein Grundriss analysiert')
+    : '🧲 Andockhilfe (Wandfang) deaktiviert');
+}
+
+let activeSnapHint = null;
+
+function applySymbolSnap(rawX, rawY) {
+  const snap = findNearestWallSnap(rawX, rawY);
+  activeSnapHint = snap;
+  return snap ? { x: snap.x, y: snap.y } : { x: rawX, y: rawY };
+}
+
+// ═══════════════════════════════════════════════════
 //  FLOORPLAN LOAD
 // ═══════════════════════════════════════════════════
 function loadFloorplan(e) {
@@ -5680,6 +5919,7 @@ function loadFloorplan(e) {
             render();
             setStatus('PDF geladen (' + pdf.numPages + ' Seiten) — Bitte Massstab kalibrieren!');
             URL.revokeObjectURL(url);
+            setTimeout(() => detectWallEdges(img), 50);
           };
           img.src = offCanvas.toDataURL('image/png');
         });
@@ -5706,6 +5946,7 @@ function loadFloorplan(e) {
       document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
       render();
       setStatus('Grundriss geladen: ' + img.width + 'x' + img.height + 'px — Bitte Massstab kalibrieren!');
+      setTimeout(() => detectWallEdges(img), 50);
     };
     img.onerror = function() { setStatus('Bild konnte nicht geladen werden'); };
     img.src = ev.target.result;
@@ -5855,12 +6096,29 @@ function exportCSV() {
   for (const w of state.wires) { byKabel[w.kabel||'—']=(byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
   Object.entries(byKabel).forEach(([k,m]) => { csv += `"${k}"${sep}${m.toFixed(1)}\n`; });
 
+  // ── 5: Räume ──
+  if (state.raeume && state.raeume.length) {
+    csv += `\nRÄUME${sep}${sep}${sep}${sep}\n`;
+    csv += `Raum${sep}Anzahl Geräte${sep}Kabellänge gesamt(m)${sep}Stromkreise${sep}Gerätetypen\n`;
+    for (const r of state.raeume) {
+      const info = raumKabelInfo(r);
+      const typCounts = {};
+      for (const s of info.syms) {
+        const def = SYMBOLS[s.type]||{name:s.type};
+        const label = def.name||s.type;
+        typCounts[label] = (typCounts[label]||0) + (s.count||1);
+      }
+      const typStr = Object.entries(typCounts).map(([k,c])=>`${k} (${c})`).join(', ');
+      csv += `"${r.name}"${sep}${info.syms.length}${sep}${info.laengeGesamt.toFixed(1)}${sep}"${info.stromkreise.join(', ')}"${sep}"${typStr}"\n`;
+    }
+  }
+
   const b = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(b);
   a.download = (pn||'grundriss').replace(/\s+/g,'_') + '_stueckliste.csv';
   a.click();
-  setStatus('✅ CSV exportiert — 4 Abschnitte: Geräte · Leitungen · Verlegung · Kabel');
+  setStatus('✅ CSV exportiert — ' + (state.raeume&&state.raeume.length?'5':'4') + ' Abschnitte: Geräte · Leitungen · Verlegung · Kabel' + (state.raeume&&state.raeume.length?' · Räume':''));
 }
 // ═══════════════════════════════════════════════════
 //  PROJEKTDATEN
@@ -5951,6 +6209,32 @@ function exportFloorplanPDF() {
     var sd = buildSummaryData(_symsAll,_wiresAll,_byType,_byKabel,_wTotal);
     var summaryHTML = renderSummaryHTML(sd, true);
 
+    // Räume-Tabelle (falls definiert): Geräteanzahl + Kabellänge pro Raum
+    var raeumeHTML = '';
+    if (state.raeume && state.raeume.length) {
+      var raeumeRows = state.raeume.map(function(r) {
+        var info = raumKabelInfo(r);
+        var typCounts = {};
+        for (var ri=0; ri<info.syms.length; ri++) {
+          var rs = info.syms[ri];
+          var rdef = SYMBOLS[rs.type]||{name:rs.type};
+          var rlabel = rdef.name||rs.type;
+          typCounts[rlabel] = (typCounts[rlabel]||0) + (rs.count||1);
+        }
+        var typStr = Object.keys(typCounts).map(function(k){return k+' ('+typCounts[k]+')';}).join(', ') || '—';
+        return '<tr>'
+          +'<td style="font-weight:700">'+r.name+'</td>'
+          +'<td style="font-family:monospace">'+info.syms.length+'</td>'
+          +'<td style="font-family:monospace">'+info.laengeGesamt.toFixed(1)+' m</td>'
+          +'<td style="font-family:monospace">'+(info.stromkreise.join(', ')||'—')+'</td>'
+          +'<td>'+typStr+'</td>'
+        +'</tr>';
+      }).join('');
+      raeumeHTML = '<h3 class="sec" style="margin-top:14px">⬜ Räume — Geräte &amp; Kabellänge</h3>'
+        +'<table><thead><tr><th>Raum</th><th>Anzahl Geräte</th><th>Kabellänge</th><th>Stromkreise</th><th>Gerätetypen</th></tr></thead>'
+        +'<tbody>'+raeumeRows+'</tbody></table>';
+    }
+
     var tbl = (document.getElementById('stBody')&&document.getElementById('stBody').parentElement&&document.getElementById('stBody').parentElement.outerHTML)||'';
     var heute = new Date().toLocaleDateString('de-DE');
 
@@ -6034,6 +6318,7 @@ function exportFloorplanPDF() {
       +'<td style="font-family:monospace;color:#27ae60">'+_wTotal.toFixed(1)+'m</td></tr></tfoot></table>'
       +'<h3 class="sec" style="margin-top:14px">Zusammenfassung &amp; Kabelmengen</h3>'
       +summaryHTML
+      +raeumeHTML
       +'</div>'
       +'<div class="footer">'
       +'<span>&#9889; Elektro-Grundriss Planer — Anvolt GmbH</span>'
@@ -8090,6 +8375,59 @@ function drawRaeume() {
     ctx.restore();
   }
 }
+
+// ═══════════════════════════════════════════════════
+//  RAUM → GERÄTE-ZUORDNUNG (für Stückliste/Export)
+// ═══════════════════════════════════════════════════
+
+// Ray-Casting Punkt-in-Polygon-Test (Welt-Koordinaten)
+function isPointInPolygon(pt, pts) {
+  let inside = false;
+  for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
+    const xi=pts[i].x, yi=pts[i].y, xj=pts[j].x, yj=pts[j].y;
+    const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+      (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// Prüft ob ein Punkt innerhalb eines Raum-Objekts liegt, unabhängig vom Zeichenmodus
+// (rect = Rechteck aus 2 Eckpunkten, poly/free = Polygon aus beliebig vielen Punkten)
+function isPointInRaum(pt, r) {
+  if (!r.pts || !r.pts.length) return false;
+  if (r.type === 'rect' && r.pts.length === 2) {
+    const x1 = Math.min(r.pts[0].x, r.pts[1].x), x2 = Math.max(r.pts[0].x, r.pts[1].x);
+    const y1 = Math.min(r.pts[0].y, r.pts[1].y), y2 = Math.max(r.pts[0].y, r.pts[1].y);
+    return pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2;
+  }
+  // poly / free: als Polygon behandeln (Freihand-Pfad wird als geschlossenes Polygon genähert)
+  if (r.pts.length >= 3) return isPointInPolygon(pt, r.pts);
+  return false;
+}
+
+// Liefert alle platzierten Symbole, die innerhalb eines gegebenen Raums liegen
+function symbolsInRaum(r) {
+  return state.symbols.filter(s => isPointInRaum({x:s.x, y:s.y}, r));
+}
+
+// Liefert die Gesamtlänge (m) aller Leitungen, deren Stromkreis zu Geräten in diesem Raum gehört.
+// Da Leitungen selbst keine feste Position haben (sie verbinden Punkte), wird die Zuordnung
+// über den Stromkreis der im Raum liegenden Symbole vorgenommen.
+function raumKabelInfo(r) {
+  const syms = symbolsInRaum(r);
+  const stromkreise = [...new Set(syms.map(s => s.circuit).filter(Boolean))];
+  const relevantWires = state.wires.filter(w => stromkreise.includes(w.circuit));
+  const laengeGesamt = relevantWires.reduce((a,w) => a + parseFloat(w.laenge_m||0), 0);
+  const byKabelTyp = {};
+  for (const w of relevantWires) {
+    const k = w.kabel || '—';
+    byKabelTyp[k] = (byKabelTyp[k]||0) + parseFloat(w.laenge_m||0);
+  }
+  return { syms, stromkreise, laengeGesamt, byKabelTyp };
+}
+
+
 
 
 </script>
