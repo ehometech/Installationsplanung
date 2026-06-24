@@ -4454,20 +4454,29 @@ function drawSnapHint() {
   const s = activeSnapHint;
   ctx.save();
   if (s.axis === 'raum') {
-    // Raum-Kanten-Snap: türkiser Kreis + Kreuz am Ankerpunkt
+    // Raum-Kanten-Snap: türkises Kreuz am Punkt auf der Kante (Symbol-Rand-Position)
+    const ex = s.edgeX !== undefined ? s.edgeX : s.x;
+    const ey = s.edgeY !== undefined ? s.edgeY : s.y;
     ctx.strokeStyle = '#39c5cf';
     ctx.fillStyle   = '#39c5cf';
     ctx.lineWidth   = 2 / state.zoom;
     ctx.setLineDash([]);
-    // Kreuz
-    const r = 8/state.zoom;
+    // Linie vom Symbolmittelpunkt zur Kante
     ctx.beginPath();
-    ctx.moveTo(s.x-r, s.y); ctx.lineTo(s.x+r, s.y);
-    ctx.moveTo(s.x, s.y-r); ctx.lineTo(s.x, s.y+r);
+    ctx.setLineDash([3/state.zoom, 3/state.zoom]);
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Kreuz am Kanten-Ankerpunkt
+    const r = 7/state.zoom;
+    ctx.beginPath();
+    ctx.moveTo(ex-r, ey); ctx.lineTo(ex+r, ey);
+    ctx.moveTo(ex, ey-r); ctx.lineTo(ex, ey+r);
     ctx.stroke();
     // Kreis
     ctx.beginPath();
-    ctx.arc(s.x, s.y, r*0.6, 0, Math.PI*2);
+    ctx.arc(ex, ey, r*0.5, 0, Math.PI*2);
     ctx.fill();
   } else {
     // Wand-Kanten-Snap: grüne gestrichelte Linie
@@ -6205,7 +6214,14 @@ function toggleSnap() {
 // Gibt {x, y, axis:'raum'} zurück, oder null wenn keine Kante nah genug ist.
 function findNearestRaumEdgeSnap(x, y) {
   if (!state.snapEnabled || !state.raeume || !state.raeume.length) return null;
-  const TOL = 14 / state.zoom;
+  const SZ_BASE = 36;
+  // Größe des aktuell gezogenen Symbols ermitteln
+  const dragSym = state.dragging ? state.symbols.find(s=>s.id===state.dragging.id) : null;
+  const SZ = SZ_BASE * (dragSym ? (dragSym.size||1) : 1);
+  const halfSZ = SZ / 2;
+
+  // Toleranz: Symbol-Rand muss innerhalb dieser Distanz zur Kante liegen
+  const TOL = (halfSZ + 18) / state.zoom;
   let best = null, bestDist = TOL;
 
   for (const r of state.raeume) {
@@ -6216,20 +6232,44 @@ function findNearestRaumEdgeSnap(x, y) {
       ? [ pts[0], {x:pts[1].x,y:pts[0].y}, pts[1], {x:pts[0].x,y:pts[1].y} ]
       : pts;
     if (poly.length < 2) continue;
-    // Alle Kanten des Polygons durchlaufen
+
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i+1) % poly.length];
-      // Senkrechte Projektion des Punkts auf das Liniensegment a→b
       const dx = b.x-a.x, dy = b.y-a.y;
       const len2 = dx*dx + dy*dy;
       if (len2 < 1) continue;
+      const len = Math.sqrt(len2);
+
+      // Senkrechte Projektion des Symbolmittelpunkts auf die Kante a→b
       const t = Math.max(0, Math.min(1, ((x-a.x)*dx + (y-a.y)*dy) / len2));
-      const px = a.x + t*dx, py = a.y + t*dy;
-      const d = Math.hypot(x-px, y-py);
+      const px = a.x + t*dx, py = a.y + t*dy; // nächster Punkt auf der Kante
+
+      // Abstand des Mittelpunkts von der Kante
+      const distToEdge = Math.hypot(x-px, y-py);
+
+      // Normalenrichtung der Kante (senkrecht, normiert): zeigt vom Punkt (x,y) zur Kante
+      // Wir bestimmen die Richtung so, dass das Symbol mit seinem Rand auf der Kante liegt.
+      // Normale: (-dy/len, dx/len) oder (dy/len, -dx/len) — wir wählen die, die zum Symbol zeigt.
+      let nx = -(dy/len), ny = dx/len;
+      // Prüfen: liegt (x,y) auf welcher Seite der Kante?
+      // Kreuzprodukt (a→b) × (a→p): positiv = links, negativ = rechts
+      const cross = dx*(y-a.y) - dy*(x-a.x);
+      if (cross < 0) { nx = -nx; ny = -ny; } // Normale in Richtung Symbol
+
+      // Ziel: Symbolmittelpunkt = Projektion + Normale * halfSZ
+      // (Symbol-Rand liegt genau auf der Kante)
+      const snapX = px + nx * halfSZ;
+      const snapY = py + ny * halfSZ;
+
+      // Distanz des aktuellen Mittelpunkts zum Ziel-Mittelpunkt
+      const d = Math.hypot(x-snapX, y-snapY);
       if (d < bestDist) {
         bestDist = d;
-        // Ausrichten: senkrecht zur Kante snappen (auf die Linie projizieren)
-        best = { x: px, y: py, axis: 'raum' };
+        best = {
+          x: snapX, y: snapY,
+          edgeX: px, edgeY: py, // Punkt auf der Kante (für visuellen Hinweis)
+          axis: 'raum'
+        };
       }
     }
   }
@@ -6237,7 +6277,7 @@ function findNearestRaumEdgeSnap(x, y) {
 }
 
 function applySymbolSnap(rawX, rawY) {
-  // 1. Zuerst Raum-Kanten prüfen (haben Vorrang vor Wand-Bitmap-Kanten)
+  // 1. Zuerst Raum-Kanten prüfen (Rand des Symbols liegt auf der Kante)
   const raumSnap = findNearestRaumEdgeSnap(rawX, rawY);
   if (raumSnap) {
     activeSnapHint = raumSnap;
