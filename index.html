@@ -961,20 +961,23 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
             </div>
             <div>
               <label class="rp-lbl">Kabeltyp</label>
-              <select class="rp-sel" id="seKabel">
-                <option>NYM-J 3×1.5</option>
-                <option>NYM-J 3×2.5</option>
-                <option>NYM-J 5×1.5</option>
-                <option>NYM-J 5×2.5</option>
-                <option>NYM-J 5×6</option>
-                <option>NYY-J 3×2.5</option>
-                <option>NYY-J 3×6</option>
-                <option>NYY-J 5×2.5</option>
-                <option>NYY-J 5×6</option>
-                <option>NYY-J 5×10</option>
-                <option>H07V-K 1×6 grün-gelb (PE)</option>
-                <option>YCYM 2×2×0.8 (KNX)</option>
-              </select>
+              <div style="display:flex;gap:4px;align-items:center">
+                <select class="rp-sel" id="seKabel" style="flex:1">
+                  <option>NYM-J 3×1.5</option>
+                  <option>NYM-J 3×2.5</option>
+                  <option>NYM-J 5×1.5</option>
+                  <option>NYM-J 5×2.5</option>
+                  <option>NYM-J 5×6</option>
+                  <option>NYY-J 3×2.5</option>
+                  <option>NYY-J 3×6</option>
+                  <option>NYY-J 5×2.5</option>
+                  <option>NYY-J 5×6</option>
+                  <option>NYY-J 5×10</option>
+                  <option>H07V-K 1×6 grün-gelb</option>
+                  <option>YCYM 2×2×0.8 (KNX)</option>
+                </select>
+                <button class="btn bg" style="padding:4px 7px;font-size:13px" onclick="addCustomKabelName(this,'seKabel')" title="Eigene Kabelbezeichnung hinzufügen">＋</button>
+              </div>
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:4px">
@@ -2281,6 +2284,18 @@ function showSymbolEditForm(upload, progressLabel, onNext) {
   pendingUpload._onNext = onNext;
 
   document.getElementById('symEditForm').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  // Eigene Kabelbezeichnungen in seKabel Dropdown nachladen
+  const seKabelSel = document.getElementById('seKabel');
+  if (seKabelSel) {
+    const existing = [...seKabelSel.options].map(o=>o.value);
+    for (const k of customKabelNames) {
+      if (!existing.includes(k)) {
+        const opt = document.createElement('option');
+        opt.value = k; opt.textContent = k;
+        seKabelSel.appendChild(opt);
+      }
+    }
+  }
 }
 
 function saveNewSymbol() {
@@ -4598,7 +4613,69 @@ function loadCustomWireTypes() {
     if (raw) customWireTypes = JSON.parse(raw);
     mergeCustomWireTypes();
   } catch(e) { console.warn('loadCustomWireTypes:', e); }
+  // Eigene Kabelbezeichnungen auch laden
+  loadCustomKabelNames();
 }
+
+// ── Eigene Kabelbezeichnungen (für Kabeltyp-Dropdowns in Symbol/Leitung) ──
+let customKabelNames = []; // z.B. ['NHXMH-J 3×2.5', 'H07RN-F 3×1.5']
+
+function loadCustomKabelNames() {
+  try {
+    const raw = localStorage.getItem('grundriss_custom_kabel_names');
+    if (raw) customKabelNames = JSON.parse(raw);
+  } catch(e) {}
+}
+
+function saveCustomKabelNames() {
+  try { localStorage.setItem('grundriss_custom_kabel_names', JSON.stringify(customKabelNames)); }
+  catch(e) {}
+}
+
+// Zentrale Funktion: Standard-Kabelbezeichnungen + eigene, dedupliziert
+function getKabelOptions() {
+  const std = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6',
+    'NYY-J 3×2.5','NYY-J 3×6','NYY-J 5×2.5','NYY-J 5×6','NYY-J 5×10',
+    'H07V-K 1×6 grün-gelb','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6',
+    'J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8','NHXMH-J 3×1.5'];
+  return [...new Set([...std, ...customKabelNames])];
+}
+
+// Öffnet einen einfachen Inline-Prompt zum Hinzufügen einer eigenen Kabelbezeichnung,
+// aktualisiert danach alle Dropdowns mit der ID kabelSelectId (optional).
+function addCustomKabelName(triggerEl, kabelSelectId) {
+  const name = prompt('Neue Kabelbezeichnung eingeben:\n(z.B. NHXMH-J 3×2.5 halogenfrei)', '');
+  if (!name || !name.trim()) return;
+  const val = name.trim();
+  if (!customKabelNames.includes(val)) {
+    customKabelNames.push(val);
+    saveCustomKabelNames();
+  }
+  // Dropdown aktualisieren und neuen Wert auswählen
+  if (kabelSelectId) {
+    const sel = document.getElementById(kabelSelectId);
+    if (sel) {
+      // Option hinzufügen falls nicht vorhanden
+      if (![...sel.options].some(o => o.value === val)) {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = val;
+        // Vor der letzten Option (falls es eine "＋" Option gibt) einfügen
+        sel.insertBefore(opt, sel.lastElementChild || null);
+      }
+      sel.value = val;
+    }
+  }
+  setStatus('✅ Kabelbezeichnung "' + val + '" hinzugefügt');
+}
+
+// Erzeugt den HTML-String für alle <option> Elemente eines Kabeltyp-Dropdowns
+function buildKabelOptions(selectedVal) {
+  return getKabelOptions()
+    .map(k => `<option${k===selectedVal?' selected':''}>${k}</option>`)
+    .join('');
+}
+
+
 
 function saveCustomWireTypesLS() {
   try { localStorage.setItem('grundriss_custom_wire_types', JSON.stringify(customWireTypes)); }
@@ -5193,7 +5270,8 @@ function renderProps(sym) {
   }
   const def = SYMBOLS[sym.type] || {};
   const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2','L2+L3'];
-  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 5×6','NHXMH-J 3×1.5'];
+  const kabels = getKabelOptions();
+  const symKabelId = 'kabelSel_' + sym.id;
   body.innerHTML = `
     <div class="pg" style="margin-bottom:12px">
       <div class="pgt" style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-bottom:3px;border-bottom:1px solid var(--bd)">${def.name||sym.type}</div>
@@ -5209,9 +5287,12 @@ function renderProps(sym) {
       <div class="rp-row"><label class="rp-lbl">Nennstrom (A)</label>
         <input class="rp-input" type="number" value="${sym.nennstrom||16}" oninput="updSym('${sym.id}','nennstrom',+this.value)"></div>
       <div class="rp-row"><label class="rp-lbl">Kabeltyp</label>
-        <select class="rp-sel" onchange="updSym('${sym.id}','kabel',this.value)">
-          ${kabels.map(k=>`<option${k===sym.kabel?' selected':''}>${k}</option>`).join('')}
-        </select></div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <select class="rp-sel" id="${symKabelId}" style="flex:1" onchange="updSym('${sym.id}','kabel',this.value)">
+            ${buildKabelOptions(sym.kabel)}
+          </select>
+          <button class="btn bg" style="padding:4px 7px;font-size:13px" onclick="addCustomKabelName(this,'${symKabelId}')" title="Eigene Kabelbezeichnung hinzufügen">＋</button>
+        </div></div>
       ` : ''}
       <div class="rp-row"><label class="rp-lbl">Drehung (°)</label>
         <input class="rp-input" type="number" value="${sym.rotation||0}" step="15" oninput="updSym('${sym.id}','rotation',+this.value);render()"></div>
@@ -5279,15 +5360,16 @@ function renderWireProps(wire) {
   if (!body) return;
   const col = getWireColor(wire);
   const phases = ['L1','L2','L3','L1+N','L1+L2+L3','L1+L2'];
-  const kabels = ['NYM-J 3×1.5','NYM-J 3×2.5','NYM-J 5×1.5','NYM-J 5×2.5','NYM-J 5×6','NYY-J 3×2.5','NYY-J 3×6','NYY-J 5×2.5','NYY-J 5×6','NYY-J 5×10','H07V-K 1×6 grün-gelb','CAT 6 U/UTP','CAT 7 S/FTP','Koax RG-6','J-Y(St)Y 2×2×0.6','YCYM 2×2×0.8','NHXMH-J 3×1.5'];
+  const kabels = getKabelOptions();
   const verlegeArten = ['UP','AP','HR','EZ','ER','HD','FU','HW'];
   const verlegeNames = {'UP':'Unterputz','AP':'Aufputz','HR':'In Rohr','EZ':'Einziehen','ER':'Erdkabel','HD':'Hohldecke','FU':'Fußboden','HW':'Hohlwand'};
 
+  const wireKabelId = 'kabelWireSel_' + wire.id;
   const wtOpts = Object.entries(WIRE_TYPES).map(([k,v]) =>
     `<option value="${k}" ${(wire.wireType||'strom')===k?'selected':''}>${v.label}</option>`
   ).join('');
   const phOpts = phases.map(p => `<option ${p===wire.phase?'selected':''}>${p}</option>`).join('');
-  const kaOpts = kabels.map(k => `<option ${k===wire.kabel?'selected':''}>${k}</option>`).join('');
+  const kaOpts = buildKabelOptions(wire.kabel);
   const vlOpts = verlegeArten.map(v => `<option value="${v}" ${v===(wire.verlegeart||'UP')?'selected':''}>${v} — ${verlegeNames[v]||v}</option>`).join('');
   const adernOpts = [['','Auto'],['3','3-adrig'],['5','5-adrig'],['1','1-adrig PE'],['2','2-adrig'],['4','4-adrig']].map(([v,l])=>
     `<option value="${v}" ${String(wire.adern||'')===v?'selected':''}>${l}</option>`).join('');
@@ -5325,7 +5407,10 @@ function renderWireProps(wire) {
         <select class="rp-sel" onchange="updWire('${wire.id}','phase',this.value)">${phOpts}</select></div>
 
       <div class="rp-row"><label class="rp-lbl">Kabeltyp</label>
-        <select class="rp-sel" onchange="updWire('${wire.id}','kabel',this.value)">${kaOpts}</select></div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <select class="rp-sel" id="${wireKabelId}" style="flex:1" onchange="updWire('${wire.id}','kabel',this.value)">${kaOpts}</select>
+          <button class="btn bg" style="padding:4px 7px;font-size:13px" onclick="addCustomKabelName(this,'${wireKabelId}')" title="Eigene Kabelbezeichnung hinzufügen">＋</button>
+        </div></div>
 
       <div class="rp-row"><label class="rp-lbl">Verlegeart</label>
         <select class="rp-sel" onchange="updWire('${wire.id}','verlegeart',this.value)">${vlOpts}</select></div>
