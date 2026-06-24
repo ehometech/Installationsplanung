@@ -535,7 +535,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
           <option value="bus">🔶 KNX/Bus</option>
           <option value="custom">✏️ Benutzerdefiniert</option>
         </optgroup>
+        <optgroup label="── Eigene Kabeltypen ──" id="customWireOptgroup"></optgroup>
       </select>
+      <button class="tool-btn" onclick="openAddWireTypeModal()" title="Eigenen Kabeltyp hinzufügen" style="font-size:14px;padding:0 7px">＋</button>
       <div class="vs"></div>
       <button class="tool-btn" onclick="deleteSelectedWire()" title="Ausgewählt löschen (Entf)" style="color:var(--rd)">✂</button>
       <button class="tool-btn" onclick="undoAction()" title="Rückgängig (Strg+Z)">↩</button>
@@ -1317,6 +1319,53 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
 <!-- SYMBOL PROPS MODAL -->
 <div class="modal-ov hid" id="symModal">
+
+<!-- KABELTYP HINZUFÜGEN MODAL -->
+<div class="modal-ov hid" id="addWireTypeModal">
+  <div class="modal" style="width:360px">
+    <h3>➕ Eigenen Kabeltyp hinzufügen</h3>
+    <div class="rp-row">
+      <label class="rp-lbl">Bezeichnung (Anzeige)</label>
+      <input class="rp-input" id="wtLabel" placeholder="z.B. NHXMH-J 3×2,5">
+    </div>
+    <div class="rp-row">
+      <label class="rp-lbl">Kabelname (Stückliste)</label>
+      <input class="rp-input" id="wtKabel" placeholder="z.B. NHXMH-J 3×2,5 halogenfrei">
+    </div>
+    <div class="rp-row">
+      <label class="rp-lbl">Linienfarbe</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="color" id="wtColor" value="#3498db" style="width:44px;height:32px;border:1px solid var(--bd);border-radius:4px;cursor:pointer">
+        <span style="font-size:11px;color:var(--tx3)">Farbe der Leitung im Plan</span>
+      </div>
+    </div>
+    <div class="rp-row">
+      <label class="rp-lbl">Linienstil</label>
+      <select class="rp-sel" id="wtDash">
+        <option value="solid">Durchgezogen ───</option>
+        <option value="dashed">Gestrichelt - - -</option>
+        <option value="dotted">Gepunktet · · ·</option>
+      </select>
+    </div>
+    <div class="rp-row">
+      <label class="rp-lbl">Linienstärke (px)</label>
+      <input class="rp-input" id="wtWidth" type="number" value="2" min="1" max="6" step="0.5">
+    </div>
+    <div class="rp-row">
+      <label class="rp-lbl">Anzahl Adern</label>
+      <input class="rp-input" id="wtAdern" type="number" value="3" min="1" max="12">
+    </div>
+    <!-- Liste vorhandener eigener Kabeltypen zum Löschen -->
+    <div id="wtExistingList" style="margin:8px 0;max-height:120px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;display:none"></div>
+    <div class="mft">
+      <button class="btn bg" onclick="closeAddWireTypeModal()">Abbrechen</button>
+      <button class="btn ba" onclick="saveCustomWireType()">✓ Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYMBOL PROPS MODAL -->
+<div class="modal-ov hid" id="symModal">
   <div class="modal">
     <h3 id="symModalTitle">Symbol bearbeiten</h3>
     <div id="symModalBody"></div>
@@ -2079,6 +2128,7 @@ const gid = () => 'e' + (nid++);
 const ROTATE_HANDLE_OFFSET = 22; // Abstand des Griffs vom Symbolrand, in Bildschirm-px
 const ROTATE_HANDLE_RADIUS = 6;  // Klickradius des Griffs, in Bildschirm-px
 let rotatingId = null; // id des Symbols, das gerade per Griff gedreht wird (null = keins)
+let activeSnapHint = null; // aktuell aktiver Snap-Treffer (für visuelles Highlight)
 
 
 
@@ -2163,12 +2213,20 @@ function mergeCustomSymbols() {
 function handleSymbolUpload(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
+  event.target.value = '';
 
-  // Process each file one by one
-  let idx = 0;
+  // Queue aufbauen — alle Dateien in Reihe abarbeiten
+  let queue = files.slice();
+  let total  = queue.length;
+  let doneCount = 0;
+
   function processNext() {
-    if (idx >= files.length) return;
-    const file = files[idx++];
+    if (!queue.length) {
+      // Alle Bilder verarbeitet
+      setStatus('✅ ' + total + ' Symbol(e) hochgeladen');
+      return;
+    }
+    const file = queue.shift();
     const reader = new FileReader();
     reader.onload = (e) => {
       pendingUpload = {
@@ -2176,22 +2234,32 @@ function handleSymbolUpload(event) {
         dataUrl: e.target.result,
         name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
       };
-      showSymbolEditForm(pendingUpload);
+      // Fortschrittsanzeige im Formular-Header
+      const progressLabel = total > 1
+        ? ` (${doneCount + 1}/${total})`
+        : '';
+      showSymbolEditForm(pendingUpload, progressLabel, () => {
+        doneCount++;
+        processNext(); // nächstes Bild nach Speichern/Überspringen
+      });
     };
     reader.readAsDataURL(file);
   }
   processNext();
-  event.target.value = '';
 }
 
-function showSymbolEditForm(upload) {
+function showSymbolEditForm(upload, progressLabel, onNext) {
   document.getElementById('symEditForm').style.display = 'flex';
   document.getElementById('symPreviewImg').src = upload.dataUrl;
-  document.getElementById('symPreviewName').textContent = upload.file.name;
+
+  // Fortschritt im Dateinamen anzeigen
+  document.getElementById('symPreviewName').textContent = upload.file.name + (progressLabel || '');
+
   const name = upload.name.charAt(0).toUpperCase() + upload.name.slice(1);
   document.getElementById('seBezeichnung').value = name;
   document.getElementById('seAbbr').value = name.substring(0,4).toUpperCase().replace(/\s/g,'');
-  // Kategorie: pendingUploadCat hat Vorrang, dann Auto-detect
+
+  // Kategorie auto-detect
   let cat = _pendingUploadCat || 'Sonstige';
   if (!_pendingUploadCat) {
     const lower = upload.name.toLowerCase();
@@ -2203,12 +2271,15 @@ function showSymbolEditForm(upload) {
     else if (/lüft|lueft|ventil/.test(lower)) cat = 'Haustechnik';
     else if (/rauch|alarm|kamera|sicher/.test(lower)) cat = 'Sicherheit';
   }
-  _pendingUploadCat = null; // Reset
-  // Kategorie setzen
+  _pendingUploadCat = null;
   const sel = document.getElementById('seCat');
   for (const opt of sel.options) {
     if (opt.text.replace(/&amp;/g,'&') === cat) { sel.value = opt.value; break; }
   }
+
+  // Callback für "nächstes Bild" merken
+  pendingUpload._onNext = onNext;
+
   document.getElementById('symEditForm').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
@@ -2221,7 +2292,6 @@ function saveNewSymbol() {
   const nennstrom = parseInt(document.getElementById('seNennstrom').value) || 16;
   const kabel = document.getElementById('seKabel').value;
   if (!name || !abbr) { alert('Bitte Bezeichnung und Kürzel eingeben!'); return; }
-  // Generate unique key
   const key = 'custom_' + abbr.toLowerCase() + '_' + Date.now();
   const isSVG = pendingUpload.file.type === 'image/svg+xml' || pendingUpload.file.name.endsWith('.svg');
   customSymbols[key] = {
@@ -2232,16 +2302,21 @@ function saveNewSymbol() {
   };
   saveCustomSymbols();
   mergeCustomSymbols();
-  cancelSymbolEdit();
-  renderSymbolManager();
   buildPalette();
   setStatus('✅ Symbol "' + name + '" gespeichert!');
+  const onNext = pendingUpload._onNext;
+  pendingUpload = null;
+  document.getElementById('symEditForm').style.display = 'none';
+  renderSymbolManager();
+  if (onNext) onNext(); // nächstes Bild in der Queue
 }
 
 function cancelSymbolEdit() {
+  const onNext = pendingUpload?._onNext;
   pendingUpload = null;
   document.getElementById('symEditForm').style.display = 'none';
   document.getElementById('symFileInput').value = '';
+  if (onNext) onNext(); // überspringen, nächstes Bild laden
 }
 
 // ── EDIT EXISTING ──
@@ -3385,6 +3460,7 @@ window.addEventListener('load', () => {
   resizeCanvas();
   ensureSymbolsBackup();
   loadCustomSymbols();
+  loadCustomWireTypes();
   buildPalette();
   initFirebase();
   setupEvents();
@@ -4377,25 +4453,44 @@ function drawSnapHint() {
   if (!activeSnapHint || !state.dragging) return;
   const s = activeSnapHint;
   ctx.save();
-  ctx.strokeStyle = '#3fb950';
-  ctx.lineWidth = 2.5 / state.zoom;
-  ctx.setLineDash([6/state.zoom, 4/state.zoom]);
-  if (s.axis === 'h') {
+  if (s.axis === 'raum') {
+    // Raum-Kanten-Snap: türkiser Kreis + Kreuz am Ankerpunkt
+    ctx.strokeStyle = '#39c5cf';
+    ctx.fillStyle   = '#39c5cf';
+    ctx.lineWidth   = 2 / state.zoom;
+    ctx.setLineDash([]);
+    // Kreuz
+    const r = 8/state.zoom;
     ctx.beginPath();
-    ctx.moveTo(s.x - 26/state.zoom, s.y);
-    ctx.lineTo(s.x + 26/state.zoom, s.y);
+    ctx.moveTo(s.x-r, s.y); ctx.lineTo(s.x+r, s.y);
+    ctx.moveTo(s.x, s.y-r); ctx.lineTo(s.x, s.y+r);
     ctx.stroke();
+    // Kreis
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r*0.6, 0, Math.PI*2);
+    ctx.fill();
   } else {
+    // Wand-Kanten-Snap: grüne gestrichelte Linie
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2.5 / state.zoom;
+    ctx.setLineDash([6/state.zoom, 4/state.zoom]);
+    if (s.axis === 'h') {
+      ctx.beginPath();
+      ctx.moveTo(s.x - 26/state.zoom, s.y);
+      ctx.lineTo(s.x + 26/state.zoom, s.y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - 26/state.zoom);
+      ctx.lineTo(s.x, s.y + 26/state.zoom);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.moveTo(s.x, s.y - 26/state.zoom);
-    ctx.lineTo(s.x, s.y + 26/state.zoom);
-    ctx.stroke();
+    ctx.arc(s.x, s.y, 5/state.zoom, 0, Math.PI*2);
+    ctx.fillStyle = '#3fb950';
+    ctx.fill();
   }
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(s.x, s.y, 5/state.zoom, 0, Math.PI*2);
-  ctx.fillStyle = '#3fb950';
-  ctx.fill();
   ctx.restore();
 }
 
@@ -4484,6 +4579,116 @@ var WIRE_TYPES = {
   bus:         { label:'KNX/Bus-Kabel',            color:'#ff5722', dash:[3,2], width:1.8, kabel:'YCYM 2×2×0.8', adern:2, adernLabel:'TKNX' },
   custom:      { label:'Benutzerdefiniert',        color:'#27ae60', dash:[],    width:2,   kabel:'—',             adern:0, adernLabel:'' },
 };
+
+// ── Eigene Kabeltypen (aus localStorage) ──
+let customWireTypes = {}; // { key: { label, kabel, color, dash, width, adern } }
+
+function loadCustomWireTypes() {
+  try {
+    const raw = localStorage.getItem('grundriss_custom_wire_types');
+    if (raw) customWireTypes = JSON.parse(raw);
+    mergeCustomWireTypes();
+  } catch(e) { console.warn('loadCustomWireTypes:', e); }
+}
+
+function saveCustomWireTypesLS() {
+  try { localStorage.setItem('grundriss_custom_wire_types', JSON.stringify(customWireTypes)); }
+  catch(e) { console.warn('saveCustomWireTypes:', e); }
+}
+
+function mergeCustomWireTypes() {
+  // Eigene Typen in WIRE_TYPES eintragen
+  for (const [key, wt] of Object.entries(customWireTypes)) {
+    const dashArr = wt.dash === 'dashed' ? [8,4] : wt.dash === 'dotted' ? [2,4] : [];
+    WIRE_TYPES[key] = {
+      label: wt.label,
+      color: wt.color || '#3498db',
+      dash:  dashArr,
+      width: wt.width || 2,
+      kabel: wt.kabel || wt.label,
+      adern: wt.adern || 3,
+      adernLabel: (wt.adern || 3) + '-adrig',
+      lsA: 16,
+      _custom: true
+    };
+  }
+  // Dropdown aktualisieren
+  rebuildCustomWireOptgroup();
+}
+
+function rebuildCustomWireOptgroup() {
+  const og = document.getElementById('customWireOptgroup');
+  if (!og) return;
+  og.innerHTML = '';
+  for (const [key, wt] of Object.entries(customWireTypes)) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = '🔧 ' + wt.label;
+    og.appendChild(opt);
+  }
+  // Optgroup ausblenden wenn leer
+  og.style.display = Object.keys(customWireTypes).length ? '' : 'none';
+}
+
+function openAddWireTypeModal() {
+  // Reset Felder
+  document.getElementById('wtLabel').value = '';
+  document.getElementById('wtKabel').value = '';
+  document.getElementById('wtColor').value = '#3498db';
+  document.getElementById('wtDash').value = 'solid';
+  document.getElementById('wtWidth').value = '2';
+  document.getElementById('wtAdern').value = '3';
+  // Vorhandene eigene Typen anzeigen (zum Löschen)
+  const list = document.getElementById('wtExistingList');
+  const keys = Object.keys(customWireTypes);
+  if (keys.length) {
+    list.style.display = 'block';
+    list.innerHTML = '<div style="font-size:10px;color:var(--tx3);padding:5px 8px;border-bottom:1px solid var(--bd)">Eigene Kabeltypen (✕ löschen)</div>'
+      + keys.map(k => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--bd);font-size:11px">
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${customWireTypes[k].color};margin-right:6px;vertical-align:middle"></span>${esc(customWireTypes[k].label)}</span>
+          <button onclick="deleteCustomWireType('${k}')" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:13px">✕</button>
+        </div>`).join('');
+  } else {
+    list.style.display = 'none';
+  }
+  document.getElementById('addWireTypeModal').classList.remove('hid');
+}
+
+function closeAddWireTypeModal() {
+  document.getElementById('addWireTypeModal').classList.add('hid');
+}
+
+function saveCustomWireType() {
+  const label = document.getElementById('wtLabel').value.trim();
+  if (!label) { alert('Bitte Bezeichnung eingeben!'); return; }
+  const key = 'cwt_' + Date.now();
+  customWireTypes[key] = {
+    label,
+    kabel:  document.getElementById('wtKabel').value.trim() || label,
+    color:  document.getElementById('wtColor').value,
+    dash:   document.getElementById('wtDash').value,
+    width:  parseFloat(document.getElementById('wtWidth').value) || 2,
+    adern:  parseInt(document.getElementById('wtAdern').value) || 3,
+  };
+  saveCustomWireTypesLS();
+  mergeCustomWireTypes();
+  closeAddWireTypeModal();
+  // Neuen Typ im Dropdown auswählen
+  const sel = document.getElementById('wireTypeSelect');
+  if (sel) { sel.value = key; setActiveWireType(key); }
+  setStatus('✅ Kabeltyp "' + label + '" hinzugefügt');
+}
+
+function deleteCustomWireType(key) {
+  if (!customWireTypes[key]) return;
+  const label = customWireTypes[key].label;
+  delete customWireTypes[key];
+  delete WIRE_TYPES[key];
+  saveCustomWireTypesLS();
+  rebuildCustomWireOptgroup();
+  openAddWireTypeModal(); // Modal neu aufbauen (Listenaktualisierung)
+  setStatus('Kabeltyp "' + label + '" gelöscht');
+}
 
 const PHASE_COLORS = {
   L1:'#e74c3c', L2:'#d4ac0d', L3:'#27ae60', N:'#2980b9',
@@ -5996,12 +6201,52 @@ function toggleSnap() {
     : '🧲 Andockhilfe (Wandfang) deaktiviert');
 }
 
-let activeSnapHint = null;
+// Findet den nächsten Punkt auf einer Raum-Polygon-Kante innerhalb der Toleranz.
+// Gibt {x, y, axis:'raum'} zurück, oder null wenn keine Kante nah genug ist.
+function findNearestRaumEdgeSnap(x, y) {
+  if (!state.snapEnabled || !state.raeume || !state.raeume.length) return null;
+  const TOL = 14 / state.zoom;
+  let best = null, bestDist = TOL;
+
+  for (const r of state.raeume) {
+    const pts = r.pts || [];
+    if (!pts.length) continue;
+    // Für rect: 2 Punkte → 4 Kanten aufbauen
+    const poly = r.type === 'rect' && pts.length === 2
+      ? [ pts[0], {x:pts[1].x,y:pts[0].y}, pts[1], {x:pts[0].x,y:pts[1].y} ]
+      : pts;
+    if (poly.length < 2) continue;
+    // Alle Kanten des Polygons durchlaufen
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i+1) % poly.length];
+      // Senkrechte Projektion des Punkts auf das Liniensegment a→b
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 < 1) continue;
+      const t = Math.max(0, Math.min(1, ((x-a.x)*dx + (y-a.y)*dy) / len2));
+      const px = a.x + t*dx, py = a.y + t*dy;
+      const d = Math.hypot(x-px, y-py);
+      if (d < bestDist) {
+        bestDist = d;
+        // Ausrichten: senkrecht zur Kante snappen (auf die Linie projizieren)
+        best = { x: px, y: py, axis: 'raum' };
+      }
+    }
+  }
+  return best;
+}
 
 function applySymbolSnap(rawX, rawY) {
-  const snap = findNearestWallSnap(rawX, rawY);
-  activeSnapHint = snap;
-  return snap ? { x: snap.x, y: snap.y } : { x: rawX, y: rawY };
+  // 1. Zuerst Raum-Kanten prüfen (haben Vorrang vor Wand-Bitmap-Kanten)
+  const raumSnap = findNearestRaumEdgeSnap(rawX, rawY);
+  if (raumSnap) {
+    activeSnapHint = raumSnap;
+    return { x: raumSnap.x, y: raumSnap.y };
+  }
+  // 2. Fallback: Wand-Kantenerkennung aus Grundriss-Bitmap
+  const wallSnap = findNearestWallSnap(rawX, rawY);
+  activeSnapHint = wallSnap;
+  return wallSnap ? { x: wallSnap.x, y: wallSnap.y } : { x: rawX, y: rawY };
 }
 
 // ═══════════════════════════════════════════════════
