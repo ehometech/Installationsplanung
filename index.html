@@ -2619,40 +2619,64 @@ function importSymbolConfig(event) {
     try {
       const data = JSON.parse(e.target.result);
 
-      // Symbole importieren
-      if (data.symbols && typeof data.symbols === 'object') {
-        const count = Object.keys(data.symbols).length;
-        if (count > 0) {
-          Object.assign(customSymbols, data.symbols);
-        }
+      if (!data.symbols && !data.version) {
+        alert('❌ Ungültige Backup-Datei. Bitte eine Symbol-Backup-JSON verwenden.');
+        return;
       }
 
-      // Version 2: gelöschte und überschriebene Standard-Symbole
-      if (data.deleted && Array.isArray(data.deleted)) {
-        deletedStdSymbols = new Set(data.deleted);
-        for (const k of deletedStdSymbols) delete SYMBOLS[k];
+      const count = Object.keys(data.symbols || {}).length;
+      if (!confirm('Symbol-Backup laden?\n\n' + count + ' eigene Symbole werden wiederhergestellt.\n\nBestehende eigene Symbole bleiben erhalten.')) {
+        event.target.value = ''; return;
       }
+
+      // ── Schritt 1: deletedStdSymbols leeren damit importierte Symbole nicht sofort wieder gelöscht werden ──
+      if (data.deleted && Array.isArray(data.deleted)) {
+        // Nur die aus dem Backup übernehmen
+        deletedStdSymbols = new Set(data.deleted);
+      } else {
+        // Kein deleted-Feld → komplett leeren (alte Version 1 Backups)
+        deletedStdSymbols = new Set();
+      }
+
+      // ── Schritt 2: symCache komplett leeren damit alle Symbole neu gerendert werden ──
+      if (typeof symCache !== 'undefined') {
+        for (const k of Object.keys(symCache)) delete symCache[k];
+      }
+
+      // ── Schritt 3: eigene Symbole aus Backup laden ──
+      if (data.symbols && typeof data.symbols === 'object') {
+        Object.assign(customSymbols, data.symbols);
+      }
+
+      // ── Schritt 4: Überschriebene Standard-Symbole (Version 2) ──
       if (data.overrides && typeof data.overrides === 'object') {
         Object.assign(overriddenStdSymbols, data.overrides);
-        for (const [k, cs] of Object.entries(data.overrides)) {
-          if (SYMBOLS[k]) {
-            SYMBOLS[k] = { ...SYMBOLS[k], ...cs, isOverride: true,
-              svg: cs.imgData ? `<image href="${cs.imgData}" width="40" height="40"/>` : SYMBOLS[k]?.svg };
-            delete symCache[k];
+      }
+
+      // ── Schritt 5: Speichern ──
+      saveCustomSymbols();
+
+      // ── Schritt 6: SYMBOLS neu aufbauen ──
+      // Erst Original-Symbole wiederherstellen (deletedStdSymbols wurde oben neu gesetzt)
+      if (window._SYMBOLS_ORIG) {
+        for (const [k, v] of Object.entries(window._SYMBOLS_ORIG)) {
+          if (!deletedStdSymbols.has(k)) {
+            SYMBOLS[k] = { ...v };
           }
         }
       }
-
-      // Alles speichern und UI aktualisieren
-      saveCustomSymbols();
+      // Dann eigene Symbole einmergen
       mergeCustomSymbols();
+
+      // ── Schritt 7: UI komplett neu aufbauen ──
       buildPalette();
       renderSymbolManager();
 
       const total = Object.keys(customSymbols).length;
-      setStatus('✅ Backup importiert — ' + total + ' eigene Symbole geladen');
+      setStatus('✅ ' + total + ' Symbole importiert und wiederhergestellt');
+
     } catch(err) {
-      alert('❌ Import fehlgeschlagen: ' + err.message + '\nBitte prüfe ob es eine gültige Backup-Datei ist.');
+      alert('❌ Import fehlgeschlagen: ' + err.message);
     }
   };
   reader.readAsText(file);
