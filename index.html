@@ -476,6 +476,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 </div>
 
 <div class="tabs">
+  <div class="tab" onclick="switchTab('projekte')" id="tab-projekte" style="color:#a371f7">📁 Projekte</div>
   <div class="tab act" onclick="switchTab('plan')" id="tab-plan">🗺 Grundrissplan</div>
   <div class="tab" onclick="switchTab('stromkreise')" id="tab-stromkreise">⚡ Stromkreise</div>
   <div class="tab" onclick="switchTab('stueckliste')" id="tab-stueckliste">📦 Stückliste</div>
@@ -1003,6 +1004,85 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
     <!-- SYMBOL GRID -->
     <div id="symMgrBody"></div>
+  </div>
+
+  <!-- ═══ PROJEKTE VIEW ═══ -->
+  <div id="projekteView" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:row;z-index:10;overflow:hidden">
+    <div style="width:240px;min-width:200px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sf)">
+      <div style="padding:12px;border-bottom:1px solid var(--bd)">
+        <div style="font-size:11px;font-weight:700;color:#a371f7;margin-bottom:8px">📁 Projekte / Kunden</div>
+        <button class="btn ba" style="width:100%;font-size:11px" onclick="pvNewKunde()">＋ Neues Projekt</button>
+      </div>
+      <div id="pvKundenListe" style="flex:1;overflow-y:auto;padding:6px"></div>
+      <div style="padding:8px;border-top:1px solid var(--bd)">
+        <button class="btn bg" style="width:100%;font-size:10px;margin-bottom:4px" onclick="pvExportAll()">📥 Alle Stücklisten (CSV)</button>
+      </div>
+      <div style="padding:8px;border-top:1px solid var(--bd);background:rgba(26,115,232,.07)">
+        <div id="gdStatus" style="font-size:10px;color:var(--tx3);margin-bottom:6px;text-align:center">☁️ Google Drive: nicht verbunden</div>
+        <button id="gdConnectBtn" class="btn bg" style="width:100%;font-size:10px" onclick="gdConnect()">🔑 Mit Google Drive verbinden</button>
+        <button id="gdDisconnectBtn" class="btn bg" style="width:100%;font-size:10px;display:none;color:var(--rd)" onclick="gdDisconnect()">Verbindung trennen</button>
+        <button id="gdSyncAllBtn" class="btn" style="width:100%;font-size:10px;margin-top:4px;display:none;background:rgba(26,115,232,.2);color:#4a90e2;border:1px solid rgba(26,115,232,.4)" onclick="gdSyncAll()">☁️ Alle auf Drive speichern</button>
+      </div>
+    </div>
+    <div style="width:280px;min-width:220px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--bg)">
+      <div style="padding:12px;border-bottom:1px solid var(--bd)">
+        <div id="pvGrundrissHeader" style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:8px">Projekt wählen →</div>
+        <button class="btn ba" id="pvAddGrundrissBtn" style="width:100%;font-size:11px;display:none" onclick="pvNewGrundriss()">＋ Grundriss hinzufügen</button>
+      </div>
+      <div id="pvGrundrissListe" style="flex:1;overflow-y:auto;padding:6px">
+        <div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">← Projekt auswählen</div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div id="pvDetail" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow:auto">
+        <div style="text-align:center;color:var(--tx3)">
+          <div style="font-size:48px;margin-bottom:16px">📁</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:8px">Projekt-Verwaltung</div>
+          <div style="font-size:11px;line-height:1.6">Erstelle ein Projekt für jeden Kunden.<br>Füge mehrere Grundrisse hinzu (EG, OG, Keller...).<br>Tippe einen Grundriss an → öffnet den Planungs-Tab.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals für Projekte -->
+  <div class="modal-ov hid" id="pvUploadModal">
+    <div class="modal" style="width:420px">
+      <h3>📄 Grundrisse hinzufügen</h3>
+      <!-- Fortschrittsanzeige (nur bei mehreren Dateien sichtbar) -->
+      <div id="pvUploadProgress" style="display:none;background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#58a6ff;text-align:center"></div>
+      <!-- Vorschau aktuelles Bild -->
+      <div id="pvUploadPreview" style="display:none;margin-bottom:10px;border-radius:6px;overflow:hidden;max-height:160px;background:var(--bg);border:1px solid var(--bd);text-align:center">
+        <img id="pvPreviewImg" style="max-width:100%;max-height:160px;object-fit:contain">
+      </div>
+      <div class="rp-row">
+        <label class="rp-lbl">Bezeichnung <span id="pvNameHint" style="color:var(--tx3);font-weight:400">(aus Dateiname vorausgefüllt)</span></label>
+        <input class="rp-input" id="pvGrundrissName" placeholder="z.B. Erdgeschoss, OG, Keller">
+      </div>
+      <div class="rp-row" id="pvFileRow">
+        <label class="rp-lbl">Grundriss-Datei(en) — PDF oder Bild</label>
+        <label class="btn bg" style="cursor:pointer;width:100%;text-align:center;display:block">
+          📁 Dateien wählen (mehrere möglich)
+          <input type="file" id="pvGrundrissFile" accept="image/*,application/pdf" multiple style="display:none" onchange="pvGrundrissFilesSelected(this)">
+        </label>
+        <div id="pvFileLabel" style="font-size:10px;color:var(--tx3);margin-top:4px">Keine Datei ausgewählt</div>
+      </div>
+      <div class="mft">
+        <button class="btn bg" onclick="pvCancelUpload()">Abbrechen</button>
+        <button class="btn ba" id="pvSaveBtn" onclick="pvSaveGrundriss()">✓ Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-ov hid" id="pvNewKundeModal">
+    <div class="modal" style="width:380px">
+      <h3>📁 Neues Projekt anlegen</h3>
+      <div class="rp-row"><label class="rp-lbl">Projektname / Kundenname</label><input class="rp-input" id="pvKundeName" placeholder="z.B. Mustermann Johann"></div>
+      <div class="rp-row"><label class="rp-lbl">Adresse (optional)</label><input class="rp-input" id="pvKundeAdresse" placeholder="z.B. Musterstr. 5, Leipzig"></div>
+      <div class="rp-row"><label class="rp-lbl">Notiz (optional)</label><input class="rp-input" id="pvKundeNotiz" placeholder="z.B. Neuinstallation EFH"></div>
+      <div class="mft">
+        <button class="btn bg" onclick="document.getElementById('pvNewKundeModal').classList.add('hid')">Abbrechen</button>
+        <button class="btn ba" onclick="pvSaveKunde()">✓ Projekt erstellen</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -5685,13 +5765,17 @@ function renderSummaryHTML(sd, forPrint=false) {
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════
 function switchTab(tab) {
+  // Auto-Speichern wenn Plan-Tab verlassen wird und PV-Grundriss offen ist
+  if (tab !== 'plan' && state._pvGrundrissId) {
+    pvSaveCurrentGrundriss().catch(()=>{});
+  }
   // Tabs markieren
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
   const tabEl = document.getElementById('tab-'+tab);
   if (tabEl) tabEl.classList.add('act');
 
   // Alle Views ausblenden
-  const views = ['planView','stromView','stView','symboleView'];
+  const views = ['planView','stromView','stView','symboleView','projekteView'];
   views.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -5719,6 +5803,10 @@ function switchTab(tab) {
     const el = document.getElementById('symboleView');
     if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
     renderSymbolManager();
+  } else if (tab === 'projekte') {
+    const el = document.getElementById('projekteView');
+    if (el) el.style.display = 'flex';
+    pvInit();
   }
 }
 
@@ -8182,6 +8270,569 @@ function drawRaeume() {
   }
 }
 
+
+
+// ═══════════════════════════════════════════════════
+//  PROJEKT-VERWALTUNG (pv* Modul)
+// ═══════════════════════════════════════════════════
+const PV_LS_KEY   = 'pv_kunden_v1';
+const PV_IDB_NAME = 'anvolt_pv';
+const PV_IDB_VER  = 1;
+let pvIDB = null;
+let pvKunden = [];
+let pvSelectedKundeId    = null;
+let pvSelectedGrundrissId = null;
+let pvPendingFileData    = null;
+
+function pvOpenIDB() {
+  return new Promise((res, rej) => {
+    if (pvIDB) { res(pvIDB); return; }
+    const req = indexedDB.open(PV_IDB_NAME, PV_IDB_VER);
+    req.onupgradeneeded = e => {
+      if (!e.target.result.objectStoreNames.contains('grundrisse'))
+        e.target.result.createObjectStore('grundrisse', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { pvIDB = e.target.result; res(pvIDB); };
+    req.onerror   = () => rej(req.error);
+  });
+}
+async function pvIDBPut(obj) {
+  const db = await pvOpenIDB();
+  return new Promise((res,rej)=>{ const tx=db.transaction('grundrisse','readwrite'); tx.objectStore('grundrisse').put(obj).onsuccess=()=>res(); tx.onerror=()=>rej(tx.error); });
+}
+async function pvIDBGet(id) {
+  const db = await pvOpenIDB();
+  return new Promise((res,rej)=>{ const req=db.transaction('grundrisse').objectStore('grundrisse').get(id); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); });
+}
+async function pvIDBDel(id) {
+  const db = await pvOpenIDB();
+  return new Promise((res,rej)=>{ const tx=db.transaction('grundrisse','readwrite'); tx.objectStore('grundrisse').delete(id).onsuccess=()=>res(); tx.onerror=()=>rej(tx.error); });
+}
+
+function pvSaveLS() {
+  try {
+    const meta = pvKunden.map(k=>({ ...k, grundrisse:(k.grundrisse||[]).map(g=>{ const {floorplanData,symbols,wires,raeume,trassen,...r}=g; return r; }) }));
+    localStorage.setItem(PV_LS_KEY, JSON.stringify(meta));
+  } catch(e) { console.warn('pvSaveLS:', e); }
+}
+function pvLoadLS() {
+  try { const raw=localStorage.getItem(PV_LS_KEY); if(raw) pvKunden=JSON.parse(raw); } catch(e) { pvKunden=[]; }
+}
+
+async function pvInit() {
+  pvLoadLS();
+  pvRenderKunden();
+  gdLoadToken();
+}
+
+function pvNewKunde() {
+  document.getElementById('pvKundeName').value='';
+  document.getElementById('pvKundeAdresse').value='';
+  document.getElementById('pvKundeNotiz').value='';
+  document.getElementById('pvNewKundeModal').classList.remove('hid');
+  setTimeout(()=>document.getElementById('pvKundeName').focus(),100);
+}
+function pvSaveKunde() {
+  const name=document.getElementById('pvKundeName').value.trim();
+  if(!name){alert('Bitte Projektname eingeben!');return;}
+  const kunde={id:'k_'+Date.now(),name,adresse:document.getElementById('pvKundeAdresse').value.trim(),notiz:document.getElementById('pvKundeNotiz').value.trim(),createdAt:new Date().toISOString(),grundrisse:[]};
+  pvKunden.unshift(kunde); pvSaveLS();
+  document.getElementById('pvNewKundeModal').classList.add('hid');
+  pvRenderKunden(); pvSelectKunde(kunde.id);
+  setStatus('✅ Projekt "'+name+'" angelegt');
+}
+function pvDeleteKunde(id) {
+  const k=pvKunden.find(k=>k.id===id);
+  if(!k||!confirm('Projekt "'+k.name+'" löschen?'))return;
+  (k.grundrisse||[]).forEach(g=>pvIDBDel(g.id).catch(()=>{}));
+  pvKunden=pvKunden.filter(k=>k.id!==id); pvSaveLS();
+  if(pvSelectedKundeId===id){pvSelectedKundeId=null;pvSelectedGrundrissId=null;}
+  pvRenderKunden(); pvRenderGrundrisse();
+}
+function pvSelectKunde(id) {
+  pvSelectedKundeId=id; pvSelectedGrundrissId=null;
+  pvRenderKunden(); pvRenderGrundrisse(); pvShowDetail(null);
+  const k=pvKunden.find(k=>k.id===id);
+  if(k){
+    const hdr=document.getElementById('pvGrundrissHeader');
+    if(hdr)hdr.textContent='📁 '+k.name;
+    const btn=document.getElementById('pvAddGrundrissBtn');
+    if(btn)btn.style.display='block';
+  }
+}
+function pvRenderKunden() {
+  const el=document.getElementById('pvKundenListe');
+  if(!el)return;
+  if(!pvKunden.length){el.innerHTML='<div style="color:var(--tx3);font-size:11px;padding:12px;text-align:center">Noch keine Projekte.<br>Tippe "+ Neues Projekt".</div>';return;}
+  el.innerHTML=pvKunden.map(k=>`
+    <div onclick="pvSelectKunde('${k.id}')" style="padding:9px 10px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid ${pvSelectedKundeId===k.id?'#a371f7':'var(--bd)'};background:${pvSelectedKundeId===k.id?'rgba(163,113,247,.12)':'var(--bg)'}">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:${pvSelectedKundeId===k.id?'#a371f7':'var(--tx)'}">${esc(k.name)}</div>
+          ${k.adresse?`<div style="font-size:10px;color:var(--tx3)">${esc(k.adresse)}</div>`:''}
+          <div style="font-size:10px;color:var(--tx3)">${(k.grundrisse||[]).length} Grundriss(e)</div>
+        </div>
+        <button onclick="event.stopPropagation();pvDeleteKunde('${k.id}')" style="background:none;border:none;color:var(--tx3);cursor:pointer;font-size:13px">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Mehrfach-Upload Queue für Grundrisse ──
+let pvUploadQueue   = [];   // [{file, dataUrl}]
+let pvUploadTotal   = 0;
+let pvUploadDoneCount = 0;
+
+function pvNewGrundriss() {
+  if (!pvSelectedKundeId) return;
+  pvUploadQueue = []; pvUploadTotal = 0; pvUploadDoneCount = 0;
+  pvPendingFileData = null;
+  document.getElementById('pvGrundrissName').value = '';
+  document.getElementById('pvFileLabel').textContent = 'Keine Datei ausgewählt';
+  document.getElementById('pvUploadProgress').style.display = 'none';
+  document.getElementById('pvUploadPreview').style.display = 'none';
+  document.getElementById('pvFileRow').style.display = 'block';
+  document.getElementById('pvUploadModal').classList.remove('hid');
+  setTimeout(() => document.getElementById('pvGrundrissName').focus(), 100);
+}
+
+function pvGrundrissFilesSelected(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  pvUploadQueue = []; pvUploadTotal = files.length; pvUploadDoneCount = 0;
+  pvPendingFileData = null;
+  document.getElementById('pvFileLabel').textContent = files.length + ' Datei(en) ausgewählt — wird verarbeitet…';
+  // Alle Dateien einlesen
+  let loaded = 0;
+  files.forEach(file => {
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        pvUploadQueue.push({ file, dataUrl: e.target.result, isPDF: true });
+        loaded++;
+        if (loaded === files.length) pvShowNextInQueue();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 2000, scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const oc = document.createElement('canvas'); oc.width = w; oc.height = h;
+          oc.getContext('2d').drawImage(img, 0, 0, w, h);
+          pvUploadQueue.push({ file, dataUrl: oc.toDataURL('image/jpeg', 0.85), isPDF: false, w, h });
+          loaded++;
+          if (loaded === files.length) pvShowNextInQueue();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function pvShowNextInQueue() {
+  if (!pvUploadQueue.length) return;
+  const entry = pvUploadQueue[0]; // zeige erstes (wird nach Speichern entfernt)
+  pvPendingFileData = entry.dataUrl;
+  // Name aus Dateiname vorausfüllen
+  const autoName = entry.file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  document.getElementById('pvGrundrissName').value = autoName;
+  document.getElementById('pvGrundrissName').select();
+  // Vorschau
+  if (!entry.isPDF) {
+    document.getElementById('pvPreviewImg').src = entry.dataUrl;
+    document.getElementById('pvUploadPreview').style.display = 'block';
+  } else {
+    document.getElementById('pvUploadPreview').style.display = 'none';
+  }
+  // Fortschritt
+  const done = pvUploadDoneCount, total = pvUploadTotal;
+  if (total > 1) {
+    document.getElementById('pvUploadProgress').style.display = 'block';
+    document.getElementById('pvUploadProgress').textContent =
+      `Grundriss ${done + 1} von ${total} — ${entry.file.name}`;
+  }
+  // Datei-Wahlfeld ausblenden (schon gewählt)
+  document.getElementById('pvFileRow').style.display = 'none';
+  // Speichern-Button beschriften
+  const remaining = pvUploadQueue.length;
+  document.getElementById('pvSaveBtn').textContent =
+    remaining > 1 ? `✓ Speichern & Nächster (${remaining - 1} weitere)` : '✓ Speichern';
+  document.getElementById('pvGrundrissName').focus();
+}
+
+function pvCancelUpload() {
+  pvUploadQueue = []; pvUploadTotal = 0; pvUploadDoneCount = 0; pvPendingFileData = null;
+  document.getElementById('pvUploadModal').classList.add('hid');
+}
+
+async function pvSaveGrundriss() {
+  const name = document.getElementById('pvGrundrissName').value.trim();
+  if (!name) { alert('Bitte Bezeichnung eingeben!'); return; }
+  const kunde = pvKunden.find(k => k.id === pvSelectedKundeId); if (!kunde) return;
+  const gId = 'g_' + Date.now();
+  const g = { id: gId, name, kundeId: pvSelectedKundeId, createdAt: new Date().toISOString(), symbols: [], wires: [], raeume: [], trassen: [], scale: null };
+  if (pvPendingFileData) {
+    await pvIDBPut({ id: gId, floorplanData: pvPendingFileData });
+    g.hasFloorplan = true;
+  }
+  if (!kunde.grundrisse) kunde.grundrisse = [];
+  kunde.grundrisse.push(g);
+  pvSaveLS();
+  pvUploadDoneCount++;
+  // Nächstes aus Queue
+  pvUploadQueue.shift();
+  if (pvUploadQueue.length > 0) {
+    pvPendingFileData = null;
+    pvShowNextInQueue();
+    pvRenderGrundrisse();
+    setStatus(`✅ "${name}" gespeichert — ${pvUploadQueue.length} weitere`);
+  } else {
+    // Alle fertig
+    pvPendingFileData = null;
+    document.getElementById('pvUploadModal').classList.add('hid');
+    pvRenderGrundrisse();
+    pvSelectGrundriss(gId);
+    setStatus(`✅ ${pvUploadDoneCount} Grundriss(e) hinzugefügt`);
+    pvUploadDoneCount = 0;
+  }
+}
+function pvDeleteGrundriss(kundeId,gId) {
+  const kunde=pvKunden.find(k=>k.id===kundeId); if(!kunde)return;
+  const g=(kunde.grundrisse||[]).find(g=>g.id===gId);
+  if(!g||!confirm('"'+g.name+'" löschen?'))return;
+  pvIDBDel(gId).catch(()=>{});
+  kunde.grundrisse=kunde.grundrisse.filter(g=>g.id!==gId); pvSaveLS();
+  if(pvSelectedGrundrissId===gId)pvSelectedGrundrissId=null;
+  pvRenderGrundrisse();
+}
+function pvSelectGrundriss(gId) {
+  pvSelectedGrundrissId=gId; pvRenderGrundrisse();
+  const kunde=pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g=(kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if(g)pvShowDetail(g);
+}
+function pvRenderGrundrisse() {
+  const el=document.getElementById('pvGrundrissListe'); if(!el)return;
+  const kunde=pvKunden.find(k=>k.id===pvSelectedKundeId);
+  if(!kunde){el.innerHTML='<div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">← Projekt auswählen</div>';return;}
+  const gs=kunde.grundrisse||[];
+  if(!gs.length){el.innerHTML='<div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">Noch keine Grundrisse.</div>';return;}
+  el.innerHTML=gs.map(g=>`
+    <div style="padding:9px 10px;border-radius:6px;margin-bottom:5px;border:1px solid ${pvSelectedGrundrissId===g.id?'#58a6ff':'var(--bd)'};background:${pvSelectedGrundrissId===g.id?'rgba(88,166,255,.1)':'var(--sf)'};cursor:pointer" onclick="pvSelectGrundriss('${g.id}')">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:18px">${g.hasFloorplan?'🗺':'📄'}</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:${pvSelectedGrundrissId===g.id?'#58a6ff':'var(--tx)'}">${esc(g.name)}</div>
+          <div style="font-size:10px;color:var(--tx3)">${(g.symbols||[]).length} Symbole · ${(g.wires||[]).length} Leitungen</div>
+        </div>
+        <button onclick="event.stopPropagation();pvDeleteGrundriss('${pvSelectedKundeId}','${g.id}')" style="background:none;border:none;color:var(--tx3);cursor:pointer;font-size:13px">✕</button>
+      </div>
+    </div>`).join('');
+}
+function pvShowDetail(g) {
+  const el=document.getElementById('pvDetail'); if(!el)return;
+  const kunde=pvKunden.find(k=>k.id===pvSelectedKundeId);
+  if(!g||!kunde){
+    el.innerHTML=`<div style="text-align:center;color:var(--tx3)"><div style="font-size:48px;margin-bottom:16px">📁</div><div style="font-size:14px;font-weight:700;margin-bottom:8px">${esc(kunde?.name||'Projekt wählen')}</div><div style="font-size:11px">← Grundriss auswählen</div></div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div style="width:100%;max-width:520px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <span style="font-size:32px">${g.hasFloorplan?'🗺':'📄'}</span>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:700">${esc(g.name)}</div>
+          <div style="font-size:11px;color:var(--tx3)">${esc(kunde.name)} · ${new Date(g.createdAt).toLocaleDateString('de-DE')}</div>
+        </div>
+      </div>
+      <!-- Statistik -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:#58a6ff">${(g.symbols||[]).length}</div><div style="font-size:10px;color:var(--tx3)">Symbole</div></div>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:#3fb950">${(g.wires||[]).length}</div><div style="font-size:10px;color:var(--tx3)">Leitungen</div></div>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:#f5a623">${(g.raeume||[]).length}</div><div style="font-size:10px;color:var(--tx3)">Räume</div></div>
+      </div>
+      <!-- Hauptaktion -->
+      <button class="btn ba" style="font-size:13px;padding:14px;width:100%;margin-bottom:12px" onclick="pvOpenGrundriss('${g.id}')">
+        🗺 Grundriss öffnen &amp; planen
+      </button>
+      <!-- Speichern -->
+      <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">💾 Speichern</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+        <button class="btn bg" style="font-size:11px" onclick="pvExportGrundrissJSON('${g.id}')">
+          💾 Lokal speichern (JSON-Datei auf PC)
+        </button>
+        <button class="btn" style="font-size:11px;background:rgba(26,115,232,.15);color:#4a90e2;border:1px solid rgba(26,115,232,.4)" onclick="gdSyncGrundriss('${pvSelectedKundeId}','${g.id}')">
+          ☁️ Auf Google Drive speichern
+        </button>
+      </div>
+      <!-- Exportieren -->
+      <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">📥 Exportieren</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+        <button class="btn bg" style="font-size:11px" onclick="pvExportStueckliste('${g.id}')">
+          📊 Stückliste als CSV exportieren
+        </button>
+      </div>
+      <!-- Wiederherstellen -->
+      <div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">📂 Wiederherstellen</div>
+      <label class="btn bg" style="font-size:11px;cursor:pointer;display:block;text-align:center;padding:8px">
+        📂 Grundriss aus JSON-Datei laden
+        <input type="file" accept=".json" style="display:none" onchange="pvImportGrundrissJSON(event,'${g.id}')">
+      </label>
+    </div>`;
+}
+
+async function pvOpenGrundriss(gId) {
+  const kunde=pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g=(kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if(!g)return;
+  await pvSaveCurrentGrundriss();
+  state.symbols=g.symbols||[]; state.wires=g.wires||[]; state.raeume=g.raeume||[]; state.trassen=g.trassen||[]; state.scale=g.scale||null; state.floorplan=null;
+  state._pvKundeId=pvSelectedKundeId; state._pvGrundrissId=gId;
+  const nameEl=document.getElementById('projName');
+  if(nameEl)nameEl.value=kunde.name+' – '+g.name;
+  let mx=0; state.symbols.forEach(s=>{const n=parseInt(s.id.replace(/\D/g,''));if(n>mx)mx=n;}); nid=mx+1;
+  switchTab('plan');
+  await new Promise(r=>setTimeout(r,80));
+  if(g.hasFloorplan){
+    try{
+      const idbEntry=await pvIDBGet(gId);
+      if(idbEntry?.floorplanData){
+        const dataUrl=idbEntry.floorplanData;
+        if(dataUrl.startsWith('data:application/pdf')&&typeof pdfjsLib!=='undefined'){
+          const base64=dataUrl.split(',')[1],binary=atob(base64),bytes=new Uint8Array(binary.length);
+          for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+          const blob=new Blob([bytes],{type:'application/pdf'}),url=URL.createObjectURL(blob);
+          pdfjsLib.getDocument(url).promise.then(pdf=>pdf.getPage(1)).then(page=>{
+            const vp=page.getViewport({scale:2.5}),oc=document.createElement('canvas');
+            oc.width=vp.width;oc.height=vp.height;
+            return page.render({canvasContext:oc.getContext('2d'),viewport:vp}).promise.then(()=>oc);
+          }).then(oc=>{
+            const img2=new Image();
+            img2.onload=()=>{state.floorplan={img:img2,w:img2.width,h:img2.height};document.getElementById('uploadZone').style.display='none';zFit();if(typeof detectWallEdges==='function')detectWallEdges(img2);render();};
+            img2.src=oc.toDataURL('image/png');URL.revokeObjectURL(url);
+          }).catch(()=>{URL.revokeObjectURL(url);render();});
+        } else {
+          const img=new Image();
+          img.onload=()=>{state.floorplan={img,w:img.width,h:img.height};document.getElementById('uploadZone').style.display='none';zFit();if(typeof detectWallEdges==='function')detectWallEdges(img);render();};
+          img.src=dataUrl;
+        }
+      } else render();
+    }catch(e){console.warn('pvOpenGrundriss IDB:',e);render();}
+  } else {document.getElementById('uploadZone').style.display='flex';render();}
+  setStatus('📂 Geöffnet: '+kunde.name+' – '+g.name);
+}
+
+async function pvSaveCurrentGrundriss() {
+  if(!state._pvKundeId||!state._pvGrundrissId)return;
+  const kunde=pvKunden.find(k=>k.id===state._pvKundeId);
+  const g=(kunde?.grundrisse||[]).find(g=>g.id===state._pvGrundrissId);
+  if(!g)return;
+  g.symbols=state.symbols; g.wires=state.wires; g.raeume=state.raeume; g.trassen=state.trassen; g.scale=state.scale;
+  if(state.floorplan?.img){
+    try{
+      const oc=document.createElement('canvas');oc.width=state.floorplan.w;oc.height=state.floorplan.h;
+      oc.getContext('2d').drawImage(state.floorplan.img,0,0);
+      await pvIDBPut({id:g.id,floorplanData:oc.toDataURL('image/jpeg',0.82)});
+      g.hasFloorplan=true;
+    }catch(e){}
+  }
+  pvSaveLS();
+  if(gdToken&&gdAutoSyncEnabled){gdSyncGrundriss(state._pvKundeId,state._pvGrundrissId).catch(()=>{});}
+}
+
+function pvExportStueckliste(gId) {
+  const kunde=pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g=(kunde?.grundrisse||[]).find(g=>g.id===gId); if(!g)return;
+  const origSym=state.symbols,origWire=state.wires,origRaeume=state.raeume;
+  state.symbols=g.symbols||[]; state.wires=g.wires||[]; state.raeume=g.raeume||[];
+  const origName=document.getElementById('projName').value;
+  document.getElementById('projName').value=(kunde.name+' '+g.name).replace(/\s+/g,'_');
+  exportCSV();
+  state.symbols=origSym; state.wires=origWire; state.raeume=origRaeume;
+  document.getElementById('projName').value=origName;
+}
+
+function pvExportAll() {
+  if(!pvKunden.length){alert('Keine Projekte vorhanden');return;}
+  const sep=';';
+  let csv=`GESAMT-STÜCKLISTE${sep}\nExportiert: ${new Date().toLocaleString('de-DE')}${sep}\n\n`;
+  for(const kunde of pvKunden){
+    csv+=`═══ PROJEKT: ${kunde.name} ${sep}${kunde.adresse||''}${sep}\n`;
+    for(const g of(kunde.grundrisse||[])){
+      csv+=`\n  GRUNDRISS: ${g.name}${sep}\n`;
+      const byType={};
+      for(const s of(g.symbols||[])){const def=SYMBOLS[s.type]||{name:s.type};const l=def.name||s.type;if(!byType[l])byType[l]={count:0,c:new Set()};byType[l].count+=(s.count||1);if(s.circuit)byType[l].c.add(s.circuit);}
+      if(Object.keys(byType).length){csv+=`  Gerät${sep}Anzahl${sep}Stromkreise${sep}\n`;Object.entries(byType).forEach(([n,v])=>{csv+=`  "${n}"${sep}${v.count}${sep}"${[...v.c].join(', ')}"${sep}\n`;});}
+      const byK={};
+      for(const w of(g.wires||[])){byK[w.kabel||'—']=(byK[w.kabel||'—']||0)+parseFloat(w.laenge_m||0);}
+      if(Object.keys(byK).length){csv+=`  Kabeltyp${sep}Länge(m)${sep}\n`;Object.entries(byK).forEach(([k,m])=>{csv+=`  "${k}"${sep}${m.toFixed(1)}${sep}\n`;});}
+    }
+    csv+='\n';
+  }
+  const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='alle_stuecklisten_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  setStatus('✅ Gesamt-Stückliste exportiert');
+}
+
+// ═══════════════════════════════════════════════════
+//  GOOGLE DRIVE (gd* Modul)
+// ═══════════════════════════════════════════════════
+const GD_CLIENT_ID = '290855467613-62k3bse6kja75f502ie8dcfilgv73386.apps.googleusercontent.com';
+const GD_SCOPES    = 'https://www.googleapis.com/auth/drive.file';
+const GD_API_BASE  = 'https://www.googleapis.com/drive/v3';
+const GD_UPLOAD    = 'https://www.googleapis.com/upload/drive/v3/files';
+let gdToken=null,gdTokenExpiry=0,gdTokenClient=null,gdRootFolderId=null;
+let gdAutoSyncEnabled=true;
+
+function gdLoadToken(){
+  try{const raw=localStorage.getItem('gd_token_v1');if(!raw)return;const{token,expiry}=JSON.parse(raw);if(Date.now()<expiry-60000){gdToken=token;gdTokenExpiry=expiry;gdUpdateUI(true);}}catch(e){}
+}
+function gdSaveToken(token,expiresIn){
+  gdToken=token;gdTokenExpiry=Date.now()+expiresIn*1000;
+  try{localStorage.setItem('gd_token_v1',JSON.stringify({token,expiry:gdTokenExpiry}));}catch(e){}
+}
+function gdConnect(){
+  if(!window.google?.accounts?.oauth2){setStatus('❌ Google Script noch nicht geladen — kurz warten');return;}
+  if(!gdTokenClient){
+    gdTokenClient=google.accounts.oauth2.initTokenClient({client_id:GD_CLIENT_ID,scope:GD_SCOPES,
+      callback:(resp)=>{if(resp.error){setStatus('❌ Google Drive: '+resp.error);return;}gdSaveToken(resp.access_token,resp.expires_in);gdUpdateUI(true);setStatus('✅ Google Drive verbunden!');gdEnsureRootFolder();}});
+  }
+  gdTokenClient.requestAccessToken({prompt:gdToken?'':'consent'});
+}
+function gdDisconnect(){
+  if(gdToken&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(gdToken);
+  gdToken=null;gdTokenExpiry=0;gdRootFolderId=null;
+  try{localStorage.removeItem('gd_token_v1');}catch(e){}
+  gdUpdateUI(false);setStatus('Google Drive Verbindung getrennt');
+}
+function gdUpdateUI(connected){
+  const c=document.getElementById('gdConnectBtn'),d=document.getElementById('gdDisconnectBtn'),s=document.getElementById('gdSyncAllBtn'),st=document.getElementById('gdStatus');
+  if(!c)return;
+  c.style.display=connected?'none':'block';d.style.display=connected?'block':'none';s.style.display=connected?'block':'none';
+  if(st){st.textContent=connected?'✅ Google Drive: verbunden':'☁️ Google Drive: nicht verbunden';st.style.color=connected?'#3fb950':'';}
+}
+async function gdEnsureToken(){return gdToken&&Date.now()<gdTokenExpiry-60000;}
+async function gdFetch(url,options={}){
+  if(!gdToken)throw new Error('Nicht verbunden');
+  const resp=await fetch(url,{...options,headers:{'Authorization':'Bearer '+gdToken,...(options.headers||{})}});
+  if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err?.error?.message||resp.statusText);}
+  return resp;
+}
+async function gdFindOrCreateFolder(name,parentId){
+  const q=`name='${name.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+  const resp=await gdFetch(`${GD_API_BASE}/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+  const data=await resp.json();
+  if(data.files?.length)return data.files[0].id;
+  const cr=await gdFetch(`${GD_API_BASE}/files`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[parentId]})});
+  return(await cr.json()).id;
+}
+async function gdEnsureRootFolder(){if(gdRootFolderId)return gdRootFolderId;gdRootFolderId=await gdFindOrCreateFolder('Anvolt Grundrisse','root');return gdRootFolderId;}
+async function gdUploadFile(folderId,filename,mimeType,content){
+  const q=`name='${filename.replace(/'/g,"\\'")}' and '${folderId}' in parents and trashed=false`;
+  const sr=await gdFetch(`${GD_API_BASE}/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+  const sd=await sr.json();const existingId=sd.files?.[0]?.id;
+  const boundary='anvolt_'+Date.now();
+  const meta=JSON.stringify(existingId?{}:{name:filename,parents:[folderId]});
+  let body;
+  if(typeof content==='string'&&content.startsWith('data:')){
+    const[,b64]=content.split(','),binary=atob(b64),bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const blob=new Blob([bytes],{type:mimeType});
+    body=new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,blob,`\r\n--${boundary}--`]);
+  }else{
+    body=new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,new TextEncoder().encode(content),`\r\n--${boundary}--`]);
+  }
+  const url=existingId?`${GD_UPLOAD}/${existingId}?uploadType=multipart`:`${GD_UPLOAD}?uploadType=multipart`;
+  const resp=await gdFetch(url,{method:existingId?'PATCH':'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body});
+  return await resp.json();
+}
+// ── Lokales Speichern & Laden eines Grundrisses als JSON-Datei ──
+async function pvExportGrundrissJSON(gId) {
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if (!g) return;
+  let floorplanData = null;
+  if (g.hasFloorplan) {
+    try { const idb = await pvIDBGet(gId); floorplanData = idb?.floorplanData||null; } catch(e){}
+  }
+  const exportData = {
+    version: 1, exportedAt: new Date().toISOString(),
+    kunde: { name: kunde.name, adresse: kunde.adresse||'' },
+    grundriss: { name: g.name, createdAt: g.createdAt, symbols: g.symbols||[], wires: g.wires||[], raeume: g.raeume||[], trassen: g.trassen||[], scale: g.scale||null, floorplanData }
+  };
+  const json = JSON.stringify(exportData);
+  const b = new Blob([json], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  const datei = (kunde.name+'_'+g.name).replace(/[^a-zA-Z0-9äöüÄÖÜß\-_]/g,'_');
+  a.download = datei+'_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setStatus('✅ "'+g.name+'" lokal gespeichert ('+Math.round(json.length/1024)+' KB)');
+}
+
+async function pvImportGrundrissJSON(event, gId) {
+  const file = event.target.files[0]; if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const gr = data.grundriss || data;
+      if (!gr.symbols && !gr.wires) { alert('❌ Ungültige Grundriss-Datei'); return; }
+      const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+      const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+      if (!g) return;
+      if (gr.symbols)  g.symbols  = gr.symbols;
+      if (gr.wires)    g.wires    = gr.wires;
+      if (gr.raeume)   g.raeume   = gr.raeume;
+      if (gr.trassen)  g.trassen  = gr.trassen;
+      if (gr.scale)    g.scale    = gr.scale;
+      if (gr.floorplanData) { await pvIDBPut({id:gId,floorplanData:gr.floorplanData}); g.hasFloorplan=true; }
+      pvSaveLS(); pvRenderGrundrisse(); pvShowDetail(g);
+      setStatus('✅ Grundriss "'+g.name+'" wiederhergestellt');
+    } catch(err) { alert('❌ Fehler: '+err.message); }
+  };
+  reader.readAsText(file);
+}
+
+async function gdSyncGrundriss(kundeId,gId){
+  if(!gdToken){gdConnect();return;}
+  const kunde=pvKunden.find(k=>k.id===kundeId);const g=(kunde?.grundrisse||[]).find(g=>g.id===gId);if(!g)return;
+  setStatus('☁️ Lade auf Google Drive hoch…');
+  try{
+    const rootId=await gdEnsureRootFolder();
+    const projId=await gdFindOrCreateFolder(kunde.name,rootId);
+    const grId=await gdFindOrCreateFolder(g.name,projId);
+    // JSON Plandaten
+    const planData={name:g.name,kunde:kunde.name,symbols:g.symbols||[],wires:g.wires||[],raeume:g.raeume||[],scale:g.scale||null,exportedAt:new Date().toISOString()};
+    await gdUploadFile(grId,g.name+'_plan.json','application/json',JSON.stringify(planData,null,2));
+    // CSV Stückliste
+    const sep=';';let csv=`Stückliste${sep}${kunde.name} – ${g.name}${sep}\n\nGerät${sep}Anzahl${sep}\n`;
+    const byType={};for(const s of(g.symbols||[])){const l=(SYMBOLS[s.type]||{name:s.type}).name||s.type;byType[l]=(byType[l]||0)+(s.count||1);}
+    Object.entries(byType).forEach(([n,c])=>{csv+=`"${n}"${sep}${c}${sep}\n`;});
+    await gdUploadFile(grId,g.name+'_stueckliste.csv','text/csv','\uFEFF'+csv);
+    // Grundrissbild
+    if(g.hasFloorplan){try{const idb=await pvIDBGet(gId);if(idb?.floorplanData){const m=idb.floorplanData.startsWith('data:application/pdf')?'application/pdf':'image/jpeg';await gdUploadFile(grId,g.name+'_grundriss'+(m==='application/pdf'?'.pdf':'.jpg'),m,idb.floorplanData);}}catch(e){}}
+    setStatus('✅ "'+g.name+'" auf Drive gespeichert → Anvolt Grundrisse / '+kunde.name);
+    pvShowDetail(g);
+  }catch(e){console.error('gdSyncGrundriss:',e);setStatus('❌ Drive-Upload fehlgeschlagen: '+e.message);}
+}
+async function gdSyncAll(){
+  if(!gdToken){gdConnect();return;}
+  if(!pvKunden.length){alert('Keine Projekte vorhanden');return;}
+  setStatus('☁️ Lade alle Projekte hoch…');
+  let ok=0,fail=0;
+  for(const kunde of pvKunden){
+    const prev=pvSelectedKundeId;pvSelectedKundeId=kunde.id;
+    for(const g of(kunde.grundrisse||[])){try{await gdSyncGrundriss(kunde.id,g.id);ok++;}catch(e){fail++;}}
+    pvSelectedKundeId=prev;
+  }
+  setStatus(`✅ Drive-Sync: ${ok} hochgeladen${fail?', '+fail+' Fehler':''}`);
+}
 
 </script>
 </body>
