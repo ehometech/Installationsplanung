@@ -476,10 +476,12 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 </div>
 
 <div class="tabs">
+  <div class="tab" onclick="switchTab('projekte')" id="tab-projekte" style="color:#a371f7">📁 Projekte</div>
   <div class="tab act" onclick="switchTab('plan')" id="tab-plan">🗺 Grundrissplan</div>
   <div class="tab" onclick="switchTab('stromkreise')" id="tab-stromkreise">⚡ Stromkreise</div>
   <div class="tab" onclick="switchTab('stueckliste')" id="tab-stueckliste">📦 Stückliste</div>
   <div class="tab" onclick="switchTab('symbole')" id="tab-symbole">🖼 Symbole verwalten</div>
+  <div class="tab" onclick="switchTab('zeichnen')" id="tab-zeichnen" style="color:#58a6ff">✏ Grundriss zeichnen</div>
   <div class="tab" onclick="showAI()" id="tab-ki" style="color:var(--pu)">🤖 KI-Assistent</div>
 </div>
 
@@ -850,6 +852,95 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   </div>
 
   <!-- STÜCKLISTE VIEW (inside main) -->
+  <!-- PROJEKTE VIEW -->
+  <div id="projekteView" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:row;z-index:10;overflow:hidden">
+
+    <!-- Linke Spalte: Kunden/Projekte -->
+    <div style="width:240px;min-width:200px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sf)">
+      <div style="padding:12px;border-bottom:1px solid var(--bd)">
+        <div style="font-size:11px;font-weight:700;color:#a371f7;margin-bottom:8px">📁 Projekte / Kunden</div>
+        <button class="btn ba" style="width:100%;font-size:11px" onclick="pvNewKunde()">＋ Neues Projekt</button>
+      </div>
+      <div id="pvKundenListe" style="flex:1;overflow-y:auto;padding:6px"></div>
+      <div style="padding:8px;border-top:1px solid var(--bd)">
+        <button class="btn bg" style="width:100%;font-size:10px" onclick="pvExportAll()">📥 Alle Stücklisten exportieren</button>
+      </div>
+    </div>
+
+    <!-- Mittlere Spalte: Grundrisse des ausgewählten Projekts -->
+    <div style="width:280px;min-width:220px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--bg)">
+      <div style="padding:12px;border-bottom:1px solid var(--bd)">
+        <div id="pvGrundrissHeader" style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:8px">Projekt wählen →</div>
+        <button class="btn ba" id="pvAddGrundrissBtn" style="width:100%;font-size:11px;display:none" onclick="pvNewGrundriss()">＋ Grundriss hinzufügen</button>
+      </div>
+      <div id="pvGrundrissListe" style="flex:1;overflow-y:auto;padding:6px">
+        <div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">← Projekt auswählen</div>
+      </div>
+    </div>
+
+    <!-- Rechte Seite: Detail / Vorschau -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div id="pvDetail" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow:auto">
+        <div style="text-align:center;color:var(--tx3)">
+          <div style="font-size:48px;margin-bottom:16px">📁</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:8px">Projekt-Verwaltung</div>
+          <div style="font-size:11px;line-height:1.6">
+            Erstelle ein Projekt für jeden Kunden.<br>
+            Füge mehrere Grundrisse hinzu (EG, OG, Keller...).<br>
+            Tippe einen Grundriss an → öffnet den Planungs-Tab.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Grundriss-Upload Modal für Projekt -->
+  <div class="modal-ov hid" id="pvUploadModal">
+    <div class="modal" style="width:400px">
+      <h3>📄 Grundriss hinzufügen</h3>
+      <div class="rp-row">
+        <label class="rp-lbl">Bezeichnung</label>
+        <input class="rp-input" id="pvGrundrissName" placeholder="z.B. Erdgeschoss, OG, Keller">
+      </div>
+      <div class="rp-row">
+        <label class="rp-lbl">Grundriss (PDF oder Bild, optional)</label>
+        <label class="btn bg" style="cursor:pointer;width:100%;text-align:center;display:block">
+          📁 Datei wählen
+          <input type="file" id="pvGrundrissFile" accept="image/*,application/pdf" style="display:none" onchange="pvGrundrissFileSelected(this)">
+        </label>
+        <div id="pvFileLabel" style="font-size:10px;color:var(--tx3);margin-top:4px">Keine Datei ausgewählt</div>
+      </div>
+      <div class="mft">
+        <button class="btn bg" onclick="document.getElementById('pvUploadModal').classList.add('hid')">Abbrechen</button>
+        <button class="btn ba" onclick="pvSaveGrundriss()">✓ Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Neues Projekt Modal -->
+  <div class="modal-ov hid" id="pvNewKundeModal">
+    <div class="modal" style="width:380px">
+      <h3>📁 Neues Projekt anlegen</h3>
+      <div class="rp-row">
+        <label class="rp-lbl">Projektname / Kundenname</label>
+        <input class="rp-input" id="pvKundeName" placeholder="z.B. Mustermann Johann">
+      </div>
+      <div class="rp-row">
+        <label class="rp-lbl">Adresse (optional)</label>
+        <input class="rp-input" id="pvKundeAdresse" placeholder="z.B. Musterstr. 5, Leipzig">
+      </div>
+      <div class="rp-row">
+        <label class="rp-lbl">Notiz (optional)</label>
+        <input class="rp-input" id="pvKundeNotiz" placeholder="z.B. Neuinstallation, EFH">
+      </div>
+      <div class="mft">
+        <button class="btn bg" onclick="document.getElementById('pvNewKundeModal').classList.add('hid')">Abbrechen</button>
+        <button class="btn ba" onclick="pvSaveKunde()">✓ Projekt erstellen</button>
+      </div>
+    </div>
+  </div>
+
   <div class="view" id="stView">
     <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="font-size:14px;font-weight:700">📦 Stückliste</h2>
@@ -1008,6 +1099,67 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
     <!-- SYMBOL GRID -->
     <div id="symMgrBody"></div>
+  </div>
+
+  <!-- GRUNDRISS ZEICHNEN VIEW -->
+  <div id="zeichnenView" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;z-index:10;">
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--sf);border-bottom:1px solid var(--bd);flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:#58a6ff;margin-right:4px">✏ Grundriss</span>
+      <div class="vs"></div>
+      <!-- Werkzeuge -->
+      <button class="tool-btn act" id="gztool-wand"   onclick="gzSetTool('wand')"   title="Wand zeichnen">🧱 Wand</button>
+      <button class="tool-btn"     id="gztool-fenster" onclick="gzSetTool('fenster')" title="Fenster einzeichnen">🪟 Fenster</button>
+      <button class="tool-btn"     id="gztool-tuer"    onclick="gzSetTool('tuer')"    title="Tür einzeichnen">🚪 Tür</button>
+      <button class="tool-btn"     id="gztool-raum"    onclick="gzSetTool('raum')"    title="Raum als Rechteck">⬜ Raum</button>
+      <button class="tool-btn"     id="gztool-select"  onclick="gzSetTool('select')"  title="Auswahl / Löschen">↖ Auswahl</button>
+      <div class="vs"></div>
+      <!-- Raster -->
+      <label style="font-size:10px;color:var(--tx3)">Raster:
+        <select class="rp-sel" id="gzGridSize" onchange="gzSetGrid(+this.value)" style="width:80px;font-size:10px">
+          <option value="10">10 cm</option>
+          <option value="25" selected>25 cm</option>
+          <option value="50">50 cm</option>
+          <option value="100">1 m</option>
+        </select>
+      </label>
+      <label style="font-size:10px;color:var(--tx3);display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="gzSnapGrid" checked onchange="gzState.snapGrid=this.checked"> Raster-Snap
+      </label>
+      <div class="vs"></div>
+      <!-- Wandstärke -->
+      <label style="font-size:10px;color:var(--tx3)">Wandstärke:
+        <select class="rp-sel" id="gzWallThick" style="width:70px;font-size:10px">
+          <option value="10">10 cm</option>
+          <option value="11.5">11.5 cm</option>
+          <option value="17.5" selected>17.5 cm</option>
+          <option value="24">24 cm</option>
+          <option value="30">30 cm</option>
+        </select>
+      </label>
+      <div class="vs"></div>
+      <!-- Zoom -->
+      <button class="tool-btn" onclick="gzZoom(-0.1)">−</button>
+      <span id="gzZoomLbl" style="font-size:10px;font-family:var(--mono);min-width:38px;text-align:center">100%</span>
+      <button class="tool-btn" onclick="gzZoom(+0.1)">+</button>
+      <button class="tool-btn" onclick="gzZoomFit()" title="Einpassen">⊡</button>
+      <div class="vs"></div>
+      <!-- Aktionen -->
+      <button class="btn bg" style="font-size:11px" onclick="gzUndo()">↩ Rückgängig</button>
+      <button class="btn bg" style="font-size:11px" onclick="gzClearAll()" style="color:var(--rd)">🗑 Alles</button>
+      <div class="hsp"></div>
+      <button class="btn ba" style="font-size:11px;font-weight:700" onclick="gzExportToFloorplan()">✅ Als Grundriss übernehmen</button>
+    </div>
+    <!-- Canvas -->
+    <div id="gzWrap" style="flex:1;position:relative;overflow:hidden;cursor:crosshair">
+      <canvas id="gzCanvas" style="position:absolute;top:0;left:0"></canvas>
+      <!-- Maßangabe-Tooltip während des Zeichnens -->
+      <div id="gzMassLabel" style="position:absolute;display:none;background:rgba(0,0,0,.8);color:#fff;font-size:11px;font-family:var(--mono);padding:3px 8px;border-radius:12px;pointer-events:none;white-space:nowrap"></div>
+    </div>
+    <!-- Statuszeile -->
+    <div style="padding:5px 12px;font-size:10px;color:var(--tx3);font-family:var(--mono);background:var(--sf);border-top:1px solid var(--bd)" id="gzStatus">
+      🧱 Wand zeichnen: Klick für ersten Punkt, zweiter Klick schließt die Wand
+    </div>
   </div>
 
 </div>
@@ -6105,13 +6257,17 @@ function renderSummaryHTML(sd, forPrint=false) {
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════
 function switchTab(tab) {
+  // Auto-Speichern: wenn man den Planungs-Tab verlässt und ein PV-Grundriss offen ist
+  if (tab !== 'plan' && state._pvGrundrissId) {
+    pvSaveCurrentGrundriss().catch(()=>{});
+  }
   // Tabs markieren
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
   const tabEl = document.getElementById('tab-'+tab);
   if (tabEl) tabEl.classList.add('act');
 
   // Alle Views ausblenden
-  const views = ['planView','stromView','stView','symboleView'];
+  const views = ['planView','stromView','stView','symboleView','zeichnenView','projekteView'];
   views.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -6139,6 +6295,14 @@ function switchTab(tab) {
     const el = document.getElementById('symboleView');
     if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
     renderSymbolManager();
+  } else if (tab === 'zeichnen') {
+    const el = document.getElementById('zeichnenView');
+    if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+    gzInit();
+  } else if (tab === 'projekte') {
+    const el = document.getElementById('projekteView');
+    if (el) { el.style.display = 'flex'; }
+    pvInit();
   }
 }
 
@@ -8877,6 +9041,1029 @@ function raumKabelInfo(r) {
 }
 
 
+
+
+
+// ═══════════════════════════════════════════════════
+//  PROJEKT-VERWALTUNG (pv* Modul)
+// ═══════════════════════════════════════════════════
+// Hierarchie: Kunde → Grundrisse
+// Speicherung: localStorage für Metadaten + IndexedDB für Grundriss-Bilder/Daten
+// Optional: Firebase wenn eingeloggt (kunden/{id}/grundrisse/{id})
+
+const PV_LS_KEY  = 'pv_kunden_v1';
+const PV_IDB_NAME = 'anvolt_pv';
+const PV_IDB_VER  = 1;
+let pvIDB = null;
+let pvKunden = []; // [{id, name, adresse, notiz, createdAt, grundrisse:[{id,name,...}]}]
+let pvSelectedKundeId   = null;
+let pvSelectedGrundrissId = null;
+let pvPendingFileData   = null; // base64 des gewählten Grundriss-Bildes
+
+// ── IndexedDB öffnen ──
+function pvOpenIDB() {
+  return new Promise((res, rej) => {
+    if (pvIDB) { res(pvIDB); return; }
+    const req = indexedDB.open(PV_IDB_NAME, PV_IDB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('grundrisse')) {
+        db.createObjectStore('grundrisse', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { pvIDB = e.target.result; res(pvIDB); };
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+async function pvIDBPut(obj) {
+  const db = await pvOpenIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('grundrisse', 'readwrite');
+    tx.objectStore('grundrisse').put(obj).onsuccess = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function pvIDBGet(id) {
+  const db = await pvOpenIDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction('grundrisse').objectStore('grundrisse').get(id);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = () => rej(req.error);
+  });
+}
+async function pvIDBDel(id) {
+  const db = await pvOpenIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('grundrisse', 'readwrite');
+    tx.objectStore('grundrisse').delete(id).onsuccess = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+// ── Metadaten persistieren ──
+function pvSaveLS() {
+  try {
+    // Nur Metadaten in localStorage (kein base64 → zu groß)
+    const meta = pvKunden.map(k => ({
+      ...k,
+      grundrisse: (k.grundrisse||[]).map(g => {
+        const {floorplanData, symbols, wires, raeume, trassen, ...rest} = g;
+        return rest;
+      })
+    }));
+    localStorage.setItem(PV_LS_KEY, JSON.stringify(meta));
+  } catch(e) { console.warn('pvSaveLS:', e); }
+}
+
+function pvLoadLS() {
+  try {
+    const raw = localStorage.getItem(PV_LS_KEY);
+    if (raw) pvKunden = JSON.parse(raw);
+  } catch(e) { pvKunden = []; }
+}
+
+// ── Firebase-Sync (wenn eingeloggt) ──
+async function pvSyncToFirebase(kunde) {
+  if (!fbDb || !currentUser) return;
+  try {
+    const ref = fbDb.collection('pv_kunden').doc(kunde.id);
+    const meta = { ...kunde, grundrisse: (kunde.grundrisse||[]).map(g => {
+      const {floorplanData, ...rest} = g;
+      return rest;
+    }), uid: currentUser.uid };
+    await ref.set(meta, { merge: true });
+  } catch(e) { console.warn('pvSyncToFirebase:', e); }
+}
+
+async function pvLoadFromFirebase() {
+  if (!fbDb || !currentUser) return;
+  try {
+    const snap = await fbDb.collection('pv_kunden')
+      .where('uid','==',currentUser.uid)
+      .orderBy('createdAt','desc')
+      .get();
+    const fbKunden = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    // Mergen: lokale Daten haben Vorrang für Grundriss-Bilddaten
+    for (const fbK of fbKunden) {
+      const existing = pvKunden.find(k => k.id === fbK.id);
+      if (!existing) pvKunden.push(fbK);
+      else {
+        // Firebase-Metadaten mit lokalem Stand mergen
+        Object.assign(existing, { name: fbK.name, adresse: fbK.adresse, notiz: fbK.notiz });
+      }
+    }
+    pvSaveLS();
+  } catch(e) { console.warn('pvLoadFromFirebase:', e); }
+}
+
+// ── Init ──
+async function pvInit() {
+  pvLoadLS();
+  pvRenderKunden();
+  // Firebase-Sync im Hintergrund
+  if (fbDb && currentUser) pvLoadFromFirebase().then(() => pvRenderKunden());
+}
+
+// ── Kunden-Verwaltung ──
+function pvNewKunde() {
+  document.getElementById('pvKundeName').value   = '';
+  document.getElementById('pvKundeAdresse').value = '';
+  document.getElementById('pvKundeNotiz').value   = '';
+  document.getElementById('pvNewKundeModal').classList.remove('hid');
+  setTimeout(() => document.getElementById('pvKundeName').focus(), 100);
+}
+
+function pvSaveKunde() {
+  const name = document.getElementById('pvKundeName').value.trim();
+  if (!name) { alert('Bitte Projektname eingeben!'); return; }
+  const kunde = {
+    id:        'k_' + Date.now(),
+    name,
+    adresse:   document.getElementById('pvKundeAdresse').value.trim(),
+    notiz:     document.getElementById('pvKundeNotiz').value.trim(),
+    createdAt: new Date().toISOString(),
+    grundrisse: [],
+  };
+  pvKunden.unshift(kunde);
+  pvSaveLS();
+  pvSyncToFirebase(kunde);
+  document.getElementById('pvNewKundeModal').classList.add('hid');
+  pvRenderKunden();
+  pvSelectKunde(kunde.id);
+  setStatus('✅ Projekt "' + name + '" angelegt');
+}
+
+function pvDeleteKunde(id) {
+  const k = pvKunden.find(k=>k.id===id);
+  if (!k) return;
+  if (!confirm('Projekt "'+k.name+'" und alle Grundrisse löschen?')) return;
+  // IDB-Einträge löschen
+  (k.grundrisse||[]).forEach(g => pvIDBDel(g.id).catch(()=>{}));
+  pvKunden = pvKunden.filter(k=>k.id!==id);
+  pvSaveLS();
+  if (fbDb && currentUser) fbDb.collection('pv_kunden').doc(id).delete().catch(()=>{});
+  if (pvSelectedKundeId === id) { pvSelectedKundeId=null; pvSelectedGrundrissId=null; }
+  pvRenderKunden();
+  pvRenderGrundrisse();
+}
+
+function pvSelectKunde(id) {
+  pvSelectedKundeId      = id;
+  pvSelectedGrundrissId  = null;
+  pvRenderKunden();
+  pvRenderGrundrisse();
+  pvShowDetail(null);
+  const k = pvKunden.find(k=>k.id===id);
+  if (k) {
+    const hdr = document.getElementById('pvGrundrissHeader');
+    if (hdr) hdr.textContent = '📁 ' + k.name;
+    const btn = document.getElementById('pvAddGrundrissBtn');
+    if (btn) btn.style.display = 'block';
+  }
+}
+
+function pvRenderKunden() {
+  const el = document.getElementById('pvKundenListe');
+  if (!el) return;
+  if (!pvKunden.length) {
+    el.innerHTML = '<div style="color:var(--tx3);font-size:11px;padding:12px;text-align:center">Noch keine Projekte.<br>Tippe "+ Neues Projekt".</div>';
+    return;
+  }
+  el.innerHTML = pvKunden.map(k => `
+    <div onclick="pvSelectKunde('${k.id}')" style="padding:9px 10px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid ${pvSelectedKundeId===k.id?'#a371f7':'var(--bd)'};background:${pvSelectedKundeId===k.id?'rgba(163,113,247,.12)':'var(--bg)'};transition:all .15s">
+      <div style="font-size:12px;font-weight:700;color:${pvSelectedKundeId===k.id?'#a371f7':'var(--tx)'}">${esc(k.name)}</div>
+      ${k.adresse?`<div style="font-size:10px;color:var(--tx3);margin-top:2px">${esc(k.adresse)}</div>`:''}
+      <div style="font-size:10px;color:var(--tx3);margin-top:2px">${(k.grundrisse||[]).length} Grundriss(e)</div>
+    </div>
+  `).join('');
+}
+
+// ── Grundriss-Verwaltung ──
+function pvNewGrundriss() {
+  if (!pvSelectedKundeId) return;
+  pvPendingFileData = null;
+  document.getElementById('pvGrundrissName').value = '';
+  document.getElementById('pvFileLabel').textContent  = 'Keine Datei ausgewählt';
+  document.getElementById('pvUploadModal').classList.remove('hid');
+  setTimeout(() => document.getElementById('pvGrundrissName').focus(), 100);
+}
+
+function pvGrundrissFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('pvFileLabel').textContent = file.name + ' (' + Math.round(file.size/1024) + ' KB)';
+  const reader = new FileReader();
+  reader.onload = e => { pvPendingFileData = e.target.result; };
+  reader.readAsDataURL(file);
+}
+
+async function pvSaveGrundriss() {
+  const name = document.getElementById('pvGrundrissName').value.trim();
+  if (!name) { alert('Bitte Bezeichnung eingeben!'); return; }
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  if (!kunde) return;
+  const gId = 'g_' + Date.now();
+  const g = {
+    id: gId,
+    name,
+    kundeId:   pvSelectedKundeId,
+    createdAt: new Date().toISOString(),
+    symbols:   [],
+    wires:     [],
+    raeume:    [],
+    trassen:   [],
+    scale:     null,
+  };
+  // Bilddaten in IDB speichern (groß, gehört nicht in LS)
+  if (pvPendingFileData) {
+    await pvIDBPut({ id: gId, floorplanData: pvPendingFileData });
+    g.hasFloorplan = true;
+  }
+  if (!kunde.grundrisse) kunde.grundrisse = [];
+  kunde.grundrisse.push(g);
+  pvSaveLS();
+  pvSyncToFirebase(kunde);
+  document.getElementById('pvUploadModal').classList.add('hid');
+  pvPendingFileData = null;
+  pvRenderGrundrisse();
+  pvSelectGrundriss(gId);
+  setStatus('✅ Grundriss "' + name + '" hinzugefügt');
+}
+
+function pvDeleteGrundriss(kundeId, gId) {
+  const kunde = pvKunden.find(k=>k.id===kundeId);
+  if (!kunde) return;
+  const g = (kunde.grundrisse||[]).find(g=>g.id===gId);
+  if (!g || !confirm('"'+g.name+'" löschen?')) return;
+  pvIDBDel(gId).catch(()=>{});
+  kunde.grundrisse = kunde.grundrisse.filter(g=>g.id!==gId);
+  pvSaveLS();
+  pvSyncToFirebase(kunde);
+  if (pvSelectedGrundrissId === gId) pvSelectedGrundrissId = null;
+  pvRenderGrundrisse();
+}
+
+function pvSelectGrundriss(gId) {
+  pvSelectedGrundrissId = gId;
+  pvRenderGrundrisse();
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if (g) pvShowDetail(g);
+}
+
+function pvRenderGrundrisse() {
+  const el = document.getElementById('pvGrundrissListe');
+  if (!el) return;
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  if (!kunde) {
+    el.innerHTML = '<div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">← Projekt auswählen</div>';
+    return;
+  }
+  const gs = kunde.grundrisse||[];
+  if (!gs.length) {
+    el.innerHTML = '<div style="color:var(--tx3);font-size:11px;padding:16px;text-align:center">Noch keine Grundrisse.<br>Tippe "+ Grundriss hinzufügen".</div>';
+    return;
+  }
+  el.innerHTML = gs.map(g => `
+    <div style="padding:9px 10px;border-radius:6px;margin-bottom:5px;border:1px solid ${pvSelectedGrundrissId===g.id?'#58a6ff':'var(--bd)'};background:${pvSelectedGrundrissId===g.id?'rgba(88,166,255,.1)':'var(--sf)'};cursor:pointer" onclick="pvSelectGrundriss('${g.id}')">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:18px">${g.hasFloorplan?'🗺':'📄'}</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:${pvSelectedGrundrissId===g.id?'#58a6ff':'var(--tx)'}">${esc(g.name)}</div>
+          <div style="font-size:10px;color:var(--tx3)">${(g.symbols||[]).length} Symbole · ${(g.wires||[]).length} Leitungen</div>
+        </div>
+        <button onclick="event.stopPropagation();pvDeleteGrundriss('${pvSelectedKundeId}','${g.id}')" style="background:none;border:none;color:var(--tx3);cursor:pointer;font-size:13px;padding:2px 4px" title="Löschen">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Detail-Ansicht ──
+function pvShowDetail(g) {
+  const el = document.getElementById('pvDetail');
+  if (!el) return;
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  if (!g || !kunde) {
+    el.innerHTML = `<div style="text-align:center;color:var(--tx3)"><div style="font-size:48px;margin-bottom:16px">📁</div><div style="font-size:14px;font-weight:700;margin-bottom:8px">${esc(kunde?.name||'Projekt wählen')}</div>${kunde?.adresse?`<div style="font-size:11px;margin-bottom:4px">${esc(kunde.adresse)}</div>`:''}<div style="font-size:11px">← Grundriss auswählen</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="width:100%;max-width:520px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <span style="font-size:32px">${g.hasFloorplan?'🗺':'📄'}</span>
+        <div>
+          <div style="font-size:16px;font-weight:700">${esc(g.name)}</div>
+          <div style="font-size:11px;color:var(--tx3)">${esc(kunde.name)} · ${new Date(g.createdAt).toLocaleDateString('de-DE')}</div>
+        </div>
+      </div>
+      <!-- Statistik -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:#58a6ff">${(g.symbols||[]).length}</div>
+          <div style="font-size:10px;color:var(--tx3)">Symbole</div>
+        </div>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:#3fb950">${(g.wires||[]).length}</div>
+          <div style="font-size:10px;color:var(--tx3)">Leitungen</div>
+        </div>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:#f5a623">${(g.raeume||[]).length}</div>
+          <div style="font-size:10px;color:var(--tx3)">Räume</div>
+        </div>
+      </div>
+      <!-- Aktionen -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn ba" style="font-size:12px;padding:12px" onclick="pvOpenGrundriss('${g.id}')">
+          🗺 Grundriss öffnen &amp; planen
+        </button>
+        <button class="btn bg" style="font-size:12px" onclick="pvExportStueckliste('${g.id}')">
+          📥 Stückliste exportieren (CSV)
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Grundriss öffnen → Planungs-Tab ──
+async function pvOpenGrundriss(gId) {
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if (!g) return;
+
+  // Aktuellen Stand aus Plan-Tab in das aktuelle Grundriss-Objekt sichern (falls eines offen war)
+  await pvSaveCurrentGrundriss();
+
+  // Neuen Grundriss-Stand laden
+  state.symbols  = g.symbols  || [];
+  state.wires    = g.wires    || [];
+  state.raeume   = g.raeume   || [];
+  state.trassen  = g.trassen  || [];
+  state.scale    = g.scale    || null;
+
+  // Grundriss-Bild aus IDB laden
+  if (g.hasFloorplan) {
+    try {
+      const idbEntry = await pvIDBGet(gId);
+      if (idbEntry?.floorplanData) {
+        const img = new Image();
+        img.onload = () => {
+          state.floorplan = { img, w: img.width, h: img.height };
+          const uz = document.getElementById('uploadZone');
+          if (uz) uz.style.display = 'none';
+          zFit();
+          detectWallEdges(img);
+          render();
+        };
+        img.src = idbEntry.floorplanData;
+      }
+    } catch(e) { console.warn('pvOpenGrundriss IDB:', e); }
+  } else {
+    state.floorplan = null;
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'flex';
+  }
+
+  // Merken welcher Grundriss aktuell offen ist
+  state._pvKundeId    = pvSelectedKundeId;
+  state._pvGrundrissId = gId;
+
+  // Projektnamen ins Plan-Tab übernehmen
+  const nameEl = document.getElementById('projName');
+  if (nameEl) nameEl.value = kunde.name + ' – ' + g.name;
+
+  // nid-Counter anpassen
+  let mx = 0;
+  state.symbols.forEach(s => { const n=parseInt(s.id.replace(/\D/g,'')); if(n>mx)mx=n; });
+  nid = mx + 1;
+
+  render();
+  switchTab('plan');
+  setStatus('📂 Geöffnet: ' + kunde.name + ' – ' + g.name);
+}
+
+// ── Aktuellen Plan-Stand in Projekt zurückspeichern ──
+async function pvSaveCurrentGrundriss() {
+  if (!state._pvKundeId || !state._pvGrundrissId) return;
+  const kunde = pvKunden.find(k=>k.id===state._pvKundeId);
+  const g = (kunde?.grundrisse||[]).find(g=>g.id===state._pvGrundrissId);
+  if (!g) return;
+  g.symbols  = state.symbols;
+  g.wires    = state.wires;
+  g.raeume   = state.raeume;
+  g.trassen  = state.trassen;
+  g.scale    = state.scale;
+  // Grundriss-Bild in IDB aktualisieren, wenn eines geladen ist
+  if (state.floorplan?.img) {
+    try {
+      const oc = document.createElement('canvas');
+      oc.width  = state.floorplan.w;
+      oc.height = state.floorplan.h;
+      oc.getContext('2d').drawImage(state.floorplan.img, 0, 0);
+      const dataUrl = oc.toDataURL('image/jpeg', 0.82);
+      await pvIDBPut({ id: g.id, floorplanData: dataUrl });
+      g.hasFloorplan = true;
+    } catch(e) {}
+  }
+  pvSaveLS();
+  pvSyncToFirebase(kunde);
+}
+
+// ── Stückliste eines Grundrisses exportieren ──
+function pvExportStueckliste(gId) {
+  const kunde = pvKunden.find(k=>k.id===pvSelectedKundeId);
+  const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if (!g) return;
+  // Temporär State umschalten, exportCSV aufrufen, zurückschalten
+  const origSym   = state.symbols, origWire = state.wires, origRaeume = state.raeume;
+  state.symbols   = g.symbols  || [];
+  state.wires     = g.wires    || [];
+  state.raeume    = g.raeume   || [];
+  // Dateiname anpassen
+  const origName = document.getElementById('projName').value;
+  document.getElementById('projName').value = (kunde.name + ' ' + g.name).replace(/\s+/g,'_');
+  exportCSV();
+  state.symbols   = origSym;
+  state.wires     = origWire;
+  state.raeume    = origRaeume;
+  document.getElementById('projName').value = origName;
+}
+
+// ── ALLE Stücklisten in eine CSV exportieren ──
+function pvExportAll() {
+  if (!pvKunden.length) { alert('Keine Projekte vorhanden'); return; }
+  const sep = ';';
+  let csv = `GESAMT-STÜCKLISTE ALLE PROJEKTE${sep}\n`;
+  csv += `Exportiert am: ${new Date().toLocaleString('de-DE')}${sep}\n\n`;
+
+  for (const kunde of pvKunden) {
+    csv += `═══════════════════════════════${sep}\n`;
+    csv += `PROJEKT: ${kunde.name}${sep}${kunde.adresse||''}${sep}\n`;
+    csv += `═══════════════════════════════${sep}\n`;
+    for (const g of (kunde.grundrisse||[])) {
+      csv += `\n  GRUNDRISS: ${g.name}${sep}\n`;
+      // Symbole
+      const syms = g.symbols||[];
+      const byType = {};
+      for (const s of syms) {
+        const def = SYMBOLS[s.type]||{name:s.type};
+        const label = def.name||s.type;
+        if (!byType[label]) byType[label] = { count:0, circuit: new Set(), phase: new Set() };
+        byType[label].count += (s.count||1);
+        if (s.circuit) byType[label].circuit.add(s.circuit);
+        if (s.phase)   byType[label].phase.add(s.phase);
+      }
+      if (Object.keys(byType).length) {
+        csv += `  Gerät${sep}Anzahl${sep}Stromkreise${sep}\n`;
+        Object.entries(byType).forEach(([name,v]) => {
+          csv += `  "${name}"${sep}${v.count}${sep}"${[...v.circuit].join(', ')}"${sep}\n`;
+        });
+      }
+      // Kabel
+      const wires = g.wires||[];
+      const byKabel = {};
+      for (const w of wires) { byKabel[w.kabel||'—'] = (byKabel[w.kabel||'—']||0)+parseFloat(w.laenge_m||0); }
+      if (Object.keys(byKabel).length) {
+        csv += `  Kabeltyp${sep}Länge(m)${sep}\n`;
+        Object.entries(byKabel).forEach(([k,m]) => { csv += `  "${k}"${sep}${m.toFixed(1)}${sep}\n`; });
+      }
+      // Räume
+      const raeume = g.raeume||[];
+      if (raeume.length && typeof symbolsInRaum === 'function') {
+        const origSyms = state.symbols; state.symbols = syms;
+        csv += `  Raum${sep}Geräte${sep}Kabellänge${sep}\n`;
+        for (const r of raeume) {
+          const info = raumKabelInfo ? raumKabelInfo(r) : {syms:[],laengeGesamt:0};
+          csv += `  "${r.name}"${sep}${info.syms.length}${sep}${info.laengeGesamt.toFixed(1)}m${sep}\n`;
+        }
+        state.symbols = origSyms;
+      }
+    }
+    csv += '\n';
+  }
+  const b = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'alle_stuecklisten_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  setStatus('✅ Gesamt-Stückliste exportiert');
+}
+
+// ── Auto-Speichern wird direkt in switchTab gehandhabt (kein Wrap nötig) ──
+
+
+// Eigenständiger Vektor-Grundriss-Editor mit Raster-Snap.
+// Elemente: Wände (Linien mit Stärke), Fenster, Türen, Räume (Rechtecke mit Namen).
+// Maßstab: 1 Pixel = 1 cm (bei gridSize=25 → 25cm-Raster).
+// "Als Grundriss übernehmen" rendert den Plan auf ein Bild und übergibt ihn an den Plan-Tab.
+
+var gzState = {
+  tool:      'wand',
+  zoom:      1,
+  pan:       { x: 60, y: 60 },
+  snapGrid:  true,
+  gridPx:    25,        // Raster-Schritt in Canvas-Pixeln (= cm bei 1px/cm)
+  elements:  [],        // { type, ... }
+  undoStack: [],
+  drawing:   null,      // aktuell gezeichnetes Element (Vorschau)
+  selected:  null,
+  panning:   false,
+  panStart:  null,
+};
+
+var gzCanvas, gzCtx, gzWrap, gzInited = false;
+
+// ── Werkzeug-Status-Texte ──
+var GZ_STATUS = {
+  wand:    '🧱 Wand: Klick für Start, zweiter Klick für Ende — Wandstärke aus Dropdown oben',
+  fenster: '🪟 Fenster: Klick für Start, zweiter Klick für Ende (auf Wand legen)',
+  tuer:    '🚪 Tür: Klick für Startpunkt, zweiter Klick für Ende',
+  raum:    '⬜ Raum: Klick für Ecke 1, zweiter Klick für Ecke 2 — dann Name eingeben',
+  select:  '↖ Auswahl: Element anklicken zum Auswählen/Löschen (Entf-Taste)',
+};
+
+function gzInit() {
+  gzCanvas = document.getElementById('gzCanvas');
+  gzWrap   = document.getElementById('gzWrap');
+  if (!gzCanvas || !gzWrap) return;
+
+  // Canvas-Größe an Wrap anpassen
+  function gzResize() {
+    gzCanvas.width  = gzWrap.clientWidth;
+    gzCanvas.height = gzWrap.clientHeight;
+    gzRender();
+  }
+  gzCtx = gzCanvas.getContext('2d');
+
+  if (!gzInited) {
+    gzInited = true;
+    gzCanvas.addEventListener('mousedown',  gzOnDown);
+    gzCanvas.addEventListener('mousemove',  gzOnMove);
+    gzCanvas.addEventListener('mouseup',    gzOnUp);
+    gzCanvas.addEventListener('wheel',      gzOnWheel, { passive: false });
+    gzCanvas.addEventListener('dblclick',   gzOnDbl);
+    window.addEventListener('keydown', e => {
+      if (document.getElementById('zeichnenView')?.style.display === 'none') return;
+      if ((e.key==='Delete'||e.key==='Backspace') && gzState.selected !== null) {
+        gzState.undoStack.push(JSON.stringify(gzState.elements));
+        gzState.elements.splice(gzState.selected, 1);
+        gzState.selected = null;
+        gzRender();
+      }
+      if (e.key==='Escape') { gzState.drawing=null; gzRender(); }
+    });
+    // Touch
+    gzCanvas.addEventListener('touchstart', e=>{ e.preventDefault(); gzOnDown(e.touches[0]); }, {passive:false});
+    gzCanvas.addEventListener('touchmove',  e=>{ e.preventDefault(); gzOnMove(e.touches[0]); }, {passive:false});
+    gzCanvas.addEventListener('touchend',   e=>{ e.preventDefault(); gzOnUp(e.changedTouches[0]); }, {passive:false});
+
+    new ResizeObserver(gzResize).observe(gzWrap);
+  }
+  gzResize();
+  gzRender();
+}
+
+// ── Koordinaten-Umrechnung ──
+function gzClientToWorld(cx, cy) {
+  const r = gzCanvas.getBoundingClientRect();
+  return {
+    x: (cx - r.left - gzState.pan.x) / gzState.zoom,
+    y: (cy - r.top  - gzState.pan.y) / gzState.zoom,
+  };
+}
+function gzSnap(p) {
+  if (!gzState.snapGrid) return p;
+  const g = gzState.gridPx;
+  return { x: Math.round(p.x/g)*g, y: Math.round(p.y/g)*g };
+}
+
+// ── Werkzeug-Auswahl ──
+function gzSetTool(t) {
+  gzState.tool = t;
+  gzState.drawing = null;
+  gzState.selected = null;
+  document.querySelectorAll('[id^="gztool-"]').forEach(b=>b.classList.remove('act'));
+  const btn = document.getElementById('gztool-'+t);
+  if (btn) btn.classList.add('act');
+  gzCanvas.style.cursor = t==='select' ? 'default' : 'crosshair';
+  document.getElementById('gzStatus').textContent = GZ_STATUS[t] || '';
+  gzRender();
+}
+
+function gzSetGrid(val) {
+  gzState.gridPx = val;
+  gzRender();
+}
+
+// ── Maus-Handling ──
+function gzOnDown(e) {
+  const raw = gzClientToWorld(e.clientX, e.clientY);
+  const pt  = gzSnap(raw);
+
+  if (e.button === 1 || e.ctrlKey || e.metaKey) {
+    gzState.panning  = true;
+    gzState.panStart = { mx: e.clientX, my: e.clientY, px: gzState.pan.x, py: gzState.pan.y };
+    return;
+  }
+  if (e.altKey) {
+    gzState.panning  = true;
+    gzState.panStart = { mx: e.clientX, my: e.clientY, px: gzState.pan.x, py: gzState.pan.y };
+    return;
+  }
+
+  const t = gzState.tool;
+
+  if (t === 'select') {
+    gzState.selected = gzHitTest(raw);
+    gzRender(); return;
+  }
+
+  if (t === 'raum') {
+    if (!gzState.drawing) {
+      gzState.drawing = { type:'raum', p1: pt, p2: pt };
+    } else {
+      gzState.drawing.p2 = pt;
+      gzFinishRaum();
+    }
+    return;
+  }
+
+  // Wand / Fenster / Tür: Linienwerkzeuge
+  if (!gzState.drawing) {
+    gzState.drawing = { type: t, p1: pt, p2: pt,
+      thick: +(document.getElementById('gzWallThick')?.value || 17.5) };
+  } else {
+    gzState.drawing.p2 = pt;
+    gzCommitDrawing();
+  }
+  gzRender();
+}
+
+function gzOnMove(e) {
+  if (gzState.panning && gzState.panStart) {
+    gzState.pan.x = gzState.panStart.px + (e.clientX - gzState.panStart.mx);
+    gzState.pan.y = gzState.panStart.py + (e.clientY - gzState.panStart.my);
+    gzRender(); return;
+  }
+  if (!gzState.drawing) return;
+  const raw = gzClientToWorld(e.clientX, e.clientY);
+  const pt  = gzSnap(raw);
+  gzState.drawing.p2 = pt;
+  // Maß-Tooltip aktualisieren
+  gzShowMassLabel(e.clientX, e.clientY, gzState.drawing.p1, pt);
+  gzRender();
+}
+
+function gzOnUp(e) {
+  if (gzState.panning) { gzState.panning = false; gzState.panStart = null; }
+}
+
+function gzOnDbl(e) {
+  if (gzState.drawing) { gzState.drawing = null; gzRender(); }
+}
+
+function gzOnWheel(e) {
+  e.preventDefault();
+  const r = gzCanvas.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const delta = e.deltaY > 0 ? 0.88 : 1.14;
+  const nz = Math.min(Math.max(gzState.zoom * delta, 0.2), 8);
+  gzState.pan.x = mx - (mx - gzState.pan.x) * (nz / gzState.zoom);
+  gzState.pan.y = my - (my - gzState.pan.y) * (nz / gzState.zoom);
+  gzState.zoom = nz;
+  document.getElementById('gzZoomLbl').textContent = Math.round(nz*100) + '%';
+  gzRender();
+}
+
+function gzZoom(delta) {
+  const nz = Math.min(Math.max(gzState.zoom + delta, 0.2), 8);
+  const cx = gzCanvas.width/2, cy = gzCanvas.height/2;
+  gzState.pan.x = cx - (cx - gzState.pan.x) * (nz / gzState.zoom);
+  gzState.pan.y = cy - (cy - gzState.pan.y) * (nz / gzState.zoom);
+  gzState.zoom = nz;
+  document.getElementById('gzZoomLbl').textContent = Math.round(nz*100) + '%';
+  gzRender();
+}
+
+function gzZoomFit() {
+  if (!gzState.elements.length) { gzState.zoom=1; gzState.pan={x:60,y:60}; gzRender(); return; }
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const el of gzState.elements) {
+    for (const p of [el.p1||{x:el.x1,y:el.y1},{x:el.x2||el.p1?.x,y:el.y2||el.p1?.y},el.p2||{}]) {
+      if (p.x!=null){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);}
+      if (p.y!=null){minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
+    }
+  }
+  const W=gzCanvas.width-80, H=gzCanvas.height-80;
+  const dw=maxX-minX||100, dh=maxY-minY||100;
+  gzState.zoom = Math.min(W/dw, H/dh, 4);
+  gzState.pan.x = 40 - minX*gzState.zoom;
+  gzState.pan.y = 40 - minY*gzState.zoom;
+  document.getElementById('gzZoomLbl').textContent = Math.round(gzState.zoom*100) + '%';
+  gzRender();
+}
+
+// ── Element fertigstellen ──
+function gzCommitDrawing() {
+  const d = gzState.drawing;
+  if (!d || Math.hypot(d.p2.x-d.p1.x, d.p2.y-d.p1.y) < 2) { gzState.drawing=null; return; }
+  gzState.undoStack.push(JSON.stringify(gzState.elements));
+  gzState.elements.push({ ...d });
+  gzState.drawing = null;
+  gzRender();
+}
+
+function gzFinishRaum() {
+  const d = gzState.drawing;
+  const w = Math.abs(d.p2.x-d.p1.x), h = Math.abs(d.p2.y-d.p1.y);
+  if (w < 5 || h < 5) { gzState.drawing = null; gzRender(); return; }
+  const name = prompt('Raumname eingeben:', 'Wohnzimmer') || 'Raum';
+  gzState.undoStack.push(JSON.stringify(gzState.elements));
+  gzState.elements.push({ type:'raum', p1: d.p1, p2: d.p2, name });
+  gzState.drawing = null;
+  gzRender();
+}
+
+// ── Rückgängig / Löschen ──
+function gzUndo() {
+  if (!gzState.undoStack.length) return;
+  gzState.elements = JSON.parse(gzState.undoStack.pop());
+  gzState.selected = null;
+  gzRender();
+}
+
+function gzClearAll() {
+  if (!confirm('Alle gezeichneten Elemente löschen?')) return;
+  gzState.undoStack.push(JSON.stringify(gzState.elements));
+  gzState.elements = [];
+  gzState.drawing  = null;
+  gzState.selected = null;
+  gzRender();
+}
+
+// ── Hit-Test (Auswahl-Modus) ──
+function gzHitTest(pt) {
+  for (let i = gzState.elements.length-1; i >= 0; i--) {
+    const el = gzState.elements[i];
+    if (el.type === 'raum') {
+      const x1=Math.min(el.p1.x,el.p2.x), x2=Math.max(el.p1.x,el.p2.x);
+      const y1=Math.min(el.p1.y,el.p2.y), y2=Math.max(el.p1.y,el.p2.y);
+      if (pt.x>=x1&&pt.x<=x2&&pt.y>=y1&&pt.y<=y2) return i;
+    } else {
+      // Abstand Punkt zur Linie
+      const dx=el.p2.x-el.p1.x, dy=el.p2.y-el.p1.y;
+      const len2=dx*dx+dy*dy;
+      if(len2<1) continue;
+      const t=Math.max(0,Math.min(1,((pt.x-el.p1.x)*dx+(pt.y-el.p1.y)*dy)/len2));
+      const px=el.p1.x+t*dx, py=el.p1.y+t*dy;
+      if (Math.hypot(pt.x-px,pt.y-py) < 8/gzState.zoom) return i;
+    }
+  }
+  return null;
+}
+
+// ── Maß-Tooltip ──
+function gzShowMassLabel(cx, cy, p1, p2) {
+  const d = Math.hypot(p2.x-p1.x, p2.y-p1.y); // in cm
+  const m = d >= 100 ? (d/100).toFixed(2)+' m' : d.toFixed(0)+' cm';
+  const lbl = document.getElementById('gzMassLabel');
+  if (!lbl) return;
+  lbl.style.display = 'block';
+  lbl.style.left = (cx+14) + 'px';
+  lbl.style.top  = (cy-22) + 'px';
+  const r = gzCanvas.getBoundingClientRect();
+  lbl.style.left = (cx - r.left + 14) + 'px';
+  lbl.style.top  = (cy - r.top  - 26) + 'px';
+  lbl.textContent = m;
+}
+
+// ── Render ──
+var GZ_COLORS = {
+  wand:    '#e8e8e8',
+  fenster: '#58a6ff',
+  tuer:    '#f5a623',
+  raum:    'rgba(63,185,80,.08)',
+};
+var GZ_STROKE = {
+  wand:    '#c0c0c0',
+  fenster: '#2060c0',
+  tuer:    '#c07000',
+  raum:    'rgba(63,185,80,.5)',
+};
+
+function gzRender() {
+  if (!gzCtx || !gzCanvas) return;
+  const W = gzCanvas.width, H = gzCanvas.height;
+  const { zoom, pan } = gzState;
+  gzCtx.clearRect(0, 0, W, H);
+
+  gzCtx.save();
+  gzCtx.setTransform(zoom, 0, 0, zoom, pan.x, pan.y);
+
+  // ── Raster ──
+  const g = gzState.gridPx;
+  const startX = Math.floor(-pan.x/zoom/g)*g;
+  const startY = Math.floor(-pan.y/zoom/g)*g;
+  const endX   = startX + W/zoom + g;
+  const endY   = startY + H/zoom + g;
+  gzCtx.strokeStyle = 'rgba(255,255,255,.06)';
+  gzCtx.lineWidth = 1/zoom;
+  for (let x=startX; x<=endX; x+=g) {
+    gzCtx.beginPath(); gzCtx.moveTo(x,startY); gzCtx.lineTo(x,endY); gzCtx.stroke();
+  }
+  for (let y=startY; y<=endY; y+=g) {
+    gzCtx.beginPath(); gzCtx.moveTo(startX,y); gzCtx.lineTo(endX,y); gzCtx.stroke();
+  }
+  // Hauptlinien (5-faches Raster)
+  gzCtx.strokeStyle = 'rgba(255,255,255,.12)';
+  for (let x=Math.floor(startX/(g*5))*(g*5); x<=endX; x+=g*5) {
+    gzCtx.beginPath(); gzCtx.moveTo(x,startY); gzCtx.lineTo(x,endY); gzCtx.stroke();
+  }
+  for (let y=Math.floor(startY/(g*5))*(g*5); y<=endY; y+=g*5) {
+    gzCtx.beginPath(); gzCtx.moveTo(startX,y); gzCtx.lineTo(endY,y); gzCtx.stroke();
+  }
+
+  // ── Elemente ──
+  gzState.elements.forEach((el, idx) => gzDrawElement(el, idx === gzState.selected));
+
+  // ── Vorschau ──
+  if (gzState.drawing) gzDrawElement(gzState.drawing, false, true);
+
+  // ── Ursprung-Markierung ──
+  gzCtx.strokeStyle = 'rgba(255,255,255,.2)';
+  gzCtx.lineWidth = 1/zoom;
+  gzCtx.beginPath(); gzCtx.moveTo(-8,0); gzCtx.lineTo(8,0); gzCtx.stroke();
+  gzCtx.beginPath(); gzCtx.moveTo(0,-8); gzCtx.lineTo(0,8); gzCtx.stroke();
+
+  gzCtx.restore();
+
+  // Maß-Label ausblenden wenn nicht gezeichnet wird
+  if (!gzState.drawing) {
+    const lbl = document.getElementById('gzMassLabel');
+    if (lbl) lbl.style.display = 'none';
+  }
+}
+
+function gzDrawElement(el, selected, preview) {
+  const ctx = gzCtx;
+  const z = gzState.zoom;
+  const alpha = preview ? 0.55 : 1;
+  ctx.globalAlpha = alpha;
+
+  if (el.type === 'raum') {
+    const x1=Math.min(el.p1.x,el.p2.x), y1=Math.min(el.p1.y,el.p2.y);
+    const w=Math.abs(el.p2.x-el.p1.x), h=Math.abs(el.p2.y-el.p1.y);
+    ctx.fillStyle = selected ? 'rgba(63,185,80,.22)' : 'rgba(63,185,80,.08)';
+    ctx.strokeStyle = selected ? '#3fb950' : 'rgba(63,185,80,.5)';
+    ctx.lineWidth = (selected?2:1.5)/z;
+    ctx.setLineDash(selected?[]:[5/z,3/z]);
+    ctx.beginPath(); ctx.rect(x1,y1,w,h); ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    if (el.name) {
+      ctx.fillStyle = 'rgba(63,185,80,.9)';
+      ctx.font = `bold ${11/z}px IBM Plex Sans,sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(el.name, x1+w/2, y1+h/2);
+      ctx.textAlign = 'left';
+    }
+    // Maß anzeigen
+    const wm = w>=100?(w/100).toFixed(2)+'m':w.toFixed(0)+'cm';
+    const hm = h>=100?(h/100).toFixed(2)+'m':h.toFixed(0)+'cm';
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.font = `${9/z}px IBM Plex Mono,monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(wm, x1+w/2, y1-3/z);
+    ctx.save(); ctx.translate(x1-3/z, y1+h/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText(hm, 0, 0); ctx.restore();
+    ctx.textAlign = 'left';
+  } else {
+    // Linienwerkzeuge (wand, fenster, tür)
+    const thick = (el.thick||17.5);
+    const dx = el.p2.x-el.p1.x, dy = el.p2.y-el.p1.y;
+    const len = Math.hypot(dx,dy);
+    if (len < 0.5) { ctx.globalAlpha=1; return; }
+    const nx = -dy/len, ny = dx/len;
+
+    ctx.save();
+    if (el.type === 'wand') {
+      // Gefüllte Wand mit zwei Linien
+      ctx.fillStyle = selected ? '#d0d0d0' : '#aaa';
+      ctx.strokeStyle = selected ? '#fff' : '#888';
+      ctx.lineWidth = 1/z;
+      ctx.beginPath();
+      ctx.moveTo(el.p1.x+nx*thick/2, el.p1.y+ny*thick/2);
+      ctx.lineTo(el.p2.x+nx*thick/2, el.p2.y+ny*thick/2);
+      ctx.lineTo(el.p2.x-nx*thick/2, el.p2.y-ny*thick/2);
+      ctx.lineTo(el.p1.x-nx*thick/2, el.p1.y-ny*thick/2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (el.type === 'fenster') {
+      ctx.strokeStyle = selected ? '#90c8ff' : '#58a6ff';
+      ctx.lineWidth = thick/2/z;
+      ctx.setLineDash([thick/3/z, thick/6/z]);
+      ctx.beginPath(); ctx.moveTo(el.p1.x,el.p1.y); ctx.lineTo(el.p2.x,el.p2.y); ctx.stroke();
+      ctx.setLineDash([]);
+      // Außenlinien
+      ctx.lineWidth = 1/z;
+      ctx.strokeStyle = selected ? '#90c8ff' : '#58a6ff';
+      [-1,1].forEach(s=>{
+        ctx.beginPath();
+        ctx.moveTo(el.p1.x+nx*thick/2*s, el.p1.y+ny*thick/2*s);
+        ctx.lineTo(el.p2.x+nx*thick/2*s, el.p2.y+ny*thick/2*s);
+        ctx.stroke();
+      });
+    } else if (el.type === 'tuer') {
+      ctx.strokeStyle = selected ? '#ffcc66' : '#f5a623';
+      ctx.lineWidth = 1.5/z;
+      ctx.beginPath(); ctx.moveTo(el.p1.x,el.p1.y); ctx.lineTo(el.p2.x,el.p2.y); ctx.stroke();
+      // Bogen (Türöffnungsradius)
+      ctx.lineWidth = 1/z; ctx.setLineDash([3/z,2/z]);
+      ctx.beginPath(); ctx.arc(el.p1.x, el.p1.y, len, Math.atan2(dy,dx)-0.1, Math.atan2(dy,dx)+Math.PI/2+0.1);
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.restore();
+
+    // Maß-Label mittig
+    const mx=(el.p1.x+el.p2.x)/2, my=(el.p1.y+el.p2.y)/2;
+    const d = len >= 100 ? (len/100).toFixed(2)+' m' : len.toFixed(0)+' cm';
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = `${9/z}px IBM Plex Mono,monospace`;
+    ctx.textAlign = 'center';
+    const ang = Math.atan2(dy,dx);
+    ctx.save(); ctx.translate(mx,my); ctx.rotate(ang);
+    ctx.fillText(d, 0, -4/z);
+    ctx.restore(); ctx.textAlign='left';
+
+    // Auswahlpunkte
+    if (selected) {
+      [el.p1, el.p2].forEach(p=>{
+        ctx.beginPath(); ctx.arc(p.x,p.y,5/z,0,Math.PI*2);
+        ctx.fillStyle='#f5a623'; ctx.fill();
+      });
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Als Grundriss übernehmen ──
+function gzExportToFloorplan() {
+  if (!gzState.elements.length) {
+    alert('Noch keine Elemente gezeichnet!'); return;
+  }
+  if (!confirm('Den gezeichneten Grundriss als Planungshintergrund übernehmen?\n(Bisheriger Grundriss wird ersetzt)')) return;
+
+  // Bounding Box berechnen
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (const el of gzState.elements) {
+    for (const p of [el.p1, el.p2]) {
+      if(!p) continue;
+      minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+      minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+    }
+  }
+  const margin = 60, W = maxX-minX+margin*2, H = maxY-minY+margin*2;
+
+  // Auf Offscreen-Canvas rendern (heller Hintergrund)
+  const oc = document.createElement('canvas');
+  oc.width = Math.max(W, 400); oc.height = Math.max(H, 300);
+  const oc2 = oc.getContext('2d');
+  oc2.fillStyle = '#ffffff';
+  oc2.fillRect(0, 0, oc.width, oc.height);
+
+  // Temporär State anpassen zum Rendern
+  const origZoom = gzState.zoom, origPan = {...gzState.pan};
+  const origCtx  = gzCtx, origCanvas = gzCanvas;
+  gzCtx   = oc2;
+  gzCanvas = oc;
+  gzState.zoom = 1;
+  gzState.pan  = { x: margin - minX, y: margin - minY };
+
+  gzState.elements.forEach(el => gzDrawElement(el, false));
+
+  // State zurücksetzen
+  gzCtx   = origCtx;
+  gzCanvas = origCanvas;
+  gzState.zoom = origZoom;
+  gzState.pan  = origPan;
+
+  // Als Grundriss-Bild übergeben
+  const dataUrl = oc.toDataURL('image/png');
+  const img = new Image();
+  img.onload = () => {
+    state.floorplan = { img, w: img.width, h: img.height };
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'none';
+    const scaleX = canvas.width / img.width * 0.9;
+    const scaleY = canvas.height / img.height * 0.9;
+    state.zoom = Math.min(scaleX, scaleY);
+    state.pan.x = (canvas.width  - img.width  * state.zoom) / 2;
+    state.pan.y = (canvas.height - img.height * state.zoom) / 2;
+    detectWallEdges(img);
+    render();
+    switchTab('plan');
+    setStatus('✅ Gezeichneter Grundriss übernommen — bitte Maßstab kalibrieren!');
+  };
+  img.src = dataUrl;
+}
 
 
 </script>
