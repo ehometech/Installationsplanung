@@ -384,6 +384,29 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     border:1px solid transparent; border-radius:4px; cursor:pointer; color:var(--tx3); font-size:14px;
     display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .proj-list-item .pi-del:hover { background:var(--rd); border-color:var(--rd); color:white; }
+  .floor-tabs { display:flex; align-items:center; gap:5px; max-width:360px; overflow-x:auto; padding:2px 0; }
+  .floor-tabs::-webkit-scrollbar { height:3px; }
+  .floor-tabs::-webkit-scrollbar-thumb { background:var(--bd2); border-radius:3px; }
+  .floor-tab { background:var(--sf2); border:1px solid var(--bd); color:var(--tx2); border-radius:4px; padding:5px 8px; font-size:10px; font-weight:600; cursor:pointer; white-space:nowrap; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
+  .floor-tab:hover { border-color:var(--ac); color:var(--tx); }
+  .floor-tab.act { background:rgba(245,166,35,.16); border-color:var(--ac); color:var(--ac); }
+  .floor-empty { color:var(--tx3); font-family:var(--mono); font-size:10px; white-space:nowrap; }
+  .proj-local-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .project-page { display:none; position:absolute; top:0; left:0; right:0; bottom:0; overflow:auto; padding:16px 20px; background:var(--bg); flex-direction:column; z-index:10; }
+  .project-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .project-title { font-size:15px; font-weight:700; color:var(--tx); }
+  .project-band { border:1px solid var(--bd); background:var(--sf); border-radius:8px; padding:12px; margin-bottom:12px; }
+  .project-band h3 { font-size:11px; color:var(--ac); text-transform:uppercase; letter-spacing:.7px; margin-bottom:9px; }
+  .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; }
+  .project-card { background:var(--sf2); border:1px solid var(--bd); border-radius:8px; padding:9px; display:flex; flex-direction:column; gap:8px; min-height:180px; }
+  .project-card.act { border-color:var(--ac); box-shadow:0 0 0 1px rgba(245,166,35,.22) inset; }
+  .project-thumb { height:104px; border-radius:5px; background:#101620; border:1px solid var(--bd); display:flex; align-items:center; justify-content:center; overflow:hidden; color:var(--tx3); font-size:11px; }
+  .project-thumb img { width:100%; height:100%; object-fit:contain; background:#fff; }
+  .project-card-name { font-size:12px; font-weight:700; color:var(--tx); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .project-card-meta { font-family:var(--mono); font-size:9px; color:var(--tx3); }
+  .project-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .project-actions .btn { font-size:10px; padding:5px 8px; }
+  .project-empty { border:1px dashed var(--bd2); border-radius:8px; padding:22px; text-align:center; color:var(--tx3); font-size:12px; }
 
 
   .type-sat_dose .ico, .type-sat_dose_2 .ico, .type-koax_dose .ico,
@@ -431,8 +454,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <div class="vs"></div>
   <button class="btn bg" onclick="showProjDataModal()" title="Kundendaten & Projektdetails">📋 Projektdaten</button>
   <div class="vs"></div>
-  <button class="btn bg" onclick="saveProject()">💾 Speichern</button>
-  <button class="btn bg" onclick="loadProject()">📂 Laden</button>
+  <button class="btn bg" onclick="saveProject()">💾 Lokal speichern</button>
+  <button class="btn bg" onclick="loadProject()">📂 Lokal laden</button>
   <div class="vs"></div>
   <button class="btn bb" onclick="exportCSV()">⬇ CSV</button>
   <button class="btn ba" onclick="exportFloorplanPDF()">🖨 PDF</button>
@@ -468,6 +491,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <input class="rp-input" id="newProjName" placeholder="Neuer Projektname..." style="flex:1">
       <button class="btn ba" onclick="createNewProject()">+ Neu</button>
     </div>
+    <div class="proj-local-row">
+      <button class="btn bg" onclick="saveProject()">Lokale Projektdatei exportieren</button>
+      <button class="btn bg" onclick="loadProject()">Lokale Projektdatei importieren</button>
+    </div>
     <div id="projList" style="max-height:320px;overflow-y:auto"></div>
     <div class="mft">
       <button class="btn bg" onclick="document.getElementById('projMgrModal').classList.add('hid')">Schließen</button>
@@ -476,6 +503,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 </div>
 
 <div class="tabs">
+  <div class="tab" onclick="switchTab('projekt')" id="tab-projekt">📁 Projekt</div>
   <div class="tab act" onclick="switchTab('plan')" id="tab-plan">🗺 Grundrissplan</div>
   <div class="tab" onclick="switchTab('stromkreise')" id="tab-stromkreise">⚡ Stromkreise</div>
   <div class="tab" onclick="switchTab('stueckliste')" id="tab-stueckliste">📦 Stückliste</div>
@@ -502,7 +530,12 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="zOut()" title="Verkleinern">−</button>
       <span class="zlbl" id="zlbl">100%</span>
       <button class="tool-btn" onclick="zIn()" title="Vergrößern">+</button>
-      <button class="tool-btn" onclick="zFit()" title="Einpassen">⊡</button>
+      <button class="tool-btn" onclick="zFit()" title="Einpassen">⥢</button>
+      <div class="vs"></div>
+      <div class="floor-tabs" id="floorTabs"><span class="floor-empty">1 Grundriss</span></div>
+      <button class="tool-btn" onclick="createBlankFloorplan()" title="Neuen Grundriss im Projekt anlegen">+</button>
+      <button class="tool-btn" onclick="renameActiveFloorplan()" title="Aktiven Grundriss benennen">✎</button>
+      <button class="tool-btn" onclick="deleteActiveFloorplan()" title="Aktiven Grundriss entfernen" style="color:var(--rd)">×</button>
       <div class="vs"></div>
       <button class="tool-btn" onclick="startCalibrate()" title="Maßstab kalibrieren" id="btnCal">📏</button>
       <span style="font-size:10px;color:var(--tx3);font-family:var(--mono)" id="scaleLabel">Kein Maßstab</span>
@@ -543,8 +576,8 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <button class="tool-btn" onclick="undoAction()" title="Rückgängig (Strg+Z)">↩</button>
       <div class="vs"></div>
       <label class="btn bg" style="cursor:pointer">
-        📁 Grundriss laden
-        <input type="file" accept="image/*,application/pdf" style="display:none" onchange="loadFloorplan(event)">
+        📁 Grundrisse laden
+        <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
@@ -564,7 +597,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
           <p>PNG, JPG oder PDF<br>Drag & Drop oder klicken</p>
           <label style="margin-top:14px;display:inline-block;cursor:pointer">
             <span class="btn ba" style="display:inline-flex">📁 Datei auswählen</span>
-            <input type="file" accept="image/*,application/pdf,.pdf" style="display:none" onchange="loadFloorplan(event)">
+            <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
           </label>
         </div>
       </div>
@@ -887,6 +920,45 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <div style="color:var(--tx3);font-size:11px;text-align:center;padding:20px">Element auswählen</div>
     </div>
   </div>
+
+  <!-- PROJEKT VIEW -->
+  <div id="projektView" class="project-page">
+    <div class="project-head">
+      <div class="project-title">📁 Projekt anlegen & Grundrisse verwalten</div>
+      <div class="hsp"></div>
+      <button class="btn bg" onclick="saveProject()">💾 Lokal exportieren</button>
+      <button class="btn bg" onclick="saveProjectToFolder()">📂 In Projektordner speichern</button>
+      <button class="btn bg" onclick="saveProjectToGoogleDrive()" style="color:var(--bl);border-color:var(--bl)">☁ Google Drive speichern</button>
+      <button class="btn ba" onclick="saveToCloud()">☁ Cloud speichern</button>
+    </div>
+
+    <div class="project-band">
+      <h3>Neues Projekt</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="rp-input" id="projectPageName" placeholder="Projektname" style="width:260px" oninput="document.getElementById('projName').value=this.value">
+        <button class="btn ba" onclick="createProjectFromPage()">+ Projekt anlegen</button>
+        <button class="btn bg" onclick="chooseProjectFolder()">Projektordner wählen</button>
+        <span id="projectFolderStatus" style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Kein lokaler Ordner gewählt</span>
+      </div>
+    </div>
+
+    <div class="project-band">
+      <h3>Grundrisse in dieses Projekt hochladen</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label class="btn ba" style="cursor:pointer">📁 Grundrisse auswählen
+          <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="uploadProjectFloorplans(event)">
+        </label>
+        <button class="btn bg" onclick="createBlankFloorplan()">+ Leeren Grundriss anlegen</button>
+        <div style="font-size:11px;color:var(--tx3)">PNG, JPG oder PDF. Danach „Im Grundrissplan öffnen“ anklicken.</div>
+      </div>
+    </div>
+
+    <div class="project-band">
+      <h3>Grundrisse im Projekt</h3>
+      <div id="projectFloorplanList" class="project-grid"></div>
+    </div>
+  </div>
+
   <!-- SYMBOLE MANAGER VIEW (full width, next to main) -->
   <div id="symboleView" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;padding:16px 20px;background:var(--bg);flex-direction:column;z-index:10;">
 
@@ -894,9 +966,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <h2 style="font-size:14px;font-weight:700">🖼 Symbole verwalten</h2>
       <div style="font-size:11px;color:var(--tx3)">Lade deine eigenen DIN 18015 PNG/SVG Symbole hoch</div>
       <div class="hsp"></div>
-      <button class="btn bg" onclick="exportSymbolConfig()">⬇ Config exportieren</button>
+      <button class="btn bg" onclick="exportSymbolConfig()">⬇ Symbol-Backup exportieren</button>
       <label class="btn bg" style="cursor:pointer">
-        📥 Config importieren
+        📥 Symbol-Backup importieren
         <input type="file" accept=".json" style="display:none" onchange="importSymbolConfig(event)">
       </label>
       <button class="btn ba" onclick="resetToBuiltin()">↺ Standard zurücksetzen</button>
@@ -2122,6 +2194,8 @@ let state = {
   undoStack: [],
   raumhoehe: 250,
   snapEnabled: true,     // Intelligente Andockhilfe an Wandkanten ein/aus
+  floorplans: [],        // mehrere Grundrisse/Blaetter im Projekt
+  activeFloorplanId: null,
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -2683,13 +2757,20 @@ function initSymUploadZone() {
 
 // ── EXPORT / IMPORT CONFIG ──
 function exportSymbolConfig() {
-  const data = { version:1, symbols: customSymbols, exported: new Date().toISOString() };
+  const data = {
+    version:2,
+    symbols: customSymbols || {},
+    deletedStdSymbols: [...(deletedStdSymbols || new Set())],
+    overriddenStdSymbols: overriddenStdSymbols || {},
+    exported: new Date().toISOString()
+  };
   const b = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(b);
-  a.download = 'meine-elektro-symbole.json';
+  a.download = 'anvolt-symbol-backup.json';
   a.click();
-  setStatus('Symbol-Konfiguration exportiert');
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  setStatus('Symbol-Backup exportiert');
 }
 
 function importSymbolConfig(event) {
@@ -2699,13 +2780,16 @@ function importSymbolConfig(event) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.symbols) {
-        Object.assign(customSymbols, data.symbols);
-        saveCustomSymbols();
-        mergeCustomSymbols();
-        renderSymbolManager();
-        setStatus('✅ ' + Object.keys(data.symbols).length + ' Symbole importiert');
-      }
+      const importedSymbols = data.symbols || data.customSymbols || {};
+      customSymbols = { ...(customSymbols||{}), ...importedSymbols };
+      if (Array.isArray(data.deletedStdSymbols)) deletedStdSymbols = new Set(data.deletedStdSymbols);
+      if (data.overriddenStdSymbols) overriddenStdSymbols = data.overriddenStdSymbols;
+      saveCustomSymbols();
+      mergeCustomSymbols();
+      buildPalette();
+      renderSymbolManager();
+      render();
+      setStatus('Symbol-Backup importiert: ' + Object.keys(importedSymbols).length + ' eigene Symbole');
     } catch(err) { alert('Fehler beim Importieren: ' + err.message); }
   };
   reader.readAsText(file);
@@ -2749,6 +2833,9 @@ let fbApp = null, fbDb = null, fbAuth = null;
 let currentUser = null;
 let currentProjectId = null;
 let cloudSaveLock = 0;
+let projectDirHandle = null;
+let googleDriveAccessToken = null;
+let currentGoogleDriveFileId = null;
 let fbUnsubscribe = null;
 
 // ── Init Firebase ──
@@ -2778,7 +2865,13 @@ function initFirebase() {
 function googleLogin() {
   if (!fbAuth) return;
   const provider = new firebase.auth.GoogleAuthProvider();
-  fbAuth.signInWithPopup(provider).catch(err => {
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
+  provider.setCustomParameters({ prompt: 'select_account consent' });
+  fbAuth.signInWithPopup(provider).then(result => {
+    const cred = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+    googleDriveAccessToken = cred && cred.accessToken ? cred.accessToken : googleDriveAccessToken;
+    setStatus(googleDriveAccessToken ? 'Google Login verbunden - Google Drive bereit' : 'Google Login verbunden');
+  }).catch(err => {
     console.warn('Login Fehler:', err);
     setStatus('Login fehlgeschlagen: ' + err.message);
   });
@@ -2786,7 +2879,7 @@ function googleLogin() {
 function googleLogout() {
   if (!fbAuth) return;
   fbAuth.signOut().then(() => {
-    currentUser = null; currentProjectId = null;
+    currentUser = null; currentProjectId = null; googleDriveAccessToken = null; currentGoogleDriveFileId = null;
     setFbStatus('offline', 'Abgemeldet');
     setStatus('Abgemeldet');
   });
@@ -2815,6 +2908,164 @@ function setFbStatus(type, msg) {
   if (!el) return;
   el.innerHTML = `<span class="fb-dot ${type}"></span>${msg}`;
 }
+
+// Multiple floorplans inside one project
+function simpleClone(v) { return JSON.parse(JSON.stringify(v || null)); }
+function cleanFileName(name) { return (name || 'Grundriss').replace(/\.[^.]+$/, '').trim() || 'Grundriss'; }
+function floorplanId() { return 'fp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function currentFloorplanData(maxD=1600, quality=.72) {
+  if (!state.floorplan || !state.floorplan.img) return null;
+  try {
+    const fc = document.createElement('canvas');
+    let fw = state.floorplan.w, fh = state.floorplan.h;
+    if (fw > maxD || fh > maxD) { const r = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r); fh=Math.round(fh*r); }
+    fc.width = fw; fc.height = fh;
+    fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
+    return fc.toDataURL('image/jpeg', quality);
+  } catch(e) { console.warn('floorplan encode:', e); return null; }
+}
+function makeSheetFromState(name) {
+  return {
+    id: state.activeFloorplanId || floorplanId(),
+    name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1),
+    floorplanData: currentFloorplanData(),
+    symbols: simpleClone(state.symbols)||[], wires: simpleClone(state.wires)||[], trassen: simpleClone(state.trassen)||[], raeume: simpleClone(state.raeume)||[],
+    scale: state.scale||null, pan: simpleClone(state.pan)||{x:0,y:0}, zoom: state.zoom||1, raumhoehe: state.raumhoehe||250,
+    updatedAt: new Date().toISOString()
+  };
+}
+function captureActiveFloorplan() {
+  if (!state.floorplans) state.floorplans = [];
+  const hasWork = !!state.floorplan || !!state.symbols.length || !!state.wires.length || !!(state.trassen&&state.trassen.length) || !!(state.raeume&&state.raeume.length);
+  if (!state.activeFloorplanId) {
+    if (!hasWork) { updateFloorplanTabs(); return; }
+    const sheet = makeSheetFromState('Grundriss 1');
+    state.activeFloorplanId = sheet.id;
+    state.floorplans.push(sheet);
+    updateFloorplanTabs();
+    return;
+  }
+  const idx = state.floorplans.findIndex(f => f.id === state.activeFloorplanId);
+  const sheet = makeSheetFromState(idx >= 0 ? state.floorplans[idx].name : 'Grundriss ' + (state.floorplans.length + 1));
+  if (idx >= 0) state.floorplans[idx] = { ...state.floorplans[idx], ...sheet };
+  else state.floorplans.push(sheet);
+  updateFloorplanTabs();
+}
+function updateFloorplanTabs() {
+  const el = document.getElementById('floorTabs');
+  if (!el) return;
+  const list = state.floorplans || [];
+  if (!list.length) { el.innerHTML = '<span class="floor-empty">Noch kein Grundriss</span>'; return; }
+  el.innerHTML = '';
+  list.forEach((fp, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'floor-tab' + (fp.id === state.activeFloorplanId ? ' act' : '');
+    b.textContent = fp.name || ('Grundriss ' + (i + 1));
+    b.title = b.textContent;
+    b.onclick = () => switchFloorplan(fp.id);
+    el.appendChild(b);
+  });
+}
+function applyFloorplanSheet(sheet) {
+  if (!sheet) return;
+  state.activeFloorplanId = sheet.id;
+  state.symbols = simpleClone(sheet.symbols)||[];
+  state.wires = simpleClone(sheet.wires)||[];
+  state.trassen = simpleClone(sheet.trassen)||[];
+  state.raeume = simpleClone(sheet.raeume)||[];
+  state.scale = sheet.scale||null;
+  state.pan = simpleClone(sheet.pan)||{x:0,y:0};
+  state.zoom = sheet.zoom||1;
+  state.raumhoehe = sheet.raumhoehe||250;
+  state.selectedId = null;
+  state.undoStack = [];
+  const uz = document.getElementById('uploadZone');
+  if (sheet.floorplanData) {
+    const img = new Image();
+    img.onload = () => {
+      state.floorplan = { img, w: img.width, h: img.height };
+      if (uz) uz.style.display = 'none';
+      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
+      render(); renderProps(null); detectWallEdges(img);
+    };
+    img.src = sheet.floorplanData;
+  } else {
+    state.floorplan = null;
+    if (uz) uz.style.display = state.symbols.length ? 'none' : 'flex';
+    render(); renderProps(null);
+  }
+  updateFloorplanTabs();
+  let maxId=0; state.symbols.forEach(s=>{const n=parseInt((s.id||'e0').replace(/\D/g,''));if(n>maxId)maxId=n;}); nid=maxId+1;
+}
+function switchFloorplan(id) {
+  if (id === state.activeFloorplanId) return;
+  captureActiveFloorplan();
+  const sheet = (state.floorplans||[]).find(f => f.id === id);
+  applyFloorplanSheet(sheet);
+  setStatus('Grundriss gewechselt: ' + (sheet?.name || ''));
+}
+function addFloorplanFromDataUrl(dataUrl, name, activate=true) {
+  captureActiveFloorplan();
+  const sheet = { id: floorplanId(), name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1), floorplanData: dataUrl, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  state.floorplans.push(sheet);
+  if (activate) applyFloorplanSheet(sheet); else updateFloorplanTabs();
+  return sheet;
+}
+function createBlankFloorplan() {
+  const name = prompt('Name fuer den neuen Grundriss:', 'Grundriss ' + ((state.floorplans||[]).length + 1));
+  if (name === null) return;
+  captureActiveFloorplan();
+  const sheet = { id: floorplanId(), name: name.trim() || 'Grundriss', floorplanData:null, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  state.floorplans.push(sheet); applyFloorplanSheet(sheet); renderProjectPage(); setStatus('Neuer Grundriss angelegt');
+}
+function renameActiveFloorplan() {
+  captureActiveFloorplan();
+  const sheet = (state.floorplans||[]).find(f => f.id === state.activeFloorplanId);
+  if (!sheet) return;
+  const name = prompt('Grundriss benennen:', sheet.name || 'Grundriss');
+  if (name === null) return;
+  sheet.name = name.trim() || sheet.name || 'Grundriss';
+  updateFloorplanTabs(); setStatus('Grundriss benannt: ' + sheet.name);
+}
+function deleteActiveFloorplan() {
+  if (!state.activeFloorplanId) return;
+  if (!confirm('Diesen Grundriss aus dem Projekt entfernen?')) return;
+  const idx = state.floorplans.findIndex(f => f.id === state.activeFloorplanId);
+  if (idx < 0) return;
+  state.floorplans.splice(idx,1);
+  const next = state.floorplans[idx] || state.floorplans[idx-1];
+  if (next) applyFloorplanSheet(next);
+  else { state.activeFloorplanId=null; state.floorplan=null; state.symbols=[]; state.wires=[]; state.trassen=[]; state.raeume=[]; state.scale=null; render(); renderProps(null); updateFloorplanTabs(); const uz=document.getElementById('uploadZone'); if(uz)uz.style.display='flex'; }
+  setStatus('Grundriss entfernt');
+}
+function serializeProjectData() {
+  captureActiveFloorplan();
+  return {
+    name: document.getElementById('projName')?.value || 'Projekt',
+    floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
+    symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
+    pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
+    floorplanData: currentFloorplanData(), customSymbols: customSymbols||{},
+    _v:2, _saved: new Date().toISOString()
+  };
+}
+function loadProjectData(d) {
+  if (!d) return;
+  document.getElementById('projName').value = d.name || 'Projekt';
+  if (Array.isArray(d.floorplans) && d.floorplans.length) {
+    state.floorplans = d.floorplans;
+    state.activeFloorplanId = d.activeFloorplanId || d.floorplans[0].id;
+    applyFloorplanSheet(state.floorplans.find(f => f.id === state.activeFloorplanId) || state.floorplans[0]);
+  } else {
+    state.floorplans = [];
+    state.activeFloorplanId = null;
+    state.symbols=d.symbols||[]; state.wires=d.wires||[]; state.trassen=d.trassen||[]; state.raeume=d.raeume||[]; state.scale=d.scale||null;
+    state.pan=d.pan||state.pan; state.zoom=d.zoom||state.zoom; state.raumhoehe=d.raumhoehe||250;
+    if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
+  }
+  if (d.customSymbols) { customSymbols = d.customSymbols; mergeCustomSymbols(); buildPalette(); }
+}
+
 
 // ═══════════════════════════════════════════════════
 //  PROJEKT-VERWALTUNG (Firestore)
@@ -2861,112 +3112,54 @@ async function loadProjectList() {
 }
 
 async function createNewProject() {
-  if (!fbAuth) { alert('Firebase Auth nicht geladen — Seite neu laden!'); return; }
-  if (!currentUser) {
-    alert('Bitte zuerst mit Google anmelden! (Schaltfläche oben)');
-    return;
-  }
-  if (!fbDb) { alert('Firestore nicht verfügbar — Seite neu laden!'); return; }
-
+  if (!fbAuth) { alert('Firebase Auth nicht geladen - Seite neu laden!'); return; }
+  if (!currentUser) { alert('Bitte zuerst mit Google anmelden!'); return; }
+  if (!fbDb) { alert('Firestore nicht verfuegbar - Seite neu laden!'); return; }
   const nameEl = document.getElementById('newProjName');
-  const name = (nameEl?.value||'').trim() || 'Projekt ' + new Date().toLocaleDateString('de-DE');
-
+  const name = (nameEl?.value||'').trim() || document.getElementById('projName')?.value || ('Projekt ' + new Date().toLocaleDateString('de-DE'));
   try {
     setFbStatus('syncing', 'Erstelle...');
-
-    // Grundriss sichern BEVOR State geleert wird
-    let floorplanData = null;
-    const keepFloorplan = state.floorplan && state.floorplan.img;
-    if (keepFloorplan) {
-      try {
-        const fc = document.createElement('canvas');
-        const maxD = 1600;
-        let fw = state.floorplan.w, fh = state.floorplan.h;
-        if (fw > maxD || fh > maxD) { const r2 = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r2); fh=Math.round(fh*r2); }
-        fc.width = fw; fc.height = fh;
-        fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-        floorplanData = fc.toDataURL('image/jpeg', 0.72);
-      } catch(fe) { console.warn('floorplan encode:', fe); }
-    }
-
+    const projectData = serializeProjectData();
+    projectData.name = name;
     const newDoc = {
+      ...projectData,
       uid: currentUser.uid,
-      name,
-      symbols: state.symbols||[],
-      wires:   state.wires||[],
-      trassen: state.trassen||[],
-      raeume:  state.raeume||[],
-      scale:   state.scale||null,
-      customSymbols: {},
-      symbolCount: (state.symbols||[]).length,
-      raumhoehe: state.raumhoehe||250,
+      symbolCount: (projectData.floorplans||[]).reduce((a,f)=>a+(f.symbols||[]).length,0),
+      floorplanCount: (projectData.floorplans||[]).length,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if (floorplanData) newDoc.floorplanData = floorplanData;
-
     const ref = await fbDb.collection(GRUNDRISS_COLLECTION).add(newDoc);
     currentProjectId = ref.id;
     if (nameEl) nameEl.value = '';
-
     document.getElementById('projName').value = name;
-    const pm = document.getElementById('projMgrModal');
-    if (pm) pm.classList.add('hid');
-
-    render(); renderProps(null);
+    const pm = document.getElementById('projMgrModal'); if (pm) pm.classList.add('hid');
     listenToProject(ref.id);
-    setFbStatus('online', '✅ Projekt erstellt & gespeichert');
-    setStatus('✅ Projekt "' + name + '" erstellt — inkl. Grundriss gespeichert!');
+    render(); renderProps(null); updateFloorplanTabs();
+    setFbStatus('online', 'Projekt erstellt & gespeichert');
+    setStatus('Projekt "' + name + '" erstellt - mit ' + ((projectData.floorplans||[]).length||1) + ' Grundriss(en)');
   } catch(e) {
     console.error('[Firebase] createProject:', e);
-    let msg = e.message || String(e);
-    if (e.code === 'permission-denied') msg = 'Keine Berechtigung — Firebase Regeln prüfen!';
-    if (e.code === 'unauthenticated')   msg = 'Nicht angemeldet!';
     setFbStatus('offline', 'Fehler');
-    alert('Projekt erstellen fehlgeschlagen: ' + msg);
+    alert('Projekt erstellen fehlgeschlagen: ' + (e.message || String(e)));
   }
 }
+
+
+
 
 async function openProject(id, data) {
   currentProjectId = id;
-  document.getElementById('projName').value = data.name || 'Projekt';
-  // Load state
-  state.symbols = data.symbols || [];
-  state.wires   = data.wires   || [];
-  state.trassen = data.trassen || [];
-  state.raeume  = data.raeume  || [];
-  state.scale   = data.scale   || null;
-  // Restore custom symbols
-  if (data.customSymbols) {
-    customSymbols = data.customSymbols;
-    mergeCustomSymbols();
-  }
-  // Restore floorplan image if saved
-  if (data.floorplanData) {
-    const img = new Image();
-    img.onload = () => {
-      state.floorplan = { img, w: img.width, h: img.height };
-      document.getElementById('uploadZone').style.display = 'none';
-      zFit(); render();
-      detectWallEdges(img);
-    };
-    img.src = data.floorplanData;
-  } else {
-    state.floorplan = null;
-    document.getElementById('uploadZone').style.display = state.symbols.length ? 'none' : 'flex';
-  }
-  // Restore nid counter
-  let maxId = 0;
-  state.symbols.forEach(s => { const n = parseInt((s.id||'e0').replace(/\D/g,'')); if(n>maxId) maxId=n; });
-  nid = maxId + 1;
-  state.selectedId = null;
+  loadProjectData(data);
   document.getElementById('projMgrModal').classList.add('hid');
   listenToProject(id);
-  render(); renderProps(null);
-  buildPalette();
+  render(); renderProps(null); buildPalette(); updateFloorplanTabs();
   setFbStatus('online', 'Projekt geladen');
-  setStatus('📂 Projekt "' + (data.name||'Projekt') + '" geladen');
+  setStatus('Projekt "' + (data.name||'Projekt') + '" geladen');
 }
+
+
+
 
 async function deleteProject(id, e) {
   e.stopPropagation();
@@ -2985,137 +3178,73 @@ function listenToProject(id) {
   if (!fbDb) return;
   fbUnsubscribe = fbDb.collection(GRUNDRISS_COLLECTION).doc(id)
     .onSnapshot(snap => {
-      if (Date.now() < cloudSaveLock) return; // ignore snapshot right after save
+      if (Date.now() < cloudSaveLock) return;
       if (!snap.exists) return;
       const d = snap.data();
-      // Only apply if symbols array changed (avoid overwriting local edits)
+      if (d.floorplans && JSON.stringify(d.floorplans) !== JSON.stringify(state.floorplans||[])) {
+        loadProjectData(d);
+        setFbStatus('online', 'Synchronisiert OK');
+        return;
+      }
       let changed = false;
-      if (d.symbols && JSON.stringify(d.symbols) !== JSON.stringify(state.symbols)) {
-        state.symbols = d.symbols; changed = true;
-      }
-      if (d.wires && JSON.stringify(d.wires) !== JSON.stringify(state.wires)) {
-        state.wires = d.wires; changed = true;
-      }
-      if (d.trassen && JSON.stringify(d.trassen) !== JSON.stringify(state.trassen||[])) {
-        state.trassen = d.trassen; changed = true;
-      }
-      if (d.raeume && JSON.stringify(d.raeume) !== JSON.stringify(state.raeume||[])) {
-        state.raeume = d.raeume; changed = true;
-      }
+      if (d.symbols && JSON.stringify(d.symbols) !== JSON.stringify(state.symbols)) { state.symbols = d.symbols; changed = true; }
+      if (d.wires && JSON.stringify(d.wires) !== JSON.stringify(state.wires)) { state.wires = d.wires; changed = true; }
+      if (d.trassen && JSON.stringify(d.trassen) !== JSON.stringify(state.trassen||[])) { state.trassen = d.trassen; changed = true; }
+      if (d.raeume && JSON.stringify(d.raeume) !== JSON.stringify(state.raeume||[])) { state.raeume = d.raeume; changed = true; }
       if (d.scale !== undefined && d.scale !== state.scale) { state.scale = d.scale; changed = true; }
       if (d.raumhoehe) state.raumhoehe = d.raumhoehe;
-      if (d.customSymbols && Object.keys(d.customSymbols).length) {
-        customSymbols = d.customSymbols; mergeCustomSymbols();
-      }
+      if (d.customSymbols && Object.keys(d.customSymbols).length) { customSymbols = d.customSymbols; mergeCustomSymbols(); }
       if (d.name) document.getElementById('projName').value = d.name;
-      // Restore floorplan if not already loaded
       if (d.floorplanData && !state.floorplan) {
         const img = new Image();
-        img.onload = () => {
-          state.floorplan = { img, w: img.width, h: img.height };
-          const uz = document.getElementById('uploadZone');
-          if (uz) uz.style.display = 'none';
-          render();
-          detectWallEdges(img);
-        };
+        img.onload = () => { state.floorplan = { img, w: img.width, h: img.height }; const uz = document.getElementById('uploadZone'); if (uz) uz.style.display = 'none'; render(); detectWallEdges(img); };
         img.src = d.floorplanData;
       }
-      if (changed) { render(); buildPalette(); }
-      setFbStatus('online', 'Synchronisiert ✓');
+      if (changed) { render(); buildPalette(); captureActiveFloorplan(); updateFloorplanTabs(); }
+      setFbStatus('online', 'Synchronisiert OK');
     }, err => {
       console.warn('[Firebase] listener:', err);
       setFbStatus('offline', 'Sync-Fehler');
     });
 }
 
+
+
+
 // ── Save to Cloud ──
 async function saveToCloud() {
   if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
-  if (!currentProjectId) {
-    // Auto-create project with current state (inkl. Grundriss)
-    await createNewProject();
-    return; // createNewProject speichert bereits alles
-  }
+  if (!currentProjectId) { await createNewProject(); return; }
   setFbStatus('syncing', 'Speichert...');
-  cloudSaveLock = Date.now() + 30000; // 30 sec lock — prevent snapshot overwrite
+  cloudSaveLock = Date.now() + 30000;
   try {
-    // Clean symbols — remove non-serializable objects (OffscreenCanvas, DOM nodes etc.)
-    const symbolsToSave = state.symbols.map(s => {
-      const clean = {};
-      for (const [k, v] of Object.entries(s)) {
-        if (v == null) { clean[k] = null; continue; }
-        if (typeof v === 'function') continue;
-        if (typeof v === 'object') {
-          if (v instanceof HTMLElement || v instanceof HTMLImageElement ||
-              v instanceof CanvasRenderingContext2D) continue;
-          // OffscreenCanvas check
-          if (typeof OffscreenCanvas !== 'undefined' && v instanceof OffscreenCanvas) continue;
-          // ImageBitmap check
-          if (typeof ImageBitmap !== 'undefined' && v instanceof ImageBitmap) continue;
-        }
-        try { JSON.stringify(v); clean[k] = v; } catch(e2) { /* skip unserializable */ }
-      }
-      return clean;
-    });
-    // CustomSymbols: strip imgData if too large (>500kb total)
-    const csToSave = {};
-    let totalSize = 0;
-    for (const [k, v] of Object.entries(customSymbols)) {
-      const sz = (v.imgData||'').length;
-      if (totalSize + sz < 800000) { csToSave[k] = v; totalSize += sz; }
-    }
-
-    // Save floorplan as compressed JPEG
-    let floorplanData = null;
-    if (state.floorplan && state.floorplan.img) {
-      try {
-        const fc = document.createElement('canvas');
-        const maxD = 1600;
-        let fw = state.floorplan.w, fh = state.floorplan.h;
-        if (fw > maxD || fh > maxD) { const r = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r); fh=Math.round(fh*r); }
-        fc.width = fw; fc.height = fh;
-        fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-        floorplanData = fc.toDataURL('image/jpeg', 0.72);
-      } catch(fe) { console.warn('Floorplan save:', fe); }
-    }
-
+    const projectData = serializeProjectData();
     const updateData = {
-      name: document.getElementById('projName').value || 'Projekt',
-      symbols: symbolsToSave,
-      wires: state.wires,
-      trassen: state.trassen||[],
-      scale: state.scale || null,
-      customSymbols: csToSave,
-      symbolCount: state.symbols.length,
+      ...projectData,
+      symbolCount: (projectData.floorplans||[]).reduce((a,f)=>a+(f.symbols||[]).length,0),
+      floorplanCount: (projectData.floorplans||[]).length,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    // Grundriss IMMER mitschicken wenn vorhanden (nicht nur wenn frisch kodiert)
-    if (floorplanData) {
-      updateData.floorplanData = floorplanData;
-    } else if (state.floorplan && state.floorplan.img) {
-      // Fallback: nochmal versuchen zu kodieren
-      try {
-        const fc2 = document.createElement('canvas');
-        fc2.width = state.floorplan.w; fc2.height = state.floorplan.h;
-        fc2.getContext('2d').drawImage(state.floorplan.img, 0, 0);
-        updateData.floorplanData = fc2.toDataURL('image/jpeg', 0.72);
-      } catch(fe2) { /* skip */ }
-    }
-
     await fbDb.collection(GRUNDRISS_COLLECTION).doc(currentProjectId).update(updateData);
-    setFbStatus('online', 'Gespeichert ✓ ' + new Date().toLocaleTimeString('de-DE'));
-    setStatus('☁ In Cloud gespeichert!');
+    setFbStatus('online', 'Gespeichert OK ' + new Date().toLocaleTimeString('de-DE'));
+    setStatus('In Cloud gespeichert - inklusive aller Grundrisse');
   } catch(e) {
     console.warn('[Firebase] save:', e);
     setFbStatus('offline', 'Speicherfehler');
-    setStatus('❌ Cloud-Speichern fehlgeschlagen: ' + e.message);
+    setStatus('Cloud-Speichern fehlgeschlagen: ' + e.message);
   }
 }
 
+
+
+
 // ── Auto-save every 60 seconds if project open ──
 setInterval(() => {
-  if (currentProjectId && currentUser && state.symbols.length > 0) {
+  if (currentProjectId && currentUser && ((state.floorplans&&state.floorplans.length) || state.symbols.length > 0)) {
     saveToCloud();
+  }
+  if (projectDirHandle && ((state.floorplans&&state.floorplans.length) || state.symbols.length > 0)) {
+    saveProjectToFolder(true);
   }
 }, 60000);
 
@@ -3483,6 +3612,7 @@ window.addEventListener('load', () => {
   // ── localStorage Backup wiederherstellen ──
   localStateRestore();
   render();
+  restoreActiveViewAfterRefresh();
   window.addEventListener('resize', resizeCanvas);
   // ── Automatisches localStorage Backup alle 10 Sekunden ──
   setInterval(localStateSave, 10000);
@@ -3494,84 +3624,32 @@ const LS_KEY = 'anvolt_grundriss_v2';
 
 function localStateSave() {
   try {
-    // Grundriss als kleine JPEG-Kopie
-    let fpData = null;
-    if (state.floorplan && state.floorplan.img) {
-      const fc = document.createElement('canvas');
-      const maxD = 1200;
-      let fw = state.floorplan.w, fh = state.floorplan.h;
-      if (fw > maxD || fh > maxD) { const r = Math.min(maxD/fw, maxD/fh); fw=Math.round(fw*r); fh=Math.round(fh*r); }
-      fc.width = fw; fc.height = fh;
-      fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
-      fpData = fc.toDataURL('image/jpeg', 0.65);
-    }
-    const backup = {
-      symbols:  state.symbols||[],
-      wires:    state.wires||[],
-      trassen:  state.trassen||[],
-      raeume:   state.raeume||[],
-      scale:    state.scale||null,
-      pan:      state.pan,
-      zoom:     state.zoom,
-      raumhoehe:state.raumhoehe||250,
-      projName: document.getElementById('projName')?.value||'',
-      floorplanData: fpData,
-      savedAt:  Date.now(),
-    };
+    const backup = serializeProjectData();
+    backup.savedAt = Date.now();
     const json = JSON.stringify(backup);
-    // Nur speichern wenn < 8MB (localStorage-Limit)
-    if (json.length < 8000000) {
-      localStorage.setItem(LS_KEY, json);
-    }
+    if (json.length < 8000000) localStorage.setItem(LS_KEY, json);
   } catch(e) { console.warn('localStateSave:', e); }
 }
+
+
+
 
 function localStateRestore() {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
+    if (!raw) { updateFloorplanTabs(); return; }
     const d = JSON.parse(raw);
-    // Nur wiederherstellen wenn < 24h alt
-    if (!d.savedAt || Date.now() - d.savedAt > 86400000) return;
-    // Nicht überschreiben wenn Firebase bereits geladen hat
+    if (!d.savedAt || Date.now() - d.savedAt > 86400000) { updateFloorplanTabs(); return; }
     if (currentProjectId) return;
-
-    state.symbols  = d.symbols||[];
-    state.wires    = d.wires||[];
-    state.trassen  = d.trassen||[];
-    state.raeume   = d.raeume||[];
-    state.scale    = d.scale||null;
-    state.raumhoehe= d.raumhoehe||250;
-    if (d.pan)  state.pan  = d.pan;
-    if (d.zoom) state.zoom = d.zoom;
-    if (d.projName) {
-      const el = document.getElementById('projName');
-      if (el) el.value = d.projName;
+    loadProjectData(d);
+    if ((d.floorplans&&d.floorplans.length) || d.symbols?.length || d.wires?.length) {
+      setStatus('Letzter lokaler Stand wiederhergestellt (' + new Date(d.savedAt).toLocaleTimeString('de-DE') + ')');
     }
-    // Grundriss wiederherstellen
-    if (d.floorplanData) {
-      const img = new Image();
-      img.onload = () => {
-        state.floorplan = { img, w: img.width, h: img.height };
-        const uz = document.getElementById('uploadZone');
-        if (uz) uz.style.display = 'none';
-        render();
-        detectWallEdges(img);
-      };
-      img.src = d.floorplanData;
-    }
-    // nid counter
-    let maxId=0;
-    state.symbols.forEach(s=>{const n=parseInt((s.id||'e0').replace(/\D/g,''));if(n>maxId)maxId=n;});
-    nid = maxId+1;
-
-    if (state.symbols.length||state.wires.length) {
-      const uz=document.getElementById('uploadZone');
-      if(uz&&!d.floorplanData) uz.style.display='none';
-      setStatus('♻️ Letzter Stand wiederhergestellt (' + new Date(d.savedAt).toLocaleTimeString('de-DE') + ')');
-    }
-  } catch(e) { console.warn('localStateRestore:', e); }
+  } catch(e) { console.warn('localStateRestore:', e); updateFloorplanTabs(); }
 }
+
+
+
 
 function resizeCanvas() {
   const r = wrap.getBoundingClientRect();
@@ -6101,32 +6179,218 @@ function renderSummaryHTML(sd, forPrint=false) {
   return kpiBlock + geraeteBlock + kabelBlock + leitungBlock;
 }
 
+
+// Project page, local folder and Google Drive storage
+function projectHasWork() {
+  return !!(state.floorplan || state.symbols.length || state.wires.length || (state.trassen&&state.trassen.length) || (state.raeume&&state.raeume.length) || (state.floorplans&&state.floorplans.length));
+}
+function createProjectFromPage() {
+  const name = (document.getElementById('projectPageName')?.value || document.getElementById('projName')?.value || '').trim() || 'Neues Projekt';
+  if (projectHasWork() && !confirm('Aktuelles Projekt schließen und ein neues Projekt anlegen?')) return;
+  currentProjectId = null;
+  currentGoogleDriveFileId = null;
+  document.getElementById('projName').value = name;
+  state.floorplan = null;
+  state.floorplans = [];
+  state.activeFloorplanId = null;
+  state.symbols = [];
+  state.wires = [];
+  state.trassen = [];
+  state.raeume = [];
+  state.scale = null;
+  state.selectedId = null;
+  state.undoStack = [];
+  const uz = document.getElementById('uploadZone');
+  if (uz) uz.style.display = 'flex';
+  updateFloorplanTabs();
+  render(); renderProps(null); renderProjectPage();
+  setStatus('Projekt angelegt: ' + name);
+}
+async function uploadProjectFloorplans(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  try {
+    setStatus('Grundrisse werden ins Projekt geladen...');
+    for (const file of files) {
+      const dataUrl = await readFloorplanFileAsDataUrl(file);
+      addFloorplanFromDataUrl(dataUrl, cleanFileName(file.name), false);
+    }
+    renderProjectPage();
+    setStatus(files.length + ' Grundriss(e) im Projekt hinzugefügt');
+  } catch(err) {
+    alert('Grundriss konnte nicht geladen werden: ' + err.message);
+  } finally {
+    event.target.value = '';
+  }
+}
+function openProjectFloorplan(id) {
+  const sheet = (state.floorplans||[]).find(f => f.id === id);
+  if (!sheet) return;
+  if (id !== state.activeFloorplanId) {
+    captureActiveFloorplan();
+    applyFloorplanSheet(sheet);
+  }
+  switchTab('plan');
+  setStatus('Grundriss im Plan geöffnet: ' + (sheet.name || 'Grundriss'));
+}
+function renameProjectFloorplan(id) {
+  captureActiveFloorplan();
+  const sheet = (state.floorplans||[]).find(f => f.id === id);
+  if (!sheet) return;
+  const name = prompt('Grundriss benennen:', sheet.name || 'Grundriss');
+  if (name === null) return;
+  sheet.name = name.trim() || sheet.name || 'Grundriss';
+  updateFloorplanTabs(); renderProjectPage();
+}
+function deleteProjectFloorplan(id) {
+  const sheet = (state.floorplans||[]).find(f => f.id === id);
+  if (!sheet || !confirm('Grundriss "' + (sheet.name||'') + '" aus dem Projekt entfernen?')) return;
+  if (id === state.activeFloorplanId) deleteActiveFloorplan();
+  else state.floorplans = (state.floorplans||[]).filter(f => f.id !== id);
+  updateFloorplanTabs(); renderProjectPage(); localStateSave();
+}
+function renderProjectPage() {
+  const nameEl = document.getElementById('projectPageName');
+  if (nameEl) nameEl.value = document.getElementById('projName')?.value || '';
+  const folderEl = document.getElementById('projectFolderStatus');
+  if (folderEl) folderEl.textContent = projectDirHandle ? 'Projektordner gewählt' : 'Kein lokaler Ordner gewählt';
+  const list = document.getElementById('projectFloorplanList');
+  if (!list) return;
+  captureActiveFloorplan();
+  const floors = state.floorplans || [];
+  if (!floors.length) {
+    list.innerHTML = '<div class="project-empty">Noch keine Grundrisse im Projekt. Oben Grundrisse auswählen oder einen leeren Grundriss anlegen.</div>';
+    return;
+  }
+  list.innerHTML = floors.map((fp, idx) => {
+    const active = fp.id === state.activeFloorplanId;
+    const thumb = fp.floorplanData ? '<img src="'+fp.floorplanData+'" alt="">' : '<span>Leerer Grundriss</span>';
+    const meta = (fp.symbols||[]).length + ' Symbole · ' + (fp.wires||[]).length + ' Leitungen';
+    return '<div class="project-card '+(active?'act':'')+'">'
+      + '<div class="project-thumb">'+thumb+'</div>'
+      + '<div class="project-card-name">'+esc(fp.name || ('Grundriss ' + (idx+1)))+'</div>'
+      + '<div class="project-card-meta">'+meta+'</div>'
+      + '<div class="project-actions">'
+      + '<button class="btn ba" onclick="openProjectFloorplan(\''+fp.id+'\')">Im Grundrissplan öffnen</button>'
+      + '<button class="btn bg" onclick="renameProjectFloorplan(\''+fp.id+'\')">Benennen</button>'
+      + '<button class="btn bg" style="color:var(--rd);border-color:var(--rd)" onclick="deleteProjectFloorplan(\''+fp.id+'\')">Löschen</button>'
+      + '</div></div>';
+  }).join('');
+}
+async function chooseProjectFolder() {
+  if (!window.showDirectoryPicker) {
+    alert('Der direkte Projektordner-Speicher wird von diesem Browser nicht unterstützt. Nutze bitte "Lokal exportieren" oder Google Drive.');
+    return;
+  }
+  try {
+    projectDirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+    renderProjectPage();
+    setStatus('Projektordner gewählt');
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('Projektordner konnte nicht gewählt werden: ' + e.message);
+  }
+}
+async function saveProjectToFolder(silent=false) {
+  if (!projectDirHandle) {
+    await chooseProjectFolder();
+    if (!projectDirHandle) return;
+  }
+  try {
+    const data = serializeProjectData();
+    const fileName = (data.name || 'grundriss-projekt').replace(/[\\/:*?"<>|]+/g,'_') + '.json';
+    const fileHandle = await projectDirHandle.getFileHandle(fileName, { create:true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+    if (!silent) setStatus('Im lokalen Projektordner gespeichert: ' + fileName);
+  } catch(e) {
+    if (!silent) alert('Speichern in Projektordner fehlgeschlagen: ' + e.message);
+  }
+}
+async function requestGoogleDriveAccess() {
+  if (!fbAuth) { alert('Google Login ist nicht verfügbar.'); return false; }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
+  provider.setCustomParameters({ prompt:'consent select_account' });
+  try {
+    const result = currentUser
+      ? await currentUser.reauthenticateWithPopup(provider)
+      : await fbAuth.signInWithPopup(provider);
+    const cred = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+    googleDriveAccessToken = cred && cred.accessToken ? cred.accessToken : null;
+    return !!googleDriveAccessToken;
+  } catch(e) {
+    alert('Google Drive Zugriff fehlgeschlagen: ' + e.message);
+    return false;
+  }
+}
+async function saveProjectToGoogleDrive() {
+  if (!googleDriveAccessToken) {
+    const ok = await requestGoogleDriveAccess();
+    if (!ok) return;
+  }
+  const data = serializeProjectData();
+  const json = JSON.stringify(data, null, 2);
+  const metadata = { name:(data.name||'grundriss-projekt') + '.json', mimeType:'application/json' };
+  const boundary = 'anvolt_' + Date.now();
+  const body = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'
+    + JSON.stringify(metadata) + '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n'
+    + json + '\r\n--' + boundary + '--';
+  const url = currentGoogleDriveFileId
+    ? 'https://www.googleapis.com/upload/drive/v3/files/' + currentGoogleDriveFileId + '?uploadType=multipart'
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  const res = await fetch(url, {
+    method: currentGoogleDriveFileId ? 'PATCH' : 'POST',
+    headers: { Authorization:'Bearer ' + googleDriveAccessToken, 'Content-Type':'multipart/related; boundary=' + boundary },
+    body
+  });
+  if (res.status === 401 || res.status === 403) {
+    googleDriveAccessToken = null;
+    alert('Google Drive Berechtigung abgelaufen. Bitte erneut speichern und Zugriff bestätigen.');
+    return;
+  }
+  if (!res.ok) throw new Error(await res.text());
+  const saved = await res.json();
+  currentGoogleDriveFileId = saved.id || currentGoogleDriveFileId;
+  setStatus('In Google Drive gespeichert: ' + (saved.name || metadata.name));
+}
+function restoreActiveViewAfterRefresh() {
+  let tab = 'projekt';
+  try { tab = localStorage.getItem('anvolt_active_tab') || 'projekt'; } catch(e) {}
+  switchTab(tab);
+}
+
 // ═══════════════════════════════════════════════════
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════
 function switchTab(tab) {
-  // Tabs markieren
+  const validTabs = ['projekt','plan','stromkreise','stueckliste','symbole'];
+  if (!validTabs.includes(tab)) tab = 'projekt';
+  try { localStorage.setItem('anvolt_active_tab', tab); } catch(e) {}
+
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
   const tabEl = document.getElementById('tab-'+tab);
   if (tabEl) tabEl.classList.add('act');
 
-  // Alle Views ausblenden
-  const views = ['planView','stromView','stView','symboleView'];
+  const views = ['projektView','planView','stromView','stView','symboleView'];
   views.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
 
-  // Palette + rpanel nur im Plan-Tab
   const palette = document.getElementById('palette');
   const rpanel  = document.getElementById('rpanel');
   if (palette) palette.style.display = tab==='plan' ? 'flex' : 'none';
   if (rpanel)  rpanel.style.display  = tab==='plan' ? 'flex' : 'none';
 
-  // Aktive View einblenden
-  if (tab === 'plan') {
+  if (tab === 'projekt') {
+    const el = document.getElementById('projektView');
+    if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+    renderProjectPage();
+  } else if (tab === 'plan') {
     const el = document.getElementById('planView');
     if (el) el.style.display = 'flex';
+    setTimeout(resizeCanvas, 0);
   } else if (tab === 'stromkreise') {
     const el = document.getElementById('stromView');
     if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
@@ -6377,74 +6641,49 @@ function applySymbolSnap(rawX, rawY) {
 // ═══════════════════════════════════════════════════
 //  FLOORPLAN LOAD
 // ═══════════════════════════════════════════════════
-function loadFloorplan(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // ── PDF via PDF.js ──
-  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    if (typeof pdfjsLib === 'undefined') {
-      setStatus('PDF.js nicht verfuegbar — bitte Seite neu laden');
-      return;
+async function loadFloorplan(e) {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  try {
+    setStatus(files.length > 1 ? 'Grundrisse werden geladen...' : 'Grundriss wird geladen...');
+    let first = true;
+    for (const file of files) {
+      const dataUrl = await readFloorplanFileAsDataUrl(file);
+      addFloorplanFromDataUrl(dataUrl, cleanFileName(file.name), first);
+      first = false;
     }
-    const url = URL.createObjectURL(file);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    setStatus('PDF wird geladen...');
-    pdfjsLib.getDocument(url).promise.then(function(pdf) {
-      pdf.getPage(1).then(function(page) {
+    setStatus(files.length + ' Grundriss(e) ins Projekt geladen - bitte Massstab je Grundriss kalibrieren');
+  } catch(err) {
+    console.warn('loadFloorplan:', err);
+    setStatus('Grundriss konnte nicht geladen werden: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+}
+function readFloorplanFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      if (typeof pdfjsLib === 'undefined') { reject(new Error('PDF.js nicht verfuegbar - bitte Seite neu laden')); return; }
+      const url = URL.createObjectURL(file);
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfjsLib.getDocument(url).promise.then(pdf => pdf.getPage(1)).then(page => {
         const viewport = page.getViewport({ scale: 2.0 });
         const offCanvas = document.createElement('canvas');
-        offCanvas.width = viewport.width;
-        offCanvas.height = viewport.height;
-        const ctx2 = offCanvas.getContext('2d');
-        page.render({ canvasContext: ctx2, viewport }).promise.then(function() {
-          const img = new Image();
-          img.onload = function() {
-            state.floorplan = { img, w: img.width, h: img.height };
-            document.getElementById('uploadZone').style.display = 'none';
-            const scaleX = canvas.width / img.width * 0.9;
-            const scaleY = canvas.height / img.height * 0.9;
-            state.zoom = Math.min(scaleX, scaleY);
-            state.pan.x = (canvas.width - img.width * state.zoom) / 2;
-            state.pan.y = (canvas.height - img.height * state.zoom) / 2;
-            document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
-            render();
-            setStatus('PDF geladen (' + pdf.numPages + ' Seiten) — Bitte Massstab kalibrieren!');
-            URL.revokeObjectURL(url);
-            setTimeout(() => detectWallEdges(img), 50);
-          };
-          img.src = offCanvas.toDataURL('image/png');
-        });
-      });
-    }).catch(function(err) {
-      setStatus('PDF Fehler: ' + err.message);
-      URL.revokeObjectURL(url);
-    });
-    return;
-  }
-
-  // ── Bild (PNG / JPG) ──
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    const img = new Image();
-    img.onload = function() {
-      state.floorplan = { img, w: img.width, h: img.height };
-      document.getElementById('uploadZone').style.display = 'none';
-      const scaleX = canvas.width / img.width * 0.9;
-      const scaleY = canvas.height / img.height * 0.9;
-      state.zoom = Math.min(scaleX, scaleY);
-      state.pan.x = (canvas.width - img.width * state.zoom) / 2;
-      state.pan.y = (canvas.height - img.height * state.zoom) / 2;
-      document.getElementById('zlbl').textContent = Math.round(state.zoom * 100) + '%';
-      render();
-      setStatus('Grundriss geladen: ' + img.width + 'x' + img.height + 'px — Bitte Massstab kalibrieren!');
-      setTimeout(() => detectWallEdges(img), 50);
-    };
-    img.onerror = function() { setStatus('Bild konnte nicht geladen werden'); };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+        offCanvas.width = viewport.width; offCanvas.height = viewport.height;
+        return page.render({ canvasContext: offCanvas.getContext('2d'), viewport }).promise.then(() => offCanvas.toDataURL('image/png'));
+      }).then(dataUrl => { URL.revokeObjectURL(url); resolve(dataUrl); })
+        .catch(err => { URL.revokeObjectURL(url); reject(err); });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => resolve(ev.target.result);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    reader.readAsDataURL(file);
+  });
 }
+
+
+
 
 
 // Upload zone drag/drop
@@ -6454,7 +6693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     box.addEventListener('dragover', e=>{ e.preventDefault(); box.classList.add('drag-over'); });
     box.addEventListener('dragleave', ()=>box.classList.remove('drag-over'));
     box.addEventListener('drop', e=>{ e.preventDefault(); box.classList.remove('drag-over');
-      const f=e.dataTransfer.files[0]; if(f) loadFloorplan({target:{files:[f]}});});
+      const files=Array.from(e.dataTransfer.files||[]); if(files.length) loadFloorplan({target:{files, value:''}});});
   }
 });
 
@@ -6504,17 +6743,12 @@ function clearAll() {
 //  SAVE / LOAD / EXPORT
 // ═══════════════════════════════════════════════════
 function saveProject() {
-  // Also save to cloud if logged in
   if (currentProjectId && currentUser) saveToCloud();
-  const data = {
-    name: document.getElementById('projName').value,
-    symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale,
-    _v:1, _saved: new Date().toISOString()
-  };
+  const data = serializeProjectData();
   const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download=(data.name||'grundriss')+'.json';a.click();
-  setStatus('Gespeichert!');
+  a.download=(data.name||'grundriss-projekt')+'.json';a.click();
+  setStatus('Lokale Projektdatei exportiert - inklusive aller Grundrisse');
 }
 function loadProject() { document.getElementById('fileIn').click(); }
 function loadFromFile(e) {
@@ -6523,14 +6757,15 @@ function loadFromFile(e) {
   r.onload=ev=>{
     try{
       const d=JSON.parse(ev.target.result);
-      state.symbols=d.symbols||[]; state.wires=d.wires||[]; state.trassen=d.trassen||[]; state.raeume=d.raeume||[]; state.scale=d.scale||null;
-      document.getElementById('projName').value=d.name||'';
-      let mx=0;state.symbols.forEach(s=>{const n=parseInt(s.id.replace(/\D/g,''));if(n>mx)mx=n;});
-      nid=mx+1; state.selectedId=null;
-      render(); renderProps(null); setStatus('Projekt geladen: '+d.name);
+      loadProjectData(d);
+      currentProjectId = null;
+      renderProjectPage();
+      setStatus('Projekt geladen: '+(d.name||f.name));
     }catch(err){alert('Fehler: '+err.message);}
   };r.readAsText(f);e.target.value='';
 }
+
+
 function exportCSV() {
   const pn = document.getElementById('projName').value || 'Elektroplan';
   const pd = projData;
