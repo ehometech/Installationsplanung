@@ -2159,31 +2159,40 @@ function mergeCustomSymbols() {
 function handleSymbolUpload(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
+  event.target.value = '';
 
-  // Process each file one by one
-  let idx = 0;
+  let queue = files.slice();
+  const total = queue.length;
+  let doneCount = 0;
+
   function processNext() {
-    if (idx >= files.length) return;
-    const file = files[idx++];
+    if (!queue.length) {
+      setStatus('✅ Alle ' + total + ' Symbole verarbeitet');
+      return;
+    }
+    const file = queue.shift();
     const reader = new FileReader();
     reader.onload = (e) => {
       pendingUpload = {
         file,
         dataUrl: e.target.result,
-        name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+        name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
+        _onNext: () => { doneCount++; processNext(); }
       };
-      showSymbolEditForm(pendingUpload);
+      // Fortschritt im Formular anzeigen
+      const progress = total > 1 ? ` (${doneCount + 1}/${total})` : '';
+      showSymbolEditForm(pendingUpload, progress);
     };
     reader.readAsDataURL(file);
   }
   processNext();
-  event.target.value = '';
 }
 
-function showSymbolEditForm(upload) {
+function showSymbolEditForm(upload, progressLabel) {
   document.getElementById('symEditForm').style.display = 'flex';
   document.getElementById('symPreviewImg').src = upload.dataUrl;
-  document.getElementById('symPreviewName').textContent = upload.file.name;
+  document.getElementById('symPreviewName').textContent =
+    upload.file.name + (progressLabel || '');
   const name = upload.name.charAt(0).toUpperCase() + upload.name.slice(1);
   document.getElementById('seBezeichnung').value = name;
   document.getElementById('seAbbr').value = name.substring(0,4).toUpperCase().replace(/\s/g,'');
@@ -2199,8 +2208,7 @@ function showSymbolEditForm(upload) {
     else if (/lüft|lueft|ventil/.test(lower)) cat = 'Haustechnik';
     else if (/rauch|alarm|kamera|sicher/.test(lower)) cat = 'Sicherheit';
   }
-  _pendingUploadCat = null; // Reset
-  // Kategorie setzen
+  _pendingUploadCat = null;
   const sel = document.getElementById('seCat');
   for (const opt of sel.options) {
     if (opt.text.replace(/&amp;/g,'&') === cat) { sel.value = opt.value; break; }
@@ -2217,7 +2225,6 @@ function saveNewSymbol() {
   const nennstrom = parseInt(document.getElementById('seNennstrom').value) || 16;
   const kabel = document.getElementById('seKabel').value;
   if (!name || !abbr) { alert('Bitte Bezeichnung und Kürzel eingeben!'); return; }
-  // Generate unique key
   const key = 'custom_' + abbr.toLowerCase() + '_' + Date.now();
   const isSVG = pendingUpload.file.type === 'image/svg+xml' || pendingUpload.file.name.endsWith('.svg');
   customSymbols[key] = {
@@ -2228,16 +2235,21 @@ function saveNewSymbol() {
   };
   saveCustomSymbols();
   mergeCustomSymbols();
-  cancelSymbolEdit();
-  renderSymbolManager();
   buildPalette();
+  renderSymbolManager();
   setStatus('✅ Symbol "' + name + '" gespeichert!');
+  const onNext = pendingUpload._onNext;
+  pendingUpload = null;
+  document.getElementById('symEditForm').style.display = 'none';
+  if (onNext) onNext(); // nächstes Bild in der Queue
 }
 
 function cancelSymbolEdit() {
+  const onNext = pendingUpload?._onNext;
   pendingUpload = null;
   document.getElementById('symEditForm').style.display = 'none';
   document.getElementById('symFileInput').value = '';
+  if (onNext) onNext(); // überspringen → nächstes Bild
 }
 
 // ── EDIT EXISTING ──
