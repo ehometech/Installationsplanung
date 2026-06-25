@@ -420,7 +420,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Google Identity Services (OAuth 2.0) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -864,6 +866,21 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <div id="pvKundenListe" style="flex:1;overflow-y:auto;padding:6px"></div>
       <div style="padding:8px;border-top:1px solid var(--bd)">
         <button class="btn bg" style="width:100%;font-size:10px" onclick="pvExportAll()">📥 Alle Stücklisten exportieren</button>
+      </div>
+      <!-- Google Drive Sync -->
+      <div style="padding:8px;border-top:1px solid var(--bd);background:rgba(26,115,232,.07)">
+        <div id="gdStatus" style="font-size:10px;color:var(--tx3);margin-bottom:6px;text-align:center">
+          ☁️ Google Drive: nicht verbunden
+        </div>
+        <button id="gdConnectBtn" class="btn bg" style="width:100%;font-size:10px" onclick="gdConnect()">
+          🔑 Mit Google Drive verbinden
+        </button>
+        <button id="gdDisconnectBtn" class="btn bg" style="width:100%;font-size:10px;display:none;color:var(--rd)" onclick="gdDisconnect()">
+          Verbindung trennen
+        </button>
+        <button id="gdSyncAllBtn" class="btn" style="width:100%;font-size:10px;margin-top:4px;display:none;background:rgba(26,115,232,.2);color:#4a90e2;border:1px solid rgba(26,115,232,.4)" onclick="gdSyncAll()">
+          ☁️ Alle Projekte auf Drive speichern
+        </button>
       </div>
     </div>
 
@@ -9252,9 +9269,37 @@ function pvNewGrundriss() {
 function pvGrundrissFileSelected(input) {
   const file = input.files[0];
   if (!file) return;
-  document.getElementById('pvFileLabel').textContent = file.name + ' (' + Math.round(file.size/1024) + ' KB)';
+  document.getElementById('pvFileLabel').textContent = file.name + ' — wird verarbeitet…';
+
+  // PDF direkt als base64 speichern (PDF.js rendert es beim Öffnen)
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      pvPendingFileData = e.target.result;
+      document.getElementById('pvFileLabel').textContent = file.name + ' (PDF, ' + Math.round(file.size/1024) + ' KB)';
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  // Bilder: auf max. 2000px herunterskalieren und als JPEG speichern (spart IDB-Platz)
   const reader = new FileReader();
-  reader.onload = e => { pvPendingFileData = e.target.result; };
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 2000;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const oc = document.createElement('canvas');
+      oc.width = w; oc.height = h;
+      oc.getContext('2d').drawImage(img, 0, 0, w, h);
+      pvPendingFileData = oc.toDataURL('image/jpeg', 0.85);
+      const kb = Math.round(pvPendingFileData.length * 0.75 / 1024);
+      document.getElementById('pvFileLabel').textContent =
+        file.name + ' (' + w + '×' + h + 'px, ~' + kb + ' KB)';
+    };
+    img.src = e.target.result;
+  };
   reader.readAsDataURL(file);
 }
 
@@ -9380,6 +9425,9 @@ function pvShowDetail(g) {
         <button class="btn bg" style="font-size:12px" onclick="pvExportStueckliste('${g.id}')">
           📥 Stückliste exportieren (CSV)
         </button>
+        <button class="btn" style="font-size:12px;background:rgba(26,115,232,.15);color:#4a90e2;border:1px solid rgba(26,115,232,.4)" onclick="gdSyncGrundriss('${pvSelectedKundeId}','${g.id}')">
+          ☁️ Auf Google Drive speichern
+        </button>
       </div>
     </div>
   `;
@@ -9391,44 +9439,22 @@ async function pvOpenGrundriss(gId) {
   const g = (kunde?.grundrisse||[]).find(g=>g.id===gId);
   if (!g) return;
 
-  // Aktuellen Stand aus Plan-Tab in das aktuelle Grundriss-Objekt sichern (falls eines offen war)
+  // Aktuellen Stand sichern (falls ein anderer Grundriss offen war)
   await pvSaveCurrentGrundriss();
 
-  // Neuen Grundriss-Stand laden
+  // State laden
   state.symbols  = g.symbols  || [];
   state.wires    = g.wires    || [];
   state.raeume   = g.raeume   || [];
   state.trassen  = g.trassen  || [];
   state.scale    = g.scale    || null;
+  state.floorplan = null;
 
-  // Grundriss-Bild aus IDB laden
-  if (g.hasFloorplan) {
-    try {
-      const idbEntry = await pvIDBGet(gId);
-      if (idbEntry?.floorplanData) {
-        const img = new Image();
-        img.onload = () => {
-          state.floorplan = { img, w: img.width, h: img.height };
-          const uz = document.getElementById('uploadZone');
-          if (uz) uz.style.display = 'none';
-          zFit();
-          detectWallEdges(img);
-          render();
-        };
-        img.src = idbEntry.floorplanData;
-      }
-    } catch(e) { console.warn('pvOpenGrundriss IDB:', e); }
-  } else {
-    state.floorplan = null;
-    const uz = document.getElementById('uploadZone');
-    if (uz) uz.style.display = 'flex';
-  }
-
-  // Merken welcher Grundriss aktuell offen ist
-  state._pvKundeId    = pvSelectedKundeId;
+  // Merken welcher Grundriss offen ist
+  state._pvKundeId     = pvSelectedKundeId;
   state._pvGrundrissId = gId;
 
-  // Projektnamen ins Plan-Tab übernehmen
+  // Projektnamen übernehmen
   const nameEl = document.getElementById('projName');
   if (nameEl) nameEl.value = kunde.name + ' – ' + g.name;
 
@@ -9437,8 +9463,78 @@ async function pvOpenGrundriss(gId) {
   state.symbols.forEach(s => { const n=parseInt(s.id.replace(/\D/g,'')); if(n>mx)mx=n; });
   nid = mx + 1;
 
-  render();
+  // ── WICHTIG: Erst Tab wechseln, damit Canvas sichtbar und dimensioniert ist ──
+  // Dann erst das Bild laden und rendern (img.onload läuft gegen sichtbaren Canvas)
   switchTab('plan');
+
+  // Kurze Pause damit der Browser den Canvas-Tab rendert und layoutet
+  await new Promise(r => setTimeout(r, 80));
+
+  // Grundriss-Bild aus IDB laden
+  if (g.hasFloorplan) {
+    try {
+      const idbEntry = await pvIDBGet(gId);
+      if (idbEntry?.floorplanData) {
+        const dataUrl = idbEntry.floorplanData;
+
+        // PDF erkennen (gespeichert als data:application/pdf;base64,...)
+        if (dataUrl.startsWith('data:application/pdf')) {
+          // PDF via PDF.js rendern (wie loadFloorplan)
+          const base64 = dataUrl.split(',')[1];
+          const binary  = atob(base64);
+          const bytes   = new Uint8Array(binary.length);
+          for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+          const blob = new Blob([bytes], {type:'application/pdf'});
+          const url  = URL.createObjectURL(blob);
+          if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.getDocument(url).promise.then(pdf => pdf.getPage(1)).then(page => {
+              const vp = page.getViewport({scale:2.5});
+              const oc = document.createElement('canvas');
+              oc.width=vp.width; oc.height=vp.height;
+              return page.render({canvasContext:oc.getContext('2d'),viewport:vp}).promise.then(()=>oc);
+            }).then(oc => {
+              const img2 = new Image();
+              img2.onload = () => {
+                state.floorplan={img:img2,w:img2.width,h:img2.height};
+                const uz=document.getElementById('uploadZone');
+                if(uz) uz.style.display='none';
+                zFit(); detectWallEdges(img2); render();
+              };
+              img2.src=oc.toDataURL('image/png');
+              URL.revokeObjectURL(url);
+            }).catch(()=>{ URL.revokeObjectURL(url); });
+          }
+        } else {
+          // Normales Bild (PNG/JPG)
+          const img = new Image();
+          img.onload = () => {
+            state.floorplan = { img, w: img.width, h: img.height };
+            const uz = document.getElementById('uploadZone');
+            if (uz) uz.style.display = 'none';
+            zFit();
+            detectWallEdges(img);
+            render();
+          };
+          img.onerror = () => {
+            console.warn('pvOpenGrundriss: Bild konnte nicht geladen werden');
+            render();
+          };
+          img.src = dataUrl;
+        }
+      } else {
+        render();
+      }
+    } catch(e) {
+      console.warn('pvOpenGrundriss IDB:', e);
+      render();
+    }
+  } else {
+    // Kein Grundriss-Bild — Upload-Zone anzeigen
+    const uz = document.getElementById('uploadZone');
+    if (uz) uz.style.display = 'flex';
+    render();
+  }
+
   setStatus('📂 Geöffnet: ' + kunde.name + ' – ' + g.name);
 }
 
@@ -9467,6 +9563,10 @@ async function pvSaveCurrentGrundriss() {
   }
   pvSaveLS();
   pvSyncToFirebase(kunde);
+  // Auto-Drive-Sync (im Hintergrund, ohne den User zu blockieren)
+  if (gdToken && gdAutoSyncEnabled) {
+    gdSyncGrundriss(state._pvKundeId, state._pvGrundrissId).catch(()=>{});
+  }
 }
 
 // ── Stückliste eines Grundrisses exportieren ──
@@ -9549,7 +9649,314 @@ function pvExportAll() {
   setStatus('✅ Gesamt-Stückliste exportiert');
 }
 
-// ── Auto-Speichern wird direkt in switchTab gehandhabt (kein Wrap nötig) ──
+
+// ═══════════════════════════════════════════════════
+//  GOOGLE DRIVE INTEGRATION (gd* Modul)
+// ═══════════════════════════════════════════════════
+// Nutzt Google Identity Services (OAuth 2.0) + Drive REST API v3.
+// Kein Backend nötig — alles läuft direkt im Browser.
+//
+// EINRICHTUNG (einmalig):
+// 1. console.cloud.google.com → Neues Projekt
+// 2. APIs & Services → Google Drive API aktivieren
+// 3. OAuth 2.0 Client ID erstellen (Typ: Webanwendung)
+// 4. Autorisierte Redirect-URI: deine GitHub Pages / Netlify URL
+// 5. Client-ID unten eintragen:
+
+const GD_CLIENT_ID = '290855467613-62k3bse6kja75f502ie8dcfilgv73386.apps.googleusercontent.com';
+const GD_SCOPES    = 'https://www.googleapis.com/auth/drive.file';
+const GD_API_BASE  = 'https://www.googleapis.com/drive/v3';
+const GD_UPLOAD    = 'https://www.googleapis.com/upload/drive/v3/files';
+
+let gdToken        = null; // OAuth Access Token
+let gdTokenExpiry  = 0;    // Unix-Timestamp ms
+let gdTokenClient  = null; // Google Identity Services Token Client
+let gdRootFolderId = null; // ID des "Anvolt Grundrisse" Root-Ordners auf Drive
+const GD_LS_KEY    = 'gd_token_v1';
+
+// ── Token aus localStorage wiederherstellen ──
+function gdLoadToken() {
+  try {
+    const raw = localStorage.getItem(GD_LS_KEY);
+    if (!raw) return;
+    const { token, expiry } = JSON.parse(raw);
+    if (Date.now() < expiry - 60000) { // noch > 1 Min gültig
+      gdToken = token;
+      gdTokenExpiry = expiry;
+      gdUpdateUI(true);
+    }
+  } catch(e) {}
+}
+
+function gdSaveToken(token, expiresIn) {
+  gdToken = token;
+  gdTokenExpiry = Date.now() + expiresIn * 1000;
+  try { localStorage.setItem(GD_LS_KEY, JSON.stringify({ token, expiry: gdTokenExpiry })); }
+  catch(e) {}
+}
+
+// ── OAuth Connect / Disconnect ──
+function gdConnect() {
+  if (GD_CLIENT_ID.startsWith('DEINE_')) {
+    alert('Bitte zuerst die Google Client-ID in der App eintragen.\n\nAnleitung:\n1. console.cloud.google.com\n2. APIs & Services → OAuth 2.0 Client IDs\n3. Client-ID kopieren und in der Datei bei GD_CLIENT_ID eintragen');
+    return;
+  }
+  if (!window.google?.accounts?.oauth2) {
+    setStatus('❌ Google Sign-In Script noch nicht geladen — bitte kurz warten und nochmal versuchen');
+    return;
+  }
+  if (!gdTokenClient) {
+    gdTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GD_CLIENT_ID,
+      scope:     GD_SCOPES,
+      callback:  (resp) => {
+        if (resp.error) { setStatus('❌ Google Drive: ' + resp.error); return; }
+        gdSaveToken(resp.access_token, resp.expires_in);
+        gdUpdateUI(true);
+        setStatus('✅ Google Drive verbunden!');
+        // Root-Ordner sicherstellen
+        gdEnsureRootFolder();
+      },
+    });
+  }
+  gdTokenClient.requestAccessToken({ prompt: gdToken ? '' : 'consent' });
+}
+
+function gdDisconnect() {
+  if (gdToken && window.google?.accounts?.oauth2) {
+    google.accounts.oauth2.revoke(gdToken);
+  }
+  gdToken = null; gdTokenExpiry = 0; gdRootFolderId = null;
+  try { localStorage.removeItem(GD_LS_KEY); } catch(e) {}
+  gdUpdateUI(false);
+  setStatus('Google Drive Verbindung getrennt');
+}
+
+function gdUpdateUI(connected) {
+  const connectBtn    = document.getElementById('gdConnectBtn');
+  const disconnectBtn = document.getElementById('gdDisconnectBtn');
+  const syncAllBtn    = document.getElementById('gdSyncAllBtn');
+  const statusEl      = document.getElementById('gdStatus');
+  if (!connectBtn) return;
+  if (connected) {
+    connectBtn.style.display    = 'none';
+    disconnectBtn.style.display = 'block';
+    syncAllBtn.style.display    = 'block';
+    if (statusEl) statusEl.textContent = '✅ Google Drive: verbunden';
+    if (statusEl) statusEl.style.color = '#3fb950';
+  } else {
+    connectBtn.style.display    = 'block';
+    disconnectBtn.style.display = 'none';
+    syncAllBtn.style.display    = 'none';
+    if (statusEl) { statusEl.textContent = '☁️ Google Drive: nicht verbunden'; statusEl.style.color = ''; }
+  }
+}
+
+// ── Token-Gültigkeit prüfen ──
+async function gdEnsureToken() {
+  if (gdToken && Date.now() < gdTokenExpiry - 60000) return true;
+  // Token abgelaufen → erneut anfordern (ohne Consent-Dialog wenn möglich)
+  return new Promise(resolve => {
+    if (!gdTokenClient) { resolve(false); return; }
+    gdTokenClient.requestAccessToken({ prompt: '' });
+    // callback wird in initTokenClient gesetzt → resolve dort
+    const orig = gdTokenClient.callback;
+    gdTokenClient.callback = (resp) => {
+      if (orig) orig(resp);
+      resolve(!resp.error);
+    };
+  });
+}
+
+// ── Drive REST API Hilfsfunktionen ──
+async function gdFetch(url, options = {}) {
+  const ok = await gdEnsureToken();
+  if (!ok) throw new Error('Nicht mit Google Drive verbunden');
+  const resp = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': 'Bearer ' + gdToken,
+      ...(options.headers || {}),
+    },
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err?.error?.message || resp.statusText);
+  }
+  return resp;
+}
+
+// Ordner suchen oder anlegen
+async function gdFindOrCreateFolder(name, parentId) {
+  // Suchen
+  const q = `name='${name.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+  const resp = await gdFetch(`${GD_API_BASE}/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  const data = await resp.json();
+  if (data.files?.length) return data.files[0].id;
+  // Anlegen
+  const createResp = await gdFetch(`${GD_API_BASE}/files`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
+  });
+  const created = await createResp.json();
+  return created.id;
+}
+
+// Root-Ordner "Anvolt Grundrisse" im Drive-Root sicherstellen
+async function gdEnsureRootFolder() {
+  if (gdRootFolderId) return gdRootFolderId;
+  gdRootFolderId = await gdFindOrCreateFolder('Anvolt Grundrisse', 'root');
+  return gdRootFolderId;
+}
+
+// Datei hochladen oder aktualisieren (multipart)
+async function gdUploadFile(folderId, filename, mimeType, content) {
+  // Prüfen ob Datei schon existiert
+  const q = `name='${filename.replace(/'/g,"\\'")}' and '${folderId}' in parents and trashed=false`;
+  const searchResp = await gdFetch(`${GD_API_BASE}/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+  const searchData = await searchResp.json();
+  const existingId = searchData.files?.[0]?.id;
+
+  const boundary   = 'anvolt_' + Date.now();
+  const metaJson   = JSON.stringify(
+    existingId ? {} : { name: filename, parents: [folderId] }
+  );
+
+  let body;
+  if (typeof content === 'string' && content.startsWith('data:')) {
+    // base64 data URL → Blob
+    const [header, b64] = content.split(',');
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mimeType });
+    // Multipart
+    const meta = new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaJson}\r\n`,
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    ]);
+    body = new Blob([meta, blob, `\r\n--${boundary}--`]);
+  } else {
+    // Text/JSON
+    const encoder = new TextEncoder();
+    const contentBytes = encoder.encode(content);
+    body = new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaJson}\r\n`,
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+      contentBytes,
+      `\r\n--${boundary}--`,
+    ]);
+  }
+
+  const url = existingId
+    ? `${GD_UPLOAD}/${existingId}?uploadType=multipart`
+    : `${GD_UPLOAD}?uploadType=multipart`;
+
+  const resp = await gdFetch(url, {
+    method:  existingId ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  return await resp.json();
+}
+
+// ── Einen Grundriss auf Drive speichern ──
+// Struktur: Anvolt Grundrisse / [Projektname] / [Grundrissname].json + [Grundrissname].jpg
+async function gdSyncGrundriss(kundeId, gId) {
+  if (!gdToken) { gdConnect(); return; }
+  const kunde = pvKunden.find(k=>k.id===kundeId);
+  const g     = (kunde?.grundrisse||[]).find(g=>g.id===gId);
+  if (!g) return;
+  setStatus('☁️ Lade auf Google Drive hoch…');
+  try {
+    const rootId  = await gdEnsureRootFolder();
+    // Projekt-Ordner
+    const projId  = await gdFindOrCreateFolder(kunde.name, rootId);
+    // Grundriss-Ordner
+    const grId    = await gdFindOrCreateFolder(g.name, projId);
+
+    // 1. Planungsdaten als JSON
+    const planData = {
+      name:      g.name,
+      kunde:     kunde.name,
+      adresse:   kunde.adresse||'',
+      symbols:   g.symbols||[],
+      wires:     g.wires||[],
+      raeume:    g.raeume||[],
+      trassen:   g.trassen||[],
+      scale:     g.scale||null,
+      exportedAt: new Date().toISOString(),
+    };
+    await gdUploadFile(grId, g.name + '_plan.json', 'application/json', JSON.stringify(planData, null, 2));
+
+    // 2. Stückliste als CSV
+    const origSyms = state.symbols, origWires = state.wires, origRaeume = state.raeume;
+    state.symbols = g.symbols||[]; state.wires = g.wires||[]; state.raeume = g.raeume||[];
+    const sep=';';
+    let csv = `Stückliste${sep}${kunde.name} – ${g.name}${sep}\n`;
+    csv += `Exportiert${sep}${new Date().toLocaleString('de-DE')}${sep}\n\n`;
+    csv += `Gerät${sep}Anzahl${sep}Stromkreis${sep}\n`;
+    const byType={};
+    for(const s of state.symbols){const def=SYMBOLS[s.type]||{name:s.type};const l=def.name||s.type;if(!byType[l])byType[l]={count:0,circuits:new Set()};byType[l].count+=(s.count||1);if(s.circuit)byType[l].circuits.add(s.circuit);}
+    Object.entries(byType).forEach(([n,v])=>{csv+=`"${n}"${sep}${v.count}${sep}"${[...v.circuits].join(', ')}"${sep}\n`;});
+    csv+=`\nKabeltyp${sep}Länge(m)${sep}\n`;
+    const byK={};
+    for(const w of state.wires){byK[w.kabel||'—']=(byK[w.kabel||'—']||0)+parseFloat(w.laenge_m||0);}
+    Object.entries(byK).forEach(([k,m])=>{csv+=`"${k}"${sep}${m.toFixed(1)}${sep}\n`;});
+    state.symbols = origSyms; state.wires = origWires; state.raeume = origRaeume;
+    await gdUploadFile(grId, g.name + '_stueckliste.csv', 'text/csv', '\uFEFF'+csv);
+
+    // 3. Grundriss-Bild (falls vorhanden)
+    if (g.hasFloorplan) {
+      try {
+        const idbEntry = await pvIDBGet(gId);
+        if (idbEntry?.floorplanData) {
+          const imgMime = idbEntry.floorplanData.startsWith('data:application/pdf') ? 'application/pdf' : 'image/jpeg';
+          const ext     = imgMime === 'application/pdf' ? '.pdf' : '.jpg';
+          await gdUploadFile(grId, g.name + '_grundriss' + ext, imgMime, idbEntry.floorplanData);
+        }
+      } catch(e) { console.warn('gdSyncGrundriss: Bild-Upload fehlgeschlagen', e); }
+    }
+
+    setStatus('✅ "' + g.name + '" auf Google Drive gespeichert (Anvolt Grundrisse / ' + kunde.name + ')');
+    // UI aktualisieren
+    pvShowDetail(g);
+  } catch(e) {
+    console.error('gdSyncGrundriss:', e);
+    setStatus('❌ Drive-Upload fehlgeschlagen: ' + e.message);
+  }
+}
+
+// ── Alle Projekte auf Drive speichern ──
+async function gdSyncAll() {
+  if (!gdToken) { gdConnect(); return; }
+  if (!pvKunden.length) { alert('Keine Projekte vorhanden'); return; }
+  setStatus('☁️ Lade alle Projekte hoch…');
+  let ok=0, fail=0;
+  for (const kunde of pvKunden) {
+    for (const g of (kunde.grundrisse||[])) {
+      try {
+        // pvSelectedKundeId temporär setzen
+        const prevKunde = pvSelectedKundeId;
+        pvSelectedKundeId = kunde.id;
+        await gdSyncGrundriss(kunde.id, g.id);
+        pvSelectedKundeId = prevKunde;
+        ok++;
+      } catch(e) { fail++; }
+    }
+  }
+  setStatus(`✅ Drive-Sync abgeschlossen: ${ok} Grundriss(e) hochgeladen${fail?', '+fail+' Fehler':''}`);
+}
+
+// ── Auto-Sync nach Speichern ──
+// Wenn Drive verbunden ist, wird nach pvSaveCurrentGrundriss im Hintergrund hochgeladen.
+// Der Hook wird direkt in switchTab und pvSaveCurrentGrundriss über ein Flag gesteuert.
+let gdAutoSyncEnabled = true; // kann deaktiviert werden um rekursion zu vermeiden
+
+// Beim Start Token wiederherstellen
+window.addEventListener('load', () => { setTimeout(gdLoadToken, 1500); }, { once: false });
+
 
 
 // Eigenständiger Vektor-Grundriss-Editor mit Raster-Snap.
