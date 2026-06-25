@@ -3473,6 +3473,8 @@ function localStateSave() {
       fc.getContext('2d').drawImage(state.floorplan.img, 0, 0, fw, fh);
       fpData = fc.toDataURL('image/jpeg', 0.65);
     }
+    // Aktiven Tab ermitteln
+    const activeTab = document.querySelector('.tab.act')?.id?.replace('tab-','') || 'plan';
     const backup = {
       symbols:  state.symbols||[],
       wires:    state.wires||[],
@@ -3483,6 +3485,7 @@ function localStateSave() {
       zoom:     state.zoom,
       raumhoehe:state.raumhoehe||250,
       projName: document.getElementById('projName')?.value||'',
+      activeTab,
       floorplanData: fpData,
       savedAt:  Date.now(),
     };
@@ -3524,6 +3527,7 @@ function localStateRestore() {
         const uz = document.getElementById('uploadZone');
         if (uz) uz.style.display = 'none';
         render();
+        detectWallEdges(img);
       };
       img.src = d.floorplanData;
     }
@@ -3536,6 +3540,13 @@ function localStateRestore() {
       const uz=document.getElementById('uploadZone');
       if(uz&&!d.floorplanData) uz.style.display='none';
       setStatus('♻️ Letzter Stand wiederhergestellt (' + new Date(d.savedAt).toLocaleTimeString('de-DE') + ')');
+    }
+
+    // Aktiven Tab wiederherstellen (nur Plan-Tab, Symbole, Stromkreise, Stückliste)
+    // Projekte und Zeichnen nicht automatisch öffnen beim Reload
+    const safeTab = ['plan','stromkreise','stueckliste','symbole'];
+    if (d.activeTab && safeTab.includes(d.activeTab)) {
+      switchTab(d.activeTab);
     }
   } catch(e) { console.warn('localStateRestore:', e); }
 }
