@@ -799,10 +799,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
       <!-- RAUM-ZEICHNEN Overlay Canvas -->
       <canvas id="raumOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:113;display:none"></canvas>
-      <!-- RAUM Banner — verschoben nach unten, damit Tab-Leiste nicht überdeckt -->
-      <div id="raumDrawBanner" style="position:absolute;top:52px;left:50%;transform:translateX(-50%);background:rgba(63,185,80,.95);color:#000;font-weight:700;font-size:12px;padding:9px 22px;border-radius:24px;z-index:134;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4)">⬜ Raum zeichnen…</div>
-      <!-- RAUM Panel — verschoben nach unten, damit Tab-Leiste nicht überdeckt -->
-      <div id="raumPanel" style="position:absolute;top:56px;left:10px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:230px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
+      <!-- RAUM Banner -->
+      <div id="raumDrawBanner" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(63,185,80,.95);color:#000;font-weight:700;font-size:12px;padding:9px 22px;border-radius:24px;z-index:134;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4)">⬜ Raum zeichnen…</div>
+      <!-- RAUM Panel (rechts, unter LV) -->
+      <div id="raumPanel" style="position:absolute;top:12px;left:300px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:230px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
         <h4 style="font-size:13px;font-weight:700;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:7px">⬜ Raum definieren
           <button onclick="closeRaumPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
         </h4>
@@ -824,7 +824,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       </div>
 
       <!-- Raum-Namenseingabe: erscheint nach Schließen des Polygons -->
-      <div id="raumNamePanel" style="display:none;position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:130;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,.6);min-width:260px">
+      <div id="raumNamePanel" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:130;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,.6);min-width:260px">
         <div style="font-size:11px;font-weight:700;color:#3fb950;margin-bottom:8px">⬜ Raum benennen</div>
         <input class="rp-input" id="raumNameInput" placeholder="z.B. Wohnzimmer" style="margin-bottom:8px;width:100%;box-sizing:border-box">
         <div style="display:flex;gap:6px">
