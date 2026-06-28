@@ -605,7 +605,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
-      <button class="btn" style="background:rgba(155,89,182,.2);color:#9b59b6;border:1px solid rgba(155,89,182,.4);font-size:11px;font-weight:600" onclick="open3DView()" title="3D-Ansicht der Kabelverlegung">🧊 3D-Ansicht</button>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
       <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
       <button class="btn" style="background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.4);font-size:11px" onclick="openKTPanel()" title="Kabeltrasse zeichnen">🔲 Kabeltrasse</button>
@@ -3097,6 +3096,8 @@ let _iMode = 'sym';   // 'sym' | 'wire'
 let _iSymId = null;
 let _iWireIdx = null;
 let _iSel = { montage:'UP', kbzf:'unten', hoehe:40, raumhoehe:250, verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
+// Gespeicherte Symbolgrößen pro Typ
+var _symSizeMemory = {};
 // Remembered wire install settings (reused for next wire)
 let _pendingWI = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'', wireType:'strom' };
 
@@ -3629,6 +3630,46 @@ function setupEvents() {
     }
     if (e.key === 'Escape') { state.wirePoints = []; state.selectedId = null; render(); }
     if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undoAction(); }
+
+    // ── Strg+C / Cmd+C — Symbol kopieren ──
+    if ((e.ctrlKey||e.metaKey) && e.key==='c') {
+      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+      if (state.selectedId) {
+        e.preventDefault();
+        var s = state.symbols.find(function(s){return s.id===state.selectedId;});
+        if (s) { window._symClipboard = JSON.parse(JSON.stringify(s)); setStatus('⎘ ' + (s.label||s.type) + ' kopiert — Strg+V zum Einfügen'); }
+      }
+    }
+
+    // ── Strg+V / Cmd+V — Symbol einfügen ──
+    if ((e.ctrlKey||e.metaKey) && e.key==='v') {
+      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+      if (window._symClipboard) {
+        e.preventDefault();
+        saveUndo();
+        var offset = 40 / state.zoom;
+        var copy = Object.assign({}, window._symClipboard, {
+          id: gid(),
+          x: window._symClipboard.x + offset,
+          y: window._symClipboard.y + offset,
+        });
+        state.symbols.push(copy);
+        if (copy.size && copy.size !== 1) _symSizeMemory[copy.type] = copy.size;
+        selectSymbol(copy.id);
+        render();
+        setStatus('📋 ' + (copy.label||copy.type) + ' eingefügt — nochmal Strg+V für weitere Kopien');
+      }
+    }
+
+    // ── Strg+D / Cmd+D — direkt duplizieren (ohne Zwischenablage) ──
+    if ((e.ctrlKey||e.metaKey) && e.key==='d') {
+      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+      if (state.selectedId) {
+        e.preventDefault();
+        copySymbol(state.selectedId);
+      }
+    }
+
     if (e.key==='Delete'||e.key==='Backspace') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
       e.preventDefault();
@@ -4277,10 +4318,10 @@ function placeSymbol(key, x, y) {
     nennstrom, kabel,
     kabelHinweis: autoK?.kabelHinweis || '',
     lsKurve: autoK?.lsKurve || 'B',
-    // Kabelausführung (Position am Symbol)
-    kabelPosition: 'unten', // oben | unten | links | rechts
-    kabelLaenge: '',        // Zuleitung in m (manuell, wenn kein Maßstab)
-    kommentar: '', count: 1
+    kabelPosition: 'unten',
+    kabelLaenge: '',
+    kommentar: '', count: 1,
+    size: _symSizeMemory[key] || 1,
   };
   state.symbols.push(s);
   selectSymbol(s.id);
@@ -4292,6 +4333,20 @@ function placeSymbol(key, x, y) {
   setTimeout(() => openInstModal(s.id), 80);
   return s;
 }
+function copySymbol(symId) {
+  const orig = state.symbols.find(s => s.id === symId);
+  if (!orig) return;
+  saveUndo();
+  const offset = 40 / state.zoom;
+  const copy = Object.assign({}, orig, { id: gid(), x: orig.x + offset, y: orig.y + offset });
+  state.symbols.push(copy);
+  if (copy.size && copy.size !== 1) _symSizeMemory[copy.type] = copy.size;
+  window._symClipboard = JSON.parse(JSON.stringify(copy));
+  selectSymbol(copy.id);
+  render();
+  setStatus('⎘ ' + (orig.label||orig.type) + ' kopiert — Strg+V für weitere');
+}
+
 function hitTest(x, y) {
   const R = 22;
   for (let i=state.symbols.length-1; i>=0; i--) {
@@ -5201,8 +5256,8 @@ function renderProps(sym) {
         <div style="display:flex;align-items:center;gap:6px">
           <input type="range" min="0.5" max="2.5" step="0.1" value="${sym.size||1}"
             style="flex:1"
-            oninput="document.getElementById('symSizeVal-${sym.id}').textContent=Math.round(this.value*100)+'%'; updSym('${sym.id}','size',+this.value)">
-          <button class="btn bg" style="font-size:9px;padding:3px 6px" onclick="updSym('${sym.id}','size',1);renderProps(state.symbols.find(s=>s.id==='${sym.id}'))" title="Zurücksetzen">↺</button>
+            oninput="var v=+this.value;document.getElementById('symSizeVal-${sym.id}').textContent=Math.round(v*100)+'%';updSym('${sym.id}','size',v);_symSizeMemory['${sym.type}']=v;">
+          <button class="btn bg" style="font-size:9px;padding:3px 6px" onclick="updSym('${sym.id}','size',1);_symSizeMemory['${sym.type}']=1;renderProps(state.symbols.find(s=>s.id==='${sym.id}'))" title="Zurücksetzen">↺</button>
         </div></div>
       <div class="rp-row"><label class="rp-lbl">Anzahl</label>
         <input class="rp-input" type="number" value="${sym.count||1}" min="1" oninput="updSym('${sym.id}','count',+this.value)"></div>
@@ -5227,6 +5282,7 @@ function renderProps(sym) {
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(-90)">↺ -90°</button>
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(90)">↻ +90°</button>
       </div>
+      <button class="btn bg" style="width:100%;margin-top:6px;font-size:10px;color:var(--bl);border-color:var(--bl);border-width:1px" onclick="copySymbol('${sym.id}')">⎘ Kopieren &nbsp;<span style="opacity:.6;font-size:9px">Strg+C / Strg+D</span></button>
       <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:6px;font-size:10px" onclick="deleteSelected()">🗑 Löschen</button>
     </div>
     <div class="rp-divider"></div>
@@ -7052,493 +7108,6 @@ function exportFloorplanPDF() {
     w.document.write(html);
     w.document.close();
   }, 200);
-}
-
-
-// ═══════════════════════════════════════════════════
-//  3D-ANSICHT — Three.js Kabelverlegung
-// ═══════════════════════════════════════════════════
-function open3DView() {
-  var sc = state.scale || 100; // px pro Meter
-  var defRH = (state.raumhoehe || 250) / 100; // Raumhöhe in Metern
-
-  // Daten sammeln
-  var raeume  = state.raeume  || [];
-  var wires   = state.wires   || [];
-  var symbols = state.symbols || [];
-
-  // Welt-Bounding-Box bestimmen (für Kamera-Zentrierung)
-  var allX = [], allZ = [];
-  raeume.forEach(function(r) {
-    if (r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); });
-  });
-  symbols.forEach(function(s){ allX.push(s.x/sc); allZ.push(s.y/sc); });
-  wires.forEach(function(w){ if(w.points) w.points.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
-
-  var minX = allX.length ? Math.min.apply(null,allX) : 0;
-  var maxX = allX.length ? Math.max.apply(null,allX) : 10;
-  var minZ = allZ.length ? Math.min.apply(null,allZ) : 0;
-  var maxZ = allZ.length ? Math.max.apply(null,allZ) : 10;
-  var cx = (minX+maxX)/2, cz = (minZ+maxZ)/2;
-  var span = Math.max(maxX-minX, maxZ-minZ, 5);
-
-  // JSON-Daten für das 3D-Fenster serialisieren
-  var data3d = {
-    raeume:  raeume,
-    wires:   wires.map(function(w){
-      var src = symbols.find(function(s){return s.id===w.srcId;});
-      var dst = symbols.find(function(s){return s.id===w.dstId;});
-      return {
-        points:     w.points,
-        verlegeart: w.verlegeart || 'UP',
-        trasseHoehe:w.trasseHoehe || 20,
-        color:      gz3d_wireColor(w),
-        label:      w.kabel || w.wireType || 'Leitung',
-        circuit:    w.circuit || '',
-        laenge_m:   w.laenge_m || '',
-        srcHoehe:   src ? (src.hoehe != null ? src.hoehe : 40) : 40,
-        dstHoehe:   dst ? (dst.hoehe != null ? dst.hoehe : 40) : 40,
-        srcRH:      src ? (src.raumhoehe || defRH*100) : defRH*100,
-        dstRH:      dst ? (dst.raumhoehe || defRH*100) : defRH*100,
-      };
-    }),
-    symbols: symbols.map(function(s){
-      var def = SYMBOLS[s.type] || {};
-      return {
-        x: s.x, y: s.y,
-        hoehe:    s.hoehe     != null ? s.hoehe     : 40,
-        raumhoehe:s.raumhoehe != null ? s.raumhoehe : defRH*100,
-        label:    s.label || def.name || s.type,
-        type:     s.type,
-        montage:  s.montage || 'UP',
-      };
-    }),
-    scale: sc,
-    raumhoehe: defRH,
-    cx: cx, cz: cz, span: span,
-    projName: document.getElementById('projName').value || 'Grundriss',
-  };
-
-  var jsonStr = JSON.stringify(data3d).replace(/</g,'\\u003c').replace(/>/g,'\\u003e');
-
-  // Symbol-Farben je Typ
-  var symColorMap = {
-    'steckdose':'#e74c3c','schalter':'#3498db','taster':'#2ecc71',
-    'leuchte':'#f1c40f','strahler':'#f39c12','lampe':'#f1c40f',
-    'verteiler':'#9b59b6','sicherung':'#e67e22','default':'#95a5a6'
-  };
-
-  var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
-    +'<title>3D-Ansicht — '+data3d.projName+'</title>'
-    +'<style>'
-    +'*{margin:0;padding:0;box-sizing:border-box}'
-    +'body{background:#0a0a14;color:#eee;font-family:Arial,sans-serif;overflow:hidden}'
-    +'#c3d{display:block;width:100vw;height:100vh}'
-    +'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px}'
-    +'.ui-panel{background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.4);border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px)}'
-    +'.ui-title{font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px}'
-    +'.ui-btn{display:block;width:100%;padding:6px 10px;margin-bottom:5px;border:1px solid rgba(155,89,182,.5);border-radius:5px;background:rgba(155,89,182,.15);color:#ccc;cursor:pointer;font-size:11px;text-align:left;transition:background .2s}'
-    +'.ui-btn:hover{background:rgba(155,89,182,.35)}'
-    +'.ui-btn.act{background:rgba(155,89,182,.4);color:#fff;border-color:#9b59b6}'
-    +'.ui-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 0}'
-    +'.cb-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#ccc;margin-bottom:5px;cursor:pointer}'
-    +'.cb-row input{accent-color:#9b59b6;cursor:pointer}'
-    +'#tooltip{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid #9b59b6;border-radius:6px;padding:7px 14px;font-size:11px;color:#eee;pointer-events:none;display:none;white-space:nowrap}'
-    +'#info{position:fixed;top:12px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#aaa;max-width:200px;line-height:1.6;backdrop-filter:blur(8px)}'
-    +'#legend{position:fixed;bottom:20px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(8px);max-height:60vh;overflow-y:auto}'
-    +'.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;color:#ccc}'
-    +'.leg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}'
-    +'</style></head><body>'
-    +'<canvas id="c3d"></canvas>'
-
-    +'<div id="ui">'
-    +'<div class="ui-panel">'
-    +'<div class="ui-title">🧊 3D-Kabelverlegung</div>'
-    +'<div style="font-size:10px;color:#888;margin-bottom:8px">'+data3d.projName+'</div>'
-    +'<button class="ui-btn" onclick="setCam(\'persp\')">👁 Perspektive</button>'
-    +'<button class="ui-btn" onclick="setCam(\'top\')">⬆ Draufsicht</button>'
-    +'<button class="ui-btn" onclick="setCam(\'front\')">⬛ Vorderansicht</button>'
-    +'<button class="ui-btn" onclick="setCam(\'iso\')">🔷 Isometrisch</button>'
-    +'<div class="ui-sep"></div>'
-    +'<button class="ui-btn" onclick="resetCam()">🎯 Zurücksetzen</button>'
-    +'</div>'
-    +'<div class="ui-panel">'
-    +'<div class="ui-title">Ebenen</div>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-walls" checked onchange="toggleLayer(\'walls\',this.checked)"> Wände/Räume</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-floor" checked onchange="toggleLayer(\'floor\',this.checked)"> Boden</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-wires" checked onchange="toggleLayer(\'wires\',this.checked)"> Kabellinien</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-symbols" checked onchange="toggleLayer(\'symbols\',this.checked)"> Elektrogeräte</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-labels" checked onchange="toggleLayer(\'labels\',this.checked)"> Beschriftungen</label>'
-    +'<div class="ui-sep"></div>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-roof" onchange="toggleLayer(\'roof\',this.checked)"> Decke (transparent)</label>'
-    +'</div>'
-    +'</div>'
-
-    +'<div id="info">'
-    +'<div style="color:#9b59b6;font-weight:700;margin-bottom:5px">Steuerung</div>'
-    +'🖱 Linke Taste: Drehen<br>'
-    +'🖱 Rechte Taste: Verschieben<br>'
-    +'🖱 Scrollrad: Zoom<br>'
-    +'👆 Touch: 1 Finger = Drehen<br>'
-    +'👆 Touch: 2 Finger = Zoom'
-    +'</div>'
-
-    +'<div id="tooltip"></div>'
-    +'<div id="legend"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:7px">Kabeltypen</div><div id="leg-items"></div></div>'
-
-    +'<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>'
-    +'<script>'
-    +'var D = '+jsonStr+';'
-    +'var SC = D.scale; var layers3d = { walls:true, floor:true, wires:true, symbols:true, labels:true, roof:false };'
-    +'var layerObjs = { walls:[], floor:[], wires:[], symbols:[], labels:[], roof:[] };'
-
-    // Scene setup
-    +'var renderer = new THREE.WebGLRenderer({canvas:document.getElementById("c3d"),antialias:true});'
-    +'renderer.setPixelRatio(window.devicePixelRatio||1);'
-    +'renderer.setSize(window.innerWidth,window.innerHeight);'
-    +'renderer.shadowMap.enabled=true;'
-    +'renderer.setClearColor(0x0a0a14);'
-
-    +'var scene = new THREE.Scene();'
-    +'scene.fog = new THREE.FogExp2(0x0a0a14, 0.015);'
-
-    // Camera
-    +'var W=window.innerWidth,H=window.innerHeight;'
-    +'var camera = new THREE.PerspectiveCamera(55,W/H,0.1,500);'
-    +'var camDist = D.span * 1.2;'
-    +'camera.position.set(D.cx, camDist*0.7, D.cz + camDist);'
-    +'camera.lookAt(D.cx, 0, D.cz);'
-
-    // Lighting
-    +'scene.add(new THREE.AmbientLight(0xffffff,0.55));'
-    +'var dirL = new THREE.DirectionalLight(0xffffff,0.8);'
-    +'dirL.position.set(D.cx+20,30,D.cz+20); dirL.castShadow=true; scene.add(dirL);'
-    +'var fillL = new THREE.DirectionalLight(0x8888ff,0.3);'
-    +'fillL.position.set(D.cx-10,10,D.cz-10); scene.add(fillL);'
-    +'scene.add(new THREE.PointLight(0xf5a623,0.4,50));'
-
-    // Grid
-    +'var grid = new THREE.GridHelper(Math.max(D.span*3,30),30,0x223,0x112);'
-    +'grid.position.set(D.cx,0,D.cz); scene.add(grid);'
-
-    // Helper: px → world-m (centered)
-    +'function px(x){return x/SC;}'
-    +'function pz(y){return y/SC;}'
-
-    // ── BODEN ──
-    +'(function buildFloor(){'
-    +'  var geo = new THREE.PlaneGeometry(D.span*3,D.span*3);'
-    +'  var mat = new THREE.MeshLambertMaterial({color:0x1a1a2a,side:THREE.DoubleSide});'
-    +'  var mesh = new THREE.Mesh(geo,mat);'
-    +'  mesh.rotation.x=-Math.PI/2; mesh.position.set(D.cx,0,D.cz);'
-    +'  mesh.receiveShadow=true; scene.add(mesh); layerObjs.floor.push(mesh);'
-    +'})();'
-
-    // ── RÄUME → Wände ──
-    +'(function buildRooms(){'
-    +'  D.raeume.forEach(function(r){'
-    +'    if(!r.pts||!r.pts.length) return;'
-    +'    var rh = (r.hoehe||D.raumhoehe*100)/100;'
-    +'    var pts2d;'
-    +'    if(r.type==="rect"&&r.pts.length===2){'
-    +'      var x1=Math.min(r.pts[0].x,r.pts[1].x)/SC, z1=Math.min(r.pts[0].y,r.pts[1].y)/SC;'
-    +'      var x2=Math.max(r.pts[0].x,r.pts[1].x)/SC, z2=Math.max(r.pts[0].y,r.pts[1].y)/SC;'
-    +'      pts2d=[[x1,z1],[x2,z1],[x2,z2],[x1,z2]];'
-    +'    } else {'
-    +'      pts2d=r.pts.map(function(p){return[p.x/SC,p.y/SC];});'
-    +'    }'
-    // Boden des Raums
-    +'    var shape = new THREE.Shape();'
-    +'    shape.moveTo(pts2d[0][0],pts2d[0][1]);'
-    +'    for(var i=1;i<pts2d.length;i++) shape.lineTo(pts2d[i][0],pts2d[i][1]);'
-    +'    shape.closePath();'
-    +'    var floorGeo = new THREE.ShapeGeometry(shape);'
-    +'    var colHex = r.color ? parseInt(r.color.replace("#","0x"))||0x1e3a2e : 0x1e3a2e;'
-    +'    var floorMat = new THREE.MeshLambertMaterial({color:colHex,transparent:true,opacity:0.35,side:THREE.DoubleSide});'
-    +'    var floorMesh = new THREE.Mesh(floorGeo,floorMat);'
-    +'    floorMesh.rotation.x=-Math.PI/2; floorMesh.position.y=0.01; scene.add(floorMesh);'
-    +'    layerObjs.walls.push(floorMesh);'
-    // Wände als dünne Boxen entlang der Kanten
-    +'    var wallMat = new THREE.MeshLambertMaterial({color:0x2a3a4a,transparent:true,opacity:0.55});'
-    +'    var wallW = 0.12;'
-    +'    for(var wi=0;wi<pts2d.length;wi++){'
-    +'      var p1=pts2d[wi], p2=pts2d[(wi+1)%pts2d.length];'
-    +'      var dx=p2[0]-p1[0], dz=p2[1]-p1[1];'
-    +'      var len=Math.sqrt(dx*dx+dz*dz);'
-    +'      if(len<0.01) continue;'
-    +'      var wGeo = new THREE.BoxGeometry(len,rh,wallW);'
-    +'      var wMesh = new THREE.Mesh(wGeo,wallMat);'
-    +'      wMesh.position.set(p1[0]+dx/2, rh/2, p1[1]+dz/2);'
-    +'      wMesh.rotation.y = -Math.atan2(dz,dx);'
-    +'      wMesh.castShadow=true; wMesh.receiveShadow=true;'
-    +'      scene.add(wMesh); layerObjs.walls.push(wMesh);'
-    +'    }'
-    // Decke (optional)
-    +'    var roofMat = new THREE.MeshLambertMaterial({color:0x1a2a3a,transparent:true,opacity:0.15,side:THREE.DoubleSide});'
-    +'    var roofMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape),roofMat);'
-    +'    roofMesh.rotation.x=-Math.PI/2; roofMesh.position.y=rh; roofMesh.visible=false;'
-    +'    scene.add(roofMesh); layerObjs.roof.push(roofMesh);'
-    // Raumname
-    +'    if(r.name){'
-    +'      var cx3=pts2d.reduce(function(a,p){return a+p[0];},0)/pts2d.length;'
-    +'      var cz3=pts2d.reduce(function(a,p){return a+p[1];},0)/pts2d.length;'
-    +'      makeLabel(r.name, cx3, 0.05, cz3, "#3fb950", 0.35);'
-    +'    }'
-    +'  });'
-    +'})();'
-
-    // ── KABEL ──
-    +'var wireLegend = {};'
-    +'(function buildWires(){'
-    +'  D.wires.forEach(function(wire,wi){'
-    +'    if(!wire.points||wire.points.length<2) return;'
-    +'    var vl = wire.verlegeart||"UP";'
-    +'    var col = new THREE.Color(wire.color||"#e74c3c");'
-    +'    var rh = (wire.srcRH||250)/100;'
-    +'    var hSrc = (wire.srcHoehe||40)/100;'
-    +'    var hDst = (wire.dstHoehe||40)/100;'
-    +'    var th  = (wire.trasseHoehe||20)/100;'
-    +'    if(!wireLegend[wire.label]) wireLegend[wire.label]=wire.color||"#e74c3c";'
-    // 3D-Punkte für Kabelweg berechnen
-    +'    var pts3 = [];'
-    +'    var n = wire.points.length;'
-    +'    wire.points.forEach(function(p,i){'
-    +'      var x3=p.x/SC, z3=p.y/SC;'
-    +'      var y3;'
-    +'      if(vl==="UP"||vl==="HR"||vl==="EZ"||vl==="HW"){'
-    // Unterputz: Start- und Endpunkt auf Gerätehöhe, Mitte unter der Decke
-    +'        if(i===0) y3=hSrc;'
-    +'        else if(i===n-1) y3=hDst;'
-    +'        else y3=rh-0.05;' // unter der Decke
-    +'      } else if(vl==="AP"){'
-    // Aufputz/Kabelkanal: direkt auf Höhe (linear interpoliert)
-    +'        var t=i/(n-1);'
-    +'        y3=hSrc+(hDst-hSrc)*t;'
-    +'      } else if(vl==="HD"){'
-    // Hohldecke: alles auf Deckenhöhe
-    +'        y3=rh;'
-    +'      } else if(vl==="FU"){'
-    // Fußboden: 3cm unter Boden
-    +'        y3=-0.03;'
-    +'      } else if(vl==="ER"){'
-    // Erdkabel: 60cm unter Boden
-    +'        y3=-0.6;'
-    +'      } else {'
-    +'        var t2=i/(n-1);'
-    +'        y3=rh-0.05;'
-    +'      }'
-    +'      pts3.push(new THREE.Vector3(x3,y3,z3));'
-    +'    });'
-    // Bei UP: Senkrechte Einführung am Start und Ende ergänzen
-    +'    if((vl==="UP"||vl==="HR"||vl==="HW")&&n>=2){'
-    +'      var p0=pts3[0].clone(); var pLast=pts3[pts3.length-1].clone();'
-    +'      pts3.unshift(new THREE.Vector3(p0.x,rh-0.05,p0.z));'
-    +'      pts3.push(new THREE.Vector3(pLast.x,rh-0.05,pLast.z));'
-    +'      pts3[1].y=hSrc; pts3[pts3.length-2].y=hDst;'
-    +'    }'
-    // TubeGeometry aus CatmullRomCurve
-    +'    var curve = new THREE.CatmullRomCurve3(pts3);'
-    +'    var tubeGeo = new THREE.TubeGeometry(curve, Math.max(pts3.length*4,8), 0.025, 6, false);'
-    +'    var tubeMat = new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:0.2});'
-    +'    var tube = new THREE.Mesh(tubeGeo,tubeMat);'
-    +'    tube.userData = { type:"wire", label:wire.label, circuit:wire.circuit, laenge:wire.laenge_m, verlegeart:vl };'
-    +'    tube.castShadow=true; scene.add(tube); layerObjs.wires.push(tube);'
-    // Stromkreis-Label in der Mitte
-    +'    if(wire.circuit){'
-    +'      var mid=pts3[Math.floor(pts3.length/2)];'
-    +'      makeLabel(wire.circuit, mid.x, mid.y+0.15, mid.z, wire.color||"#e74c3c", 0.2);'
-    +'    }'
-    +'  });'
-    // Legende aufbauen
-    +'  var legEl=document.getElementById("leg-items");'
-    +'  Object.keys(wireLegend).forEach(function(k){'
-    +'    legEl.innerHTML+=\'<div class="leg-row"><div class="leg-dot" style="background:\'+wireLegend[k]+\'"></div><span>\'+k+\'</span></div>\';'
-    +'  });'
-    +'})();'
-
-    // ── SYMBOLE (Elektrogeräte) ──
-    +'(function buildSymbols(){'
-    +'  var symColors={"steckdose":"#e74c3c","schalter":"#3498db","taster":"#2ecc71","leuchte":"#f1c40f","strahler":"#f39c12","lampe":"#f1c40f","verteiler":"#9b59b6","sicherung":"#e67e22","default":"#95a5a6"};'
-    +'  D.symbols.forEach(function(s){'
-    +'    var x3=s.x/SC, z3=s.y/SC;'
-    +'    var h=(s.hoehe||40)/100;'
-    +'    var colKey=Object.keys(symColors).find(function(k){return s.type&&s.type.toLowerCase().indexOf(k)>=0;});'
-    +'    var col=symColors[colKey||"default"];'
-    // Kleiner Würfel an der Wand-Position
-    +'    var geo = new THREE.BoxGeometry(0.12,0.12,0.08);'
-    +'    var mat = new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.4});'
-    +'    var mesh = new THREE.Mesh(geo,mat);'
-    +'    mesh.position.set(x3,h,z3);'
-    +'    mesh.userData={type:"symbol",label:s.label,hoehe:s.hoehe,montage:s.montage};'
-    +'    scene.add(mesh); layerObjs.symbols.push(mesh);'
-    // Vertikale Verbindungslinie (Installationspfad)
-    +'    var vGeo=new THREE.BufferGeometry().setFromPoints(['
-    +'      new THREE.Vector3(x3,0.01,z3),'
-    +'      new THREE.Vector3(x3,h,z3)'
-    +'    ]);'
-    +'    var vLine=new THREE.Line(vGeo,new THREE.LineBasicMaterial({color:0x444444,opacity:0.5,transparent:true}));'
-    +'    scene.add(vLine); layerObjs.symbols.push(vLine);'
-    // Glüh-Kugel am Symbol
-    +'    var sphereGeo=new THREE.SphereGeometry(0.07,8,8);'
-    +'    var sphereMat=new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.6,transparent:true,opacity:0.8});'
-    +'    var sphere=new THREE.Mesh(sphereGeo,sphereMat);'
-    +'    sphere.position.set(x3,h+0.12,z3);'
-    +'    scene.add(sphere); layerObjs.symbols.push(sphere);'
-    +'    if(s.label) makeLabel(s.label,x3,h+0.28,z3,"#ffffff",0.18);'
-    +'  });'
-    +'})();'
-
-    // ── SPRITE-LABELS ──
-    +'var labelSprites=[];'
-    +'function makeLabel(text,x,y,z,color,size){'
-    +'  var c2=document.createElement("canvas"); c2.width=256; c2.height=64;'
-    +'  var cx2=c2.getContext("2d");'
-    +'  cx2.clearRect(0,0,256,64);'
-    +'  cx2.fillStyle="rgba(0,0,0,.6)"; cx2.beginPath();'
-    +'  cx2.roundRect(2,2,252,60,8); cx2.fill();'
-    +'  cx2.fillStyle=color||"#fff"; cx2.font="bold 22px Arial";'
-    +'  cx2.textAlign="center"; cx2.textBaseline="middle";'
-    +'  cx2.fillText(text.substring(0,24),128,32);'
-    +'  var tex=new THREE.CanvasTexture(c2);'
-    +'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));'
-    +'  sp.position.set(x,y,z); sp.scale.set(size*4,size,1);'
-    +'  scene.add(sp); layerObjs.labels.push(sp); labelSprites.push(sp);'
-    +'}'
-
-    // ── KAMERA-STEUERUNG ──
-    +'var isDragging=false, isRightDrag=false;'
-    +'var lastMouse={x:0,y:0};'
-    +'var camTheta=0, camPhi=Math.PI/4;'
-    +'var camTarget=new THREE.Vector3(D.cx,0,D.cz);'
-    +'var camR=camDist;'
-
-    +'function updateCameraPos(){'
-    +'  camera.position.x=camTarget.x+camR*Math.sin(camPhi)*Math.sin(camTheta);'
-    +'  camera.position.y=camTarget.y+camR*Math.cos(camPhi);'
-    +'  camera.position.z=camTarget.z+camR*Math.sin(camPhi)*Math.cos(camTheta);'
-    +'  camera.lookAt(camTarget);'
-    +'}'
-
-    // Mouse
-    +'document.addEventListener("mousedown",function(e){'
-    +'  isDragging=true; isRightDrag=(e.button===2);'
-    +'  lastMouse={x:e.clientX,y:e.clientY};'
-    +'});'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  if(!isDragging) return;'
-    +'  var dx=(e.clientX-lastMouse.x)*0.005, dy=(e.clientY-lastMouse.y)*0.005;'
-    +'  lastMouse={x:e.clientX,y:e.clientY};'
-    +'  if(isRightDrag){'
-    +'    var right=new THREE.Vector3(); camera.getWorldDirection(right);'
-    +'    var up2=new THREE.Vector3(0,1,0);'
-    +'    right.cross(up2).normalize();'
-    +'    camTarget.addScaledVector(right,-dx*camR*0.5);'
-    +'    camTarget.y+=dy*camR*0.5;'
-    +'  } else {'
-    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
-    +'  }'
-    +'  updateCameraPos();'
-    +'});'
-    +'document.addEventListener("mouseup",function(){isDragging=false;});'
-    +'document.addEventListener("wheel",function(e){'
-    +'  camR=Math.max(1,Math.min(100,camR*(1+e.deltaY*0.001)));'
-    +'  updateCameraPos();'
-    +'},{passive:true});'
-    +'document.addEventListener("contextmenu",function(e){e.preventDefault();});'
-
-    // Touch
-    +'var touches={};'
-    +'var lastPinchDist=null;'
-    +'document.addEventListener("touchstart",function(e){'
-    +'  e.preventDefault();'
-    +'  Array.from(e.changedTouches).forEach(function(t){touches[t.identifier]={x:t.clientX,y:t.clientY};});'
-    +'},{passive:false});'
-    +'document.addEventListener("touchmove",function(e){'
-    +'  e.preventDefault();'
-    +'  var ids=Object.keys(touches);'
-    +'  if(ids.length===1&&e.touches.length===1){'
-    +'    var t=e.touches[0];'
-    +'    var dx=(t.clientX-touches[ids[0]].x)*0.006, dy=(t.clientY-touches[ids[0]].y)*0.006;'
-    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
-    +'    touches[ids[0]]={x:t.clientX,y:t.clientY};'
-    +'    updateCameraPos();'
-    +'  } else if(e.touches.length===2){'
-    +'    var t0=e.touches[0],t1=e.touches[1];'
-    +'    var dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);'
-    +'    if(lastPinchDist){camR=Math.max(1,Math.min(100,camR*(lastPinchDist/dist)));updateCameraPos();}'
-    +'    lastPinchDist=dist;'
-    +'    touches[t0.identifier]={x:t0.clientX,y:t0.clientY};'
-    +'    touches[t1.identifier]={x:t1.clientX,y:t1.clientY};'
-    +'  }'
-    +'},{passive:false});'
-    +'document.addEventListener("touchend",function(e){'
-    +'  Array.from(e.changedTouches).forEach(function(t){delete touches[t.identifier];});'
-    +'  if(Object.keys(touches).length<2) lastPinchDist=null;'
-    +'},{passive:false});'
-
-    // Kamera-Presets
-    +'function setCam(mode){'
-    +'  if(mode==="top"){camPhi=0.01;camR=D.span*2;}'
-    +'  else if(mode==="front"){camPhi=Math.PI/2;camTheta=0;camR=D.span*1.5;}'
-    +'  else if(mode==="iso"){camPhi=Math.PI/4;camTheta=Math.PI/4;camR=D.span*1.5;}'
-    +'  else{camPhi=Math.PI/3.5;camTheta=Math.PI/6;camR=D.span*1.2;}'
-    +'  updateCameraPos();'
-    +'}'
-    +'function resetCam(){camTarget.set(D.cx,0,D.cz);camR=camDist;camPhi=Math.PI/4;camTheta=0;updateCameraPos();}'
-
-    // Layer toggle
-    +'function toggleLayer(name,val){'
-    +'  layers3d[name]=val;'
-    +'  (layerObjs[name]||[]).forEach(function(o){o.visible=val;});'
-    +'}'
-
-    // Raycasting für Tooltip
-    +'var raycaster=new THREE.Raycaster();'
-    +'var mouse2=new THREE.Vector2();'
-    +'var tooltip=document.getElementById("tooltip");'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  mouse2.x=(e.clientX/window.innerWidth)*2-1;'
-    +'  mouse2.y=-(e.clientY/window.innerHeight)*2+1;'
-    +'  raycaster.setFromCamera(mouse2,camera);'
-    +'  var allMeshes=[];'
-    +'  ["wires","symbols"].forEach(function(k){layerObjs[k].forEach(function(o){if(o.isMesh)allMeshes.push(o);});});'
-    +'  var hits=raycaster.intersectObjects(allMeshes);'
-    +'  if(hits.length&&hits[0].object.userData.label){'
-    +'    var d=hits[0].object.userData;'
-    +'    var txt=d.label;'
-    +'    if(d.circuit) txt+=" · SK "+d.circuit;'
-    +'    if(d.laenge)  txt+=" · "+d.laenge+"m";'
-    +'    if(d.verlegeart) txt+=" · "+d.verlegeart;'
-    +'    if(d.hoehe)   txt+=" · "+d.hoehe+"cm";'
-    +'    tooltip.textContent=txt; tooltip.style.display="block";'
-    +'  } else { tooltip.style.display="none"; }'
-    +'});'
-
-    // Resize
-    +'window.addEventListener("resize",function(){'
-    +'  camera.aspect=window.innerWidth/window.innerHeight;'
-    +'  camera.updateProjectionMatrix();'
-    +'  renderer.setSize(window.innerWidth,window.innerHeight);'
-    +'});'
-
-    // Animate
-    +'updateCameraPos();'
-    +'(function animate(){'
-    +'  requestAnimationFrame(animate);'
-    +'  renderer.render(scene,camera);'
-    +'})();'
-    +'<\/script>'
-    +'</body></html>';
-
-  var w3 = window.open('', '_blank', 'width=1200,height=800');
-  if (!w3) { alert('Popup blockiert \u2014 bitte erlauben'); return; }
-  w3.document.write(html);
-  w3.document.close();
-}
-
-function gz3d_wireColor(wire) {
-  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
-  return PHASE_COLORS[wire.phase] || '#e74c3c';
 }
 
 // ═══════════════════════════════════════════════════
