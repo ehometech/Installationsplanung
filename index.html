@@ -7103,478 +7103,341 @@ function exportFloorplanPDF() {
 // ═══════════════════════════════════════════════════
 //  3D-ANSICHT — Three.js Kabelverlegung
 // ═══════════════════════════════════════════════════
-function open3DView() {
-  var sc = state.scale || 100; // px pro Meter
-  var defRH = (state.raumhoehe || 250) / 100; // Raumhöhe in Metern
+function gz3d_wireColor(wire) {
+  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
+  return (typeof PHASE_COLORS !== 'undefined' && PHASE_COLORS[wire.phase]) || '#e74c3c';
+}
 
-  // Daten sammeln
+function open3DView() {
+  var sc      = state.scale || 100;
+  var defRH   = (state.raumhoehe || 250) / 100;
   var raeume  = state.raeume  || [];
   var wires   = state.wires   || [];
   var symbols = state.symbols || [];
 
-  // Welt-Bounding-Box bestimmen (für Kamera-Zentrierung)
+  // Bounding Box
   var allX = [], allZ = [];
-  raeume.forEach(function(r) {
-    if (r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); });
-  });
+  raeume.forEach(function(r){ if(r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
   symbols.forEach(function(s){ allX.push(s.x/sc); allZ.push(s.y/sc); });
   wires.forEach(function(w){ if(w.points) w.points.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
+  if (!allX.length) { allX=[0,10]; allZ=[0,10]; }
+  var minX=Math.min.apply(null,allX), maxX=Math.max.apply(null,allX);
+  var minZ=Math.min.apply(null,allZ), maxZ=Math.max.apply(null,allZ);
+  var cx=(minX+maxX)/2, cz=(minZ+maxZ)/2;
+  var span=Math.max(maxX-minX, maxZ-minZ, 5);
 
-  var minX = allX.length ? Math.min.apply(null,allX) : 0;
-  var maxX = allX.length ? Math.max.apply(null,allX) : 10;
-  var minZ = allZ.length ? Math.min.apply(null,allZ) : 0;
-  var maxZ = allZ.length ? Math.max.apply(null,allZ) : 10;
-  var cx = (minX+maxX)/2, cz = (minZ+maxZ)/2;
-  var span = Math.max(maxX-minX, maxZ-minZ, 5);
-
-  // JSON-Daten für das 3D-Fenster serialisieren
-  var data3d = {
-    raeume:  raeume,
-    wires:   wires.map(function(w){
-      var src = symbols.find(function(s){return s.id===w.srcId;});
-      var dst = symbols.find(function(s){return s.id===w.dstId;});
+  // Daten zusammenstellen
+  var D = {
+    raeume:   raeume,
+    wires:    wires.map(function(w){
+      var src=symbols.find(function(s){return s.id===w.srcId;});
+      var dst=symbols.find(function(s){return s.id===w.dstId;});
       return {
-        points:     w.points,
-        verlegeart: w.verlegeart || 'UP',
-        trasseHoehe:w.trasseHoehe || 20,
-        color:      gz3d_wireColor(w),
-        label:      w.kabel || w.wireType || 'Leitung',
-        circuit:    w.circuit || '',
-        laenge_m:   w.laenge_m || '',
-        srcHoehe:   src ? (src.hoehe != null ? src.hoehe : 40) : 40,
-        dstHoehe:   dst ? (dst.hoehe != null ? dst.hoehe : 40) : 40,
-        srcRH:      src ? (src.raumhoehe || defRH*100) : defRH*100,
-        dstRH:      dst ? (dst.raumhoehe || defRH*100) : defRH*100,
+        points:w.points, verlegeart:w.verlegeart||'UP',
+        color:gz3d_wireColor(w), label:w.kabel||w.wireType||'Leitung',
+        circuit:w.circuit||'', laenge_m:w.laenge_m||'',
+        srcH:(src&&src.hoehe!=null?src.hoehe:40)/100,
+        dstH:(dst&&dst.hoehe!=null?dst.hoehe:40)/100,
+        rh:defRH,
       };
     }),
-    symbols: symbols.map(function(s){
-      var def = SYMBOLS[s.type] || {};
-      return {
-        x: s.x, y: s.y,
-        hoehe:    s.hoehe     != null ? s.hoehe     : 40,
-        raumhoehe:s.raumhoehe != null ? s.raumhoehe : defRH*100,
-        label:    s.label || def.name || s.type,
-        type:     s.type,
-        montage:  s.montage || 'UP',
-      };
+    symbols:  symbols.map(function(s){
+      var def=SYMBOLS[s.type]||{};
+      return { x:s.x, y:s.y, h:(s.hoehe!=null?s.hoehe:40)/100,
+               label:s.label||def.name||s.type, type:s.type||'' };
     }),
-    scale: sc,
-    raumhoehe: defRH,
-    cx: cx, cz: cz, span: span,
-    projName: document.getElementById('projName').value || 'Grundriss',
+    sc:sc, rh:defRH, cx:cx, cz:cz, span:span,
+    name: document.getElementById('projName').value||'Grundriss',
   };
 
-  var jsonStr = JSON.stringify(data3d).replace(/</g,'\\u003c').replace(/>/g,'\\u003e');
+  // HTML des 3D-Fensters aufbauen
+  var html = [
+'<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">',
+'<title>3D \u2014 '+D.name+'</title>',
+'<style>',
+'*{margin:0;padding:0;box-sizing:border-box}',
+'body{background:#0d0d1a;font-family:Arial,sans-serif;overflow:hidden}',
+'canvas{display:block}',
+'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 24px);overflow-y:auto}',
+'.pnl{background:rgba(8,8,20,.9);border:1px solid rgba(155,89,182,.45);border-radius:8px;padding:10px 14px;backdrop-filter:blur(6px)}',
+'.ptit{font-size:12px;font-weight:700;color:#9b59b6;margin-bottom:8px}',
+'.pbtn{display:block;width:100%;padding:7px 10px;margin-bottom:4px;border:1px solid rgba(155,89,182,.4);border-radius:5px;background:rgba(155,89,182,.1);color:#ccc;cursor:pointer;font-size:11px;text-align:left}',
+'.pbtn:hover{background:rgba(155,89,182,.3);color:#fff}',
+'.sep{height:1px;background:rgba(255,255,255,.07);margin:5px 0}',
+'.cbl{display:flex;align-items:center;gap:7px;font-size:11px;color:#bbb;margin-bottom:5px;cursor:pointer}',
+'.cbl input{accent-color:#9b59b6}',
+'#tip{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid #9b59b6;border-radius:6px;padding:6px 14px;font-size:11px;color:#eee;pointer-events:none;display:none;white-space:nowrap}',
+'#inf{position:fixed;top:12px;right:12px;background:rgba(8,8,20,.9);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#888;line-height:1.8;backdrop-filter:blur(6px)}',
+'#leg{position:fixed;bottom:16px;right:12px;background:rgba(8,8,20,.9);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(6px);max-height:50vh;overflow-y:auto}',
+'.lr{display:flex;align-items:center;gap:7px;margin-bottom:4px;color:#ccc}',
+'.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}',
+'</style></head><body>',
+'<canvas id="c"></canvas>',
+'<div id="ui">',
+'<div class="pnl"><div class="ptit">🧊 3D — '+D.name+'</div>',
+'<button class="pbtn" onclick="sv(0)">👁 Perspektive</button>',
+'<button class="pbtn" onclick="sv(1)">⬆ Draufsicht</button>',
+'<button class="pbtn" onclick="sv(2)">⬛ Vorderansicht</button>',
+'<button class="pbtn" onclick="sv(3)">🔷 Isometrisch</button>',
+'<div class="sep"></div>',
+'<button class="pbtn" onclick="rst()">🎯 Reset</button></div>',
+'<div class="pnl"><div class="ptit">Ebenen</div>',
+'<label class="cbl"><input type="checkbox" id="lw" checked onchange="tg(\'w\',this.checked)"> Wände</label>',
+'<label class="cbl"><input type="checkbox" id="lf" checked onchange="tg(\'f\',this.checked)"> Boden</label>',
+'<label class="cbl"><input type="checkbox" id="lk" checked onchange="tg(\'k\',this.checked)"> Kabel</label>',
+'<label class="cbl"><input type="checkbox" id="ls" checked onchange="tg(\'s\',this.checked)"> Symbole</label>',
+'<label class="cbl"><input type="checkbox" id="ll" checked onchange="tg(\'l\',this.checked)"> Labels</label>',
+'<div class="sep"></div>',
+'<label class="cbl"><input type="checkbox" id="ld" onchange="tg(\'d\',this.checked)"> Decke</label>',
+'</div></div>',
+'<div id="inf"><b style="color:#9b59b6">Steuerung</b><br>🖱 Links: Drehen<br>🖱 Rechts: Verschieben<br>🖱 Rad: Zoom<br>👆 1 Finger: Drehen<br>👆 2 Finger: Zoom</div>',
+'<div id="tip"></div>',
+'<div id="leg"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:6px">Kabeltypen</div><div id="li"></div></div>',
+'<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>',
+'<script>',
+'var D='+JSON.stringify(D).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')+';',
+'var SC=D.sc, ob={w:[],f:[],k:[],s:[],l:[],d:[]};',
+'var W=innerWidth,H=innerHeight;',
+'var R=new THREE.WebGLRenderer({canvas:document.getElementById("c"),antialias:true,alpha:false});',
+'R.setPixelRatio(Math.min(devicePixelRatio||1,2));',
+'R.setSize(W,H);',
+'R.shadowMap.enabled=true;',
+'R.setClearColor(0x0d0d1a,1);',
+'var scene=new THREE.Scene();',
+// Kamera weit weg, schaut auf Szene-Zentrum
+'var cam=new THREE.PerspectiveCamera(50,W/H,0.01,2000);',
+'var cr=D.span*1.5, cth=Math.PI/6, cph=Math.PI/3.5;',
+'var ct=new THREE.Vector3(D.cx,D.rh*0.5,D.cz);',
+'function upC(){',
+'  cam.position.set(',
+'    ct.x+cr*Math.sin(cph)*Math.sin(cth),',
+'    ct.y+cr*Math.cos(cph),',
+'    ct.z+cr*Math.sin(cph)*Math.cos(cth)',
+'  );',
+'  cam.lookAt(ct);',
+'}',
+'upC();',
+// Licht
+'scene.add(new THREE.AmbientLight(0xffffff,0.7));',
+'var dl=new THREE.DirectionalLight(0xffffff,0.9);',
+'dl.position.set(D.cx+D.span,D.span*2,D.cz+D.span);',
+'dl.castShadow=true; scene.add(dl);',
+'scene.add(new THREE.HemisphereLight(0x334466,0x111122,0.4));',
+// Grid
+'var g=new THREE.GridHelper(D.span*4,40,0x223344,0x1a2233);',
+'g.position.set(D.cx,0,D.cz); scene.add(g);',
+// Boden
+'var fm=new THREE.Mesh(',
+'  new THREE.PlaneGeometry(D.span*4,D.span*4),',
+'  new THREE.MeshLambertMaterial({color:0x111122,side:THREE.DoubleSide})',
+');',
+'fm.rotation.x=-Math.PI/2; fm.position.set(D.cx,-0.01,D.cz);',
+'fm.receiveShadow=true; scene.add(fm); ob.f.push(fm);',
+// Räume
+'D.raeume.forEach(function(r){',
+'  if(!r.pts||r.pts.length<3) return;',
+'  var rh=D.rh;',
+'  var pts=r.pts.map(function(p){return[p.x/SC, p.y/SC];});',
+// Farbe aus rgba() parsen
+'  var cr2=80,cg=140,cb2=255;',
+'  if(r.color){',
+'    var m=r.color.match(/rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.]+)/i);',
+'    if(m){cr2=+m[1];cg=+m[2];cb2=+m[3];}',
+'    else if(/^#/.test(r.color)){var h=parseInt(r.color.slice(1),16)||0;cr2=(h>>16)&255;cg=(h>>8)&255;cb2=h&255;}',
+'  }',
+'  var col=(cr2<<16)|(cg<<8)|cb2;',
+// Bodenfläche
+'  var sh=new THREE.Shape();',
+'  sh.moveTo(pts[0][0],pts[0][1]);',
+'  for(var i=1;i<pts.length;i++)sh.lineTo(pts[i][0],pts[i][1]);',
+'  sh.closePath();',
+'  var fm2=new THREE.Mesh(',
+'    new THREE.ShapeGeometry(sh),',
+'    new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.45,side:THREE.DoubleSide})',
+'  );',
+'  fm2.rotation.x=-Math.PI/2; fm2.position.y=0.02;',
+'  scene.add(fm2); ob.w.push(fm2);',
+// Wände
+'  for(var wi=0;wi<pts.length;wi++){',
+'    var p1=pts[wi], p2=pts[(wi+1)%pts.length];',
+'    var dx=p2[0]-p1[0], dz=p2[1]-p1[1], wl=Math.sqrt(dx*dx+dz*dz);',
+'    if(wl<0.05)continue;',
+'    var wm=new THREE.Mesh(',
+'      new THREE.BoxGeometry(wl,rh,0.1),',
+'      new THREE.MeshLambertMaterial({color:0x2a3a50,transparent:true,opacity:0.7})',
+'    );',
+'    wm.position.set(p1[0]+dx/2, rh/2, p1[1]+dz/2);',
+'    wm.rotation.y=-Math.atan2(dz,dx);',
+'    wm.castShadow=true; scene.add(wm); ob.w.push(wm);',
+'  }',
+// Decke
+'  var rm=new THREE.Mesh(',
+'    new THREE.ShapeGeometry(sh),',
+'    new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.1,side:THREE.DoubleSide})',
+'  );',
+'  rm.rotation.x=-Math.PI/2; rm.position.y=rh; rm.visible=false;',
+'  scene.add(rm); ob.d.push(rm);',
+// Label
+'  if(r.name){',
+'    var cx2=pts.reduce(function(a,p){return a+p[0];},0)/pts.length;',
+'    var cz2=pts.reduce(function(a,p){return a+p[1];},0)/pts.length;',
+'    mkL(r.name,cx2,0.1,cz2,"#3fb950",0.5);',
+'  }',
+'});',
+// Kabel
+'var wleg={};',
+'D.wires.forEach(function(w){',
+'  if(!w.points||w.points.length<2)return;',
+'  var vl=w.verlegeart||"UP", rh=w.rh||D.rh, hS=w.srcH||0.4, hD=w.dstH||0.4;',
+'  if(!wleg[w.label])wleg[w.label]=w.color||"#e74c3c";',
+'  var pts=w.points.map(function(p,i){',
+'    var x=p.x/SC, z=p.y/SC, y, n=w.points.length;',
+'    if(vl==="FU"){y=-0.05;}',
+'    else if(vl==="ER"){y=-0.6;}',
+'    else if(vl==="HD"){y=rh-0.05;}',
+'    else if(vl==="AP"){y=hS+(hD-hS)*(i/(n-1));}',
+'    else{y=(i===0)?hS:(i===n-1)?hD:rh-0.1;}',
+'    return new THREE.Vector3(x,y,z);',
+'  });',
+// UP: senkrechte Führung hinzufügen
+'  if(vl!=="AP"&&vl!=="FU"&&vl!=="ER"&&pts.length>=2){',
+'    var p0=pts[0].clone(), pL=pts[pts.length-1].clone();',
+'    var full=[];',
+'    full.push(new THREE.Vector3(p0.x,hS,p0.z));',
+'    full.push(new THREE.Vector3(p0.x,rh-0.1,p0.z));',
+'    pts.forEach(function(v,i){if(i>0&&i<pts.length-1)full.push(v);});',
+'    full.push(new THREE.Vector3(pL.x,rh-0.1,pL.z));',
+'    full.push(new THREE.Vector3(pL.x,hD,pL.z));',
+'    pts=full;',
+'  }',
+'  try{',
+'    var curve=new THREE.CatmullRomCurve3(pts);',
+'    var segs=Math.max(pts.length*6,12);',
+'    var tg=new THREE.TubeGeometry(curve,segs,0.03,6,false);',
+'    var tm=new THREE.MeshLambertMaterial({color:new THREE.Color(w.color||"#e74c3c"),emissive:new THREE.Color(w.color||"#e74c3c"),emissiveIntensity:0.3});',
+'    var tube=new THREE.Mesh(tg,tm);',
+'    tube.userData={lbl:w.label,cir:w.circuit,len:w.laenge_m,vl:vl};',
+'    tube.castShadow=true; scene.add(tube); ob.k.push(tube);',
+'    if(w.circuit){var mid=pts[Math.floor(pts.length/2)];mkL(w.circuit,mid.x,mid.y+0.15,mid.z,w.color||"#e74c3c",0.2);}',
+'  }catch(e){console.warn("wire err",e);}',
+'});',
+// Legende
+'(function(){',
+'  var el=document.getElementById("li");',
+'  Object.keys(wleg).forEach(function(k){',
+'    el.innerHTML+=\'<div class="lr"><div class="ld" style="background:\'+wleg[k]+\'"></div><span>\'+k+\'</span></div>\';',
+'  });',
+'})();',
+// Symbole
+'D.symbols.forEach(function(s){',
+'  var x=s.x/SC, z=s.y/SC, h=s.h||0.4;',
+'  var sc2={steckdose:"#e74c3c",schalter:"#3498db",taster:"#2ecc71",leuchte:"#f1c40f",strahler:"#f39c12",lampe:"#f1c40f",verteiler:"#9b59b6",sicherung:"#e67e22"};',
+'  var ck=Object.keys(sc2).find(function(k){return s.type.toLowerCase().indexOf(k)>=0;})||"";',
+'  var c=sc2[ck]||"#95a5a6";',
+'  var box=new THREE.Mesh(',
+'    new THREE.BoxGeometry(0.15,0.15,0.1),',
+'    new THREE.MeshLambertMaterial({color:new THREE.Color(c),emissive:new THREE.Color(c),emissiveIntensity:0.5})',
+'  );',
+'  box.position.set(x,h,z);',
+'  box.userData={lbl:s.label,h:s.h};',
+'  scene.add(box); ob.s.push(box);',
+'  var vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0.02,z),new THREE.Vector3(x,h,z)]);',
+'  var vl2=new THREE.Line(vg,new THREE.LineBasicMaterial({color:0x445566,transparent:true,opacity:0.5}));',
+'  scene.add(vl2); ob.s.push(vl2);',
+'  var sp=new THREE.Mesh(',
+'    new THREE.SphereGeometry(0.08,8,8),',
+'    new THREE.MeshLambertMaterial({color:new THREE.Color(c),emissive:new THREE.Color(c),emissiveIntensity:0.7,transparent:true,opacity:0.9})',
+'  );',
+'  sp.position.set(x,h+0.14,z); scene.add(sp); ob.s.push(sp);',
+'  if(s.label)mkL(s.label,x,h+0.35,z,"#ffffff",0.22);',
+'});',
+// Labels
+'function mkL(txt,x,y,z,col,sz){',
+'  var cv=document.createElement("canvas");cv.width=256;cv.height=64;',
+'  var cx3=cv.getContext("2d");',
+'  cx3.clearRect(0,0,256,64);',
+'  cx3.fillStyle="rgba(0,0,0,.7)";',
+'  cx3.beginPath();cx3.roundRect(2,2,252,60,8);cx3.fill();',
+'  cx3.fillStyle=col||"#fff";cx3.font="bold 22px Arial";',
+'  cx3.textAlign="center";cx3.textBaseline="middle";',
+'  cx3.fillText(txt.substring(0,22),128,32);',
+'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));',
+'  sp.position.set(x,y,z);sp.scale.set(sz*4,sz,1);',
+'  scene.add(sp);ob.l.push(sp);',
+'}',
+// Layer-Toggle
+'function tg(n,v){(ob[n]||[]).forEach(function(o){o.visible=v;});}',
+// Kamera-Steuerung
+'var drag=false,rdr=false,lm={x:0,y:0};',
+'document.addEventListener("mousedown",function(e){drag=true;rdr=e.button===2;lm={x:e.clientX,y:e.clientY};});',
+'document.addEventListener("mousemove",function(e){',
+'  if(!drag)return;',
+'  var dx=(e.clientX-lm.x)*0.005,dy=(e.clientY-lm.y)*0.005;',
+'  lm={x:e.clientX,y:e.clientY};',
+'  if(rdr){var r2=new THREE.Vector3();cam.getWorldDirection(r2);r2.cross(new THREE.Vector3(0,1,0)).normalize();ct.addScaledVector(r2,-dx*cr*0.5);ct.y+=dy*cr*0.5;}',
+'  else{cth-=dx;cph=Math.max(0.05,Math.min(Math.PI-0.05,cph+dy));}',
+'  upC();',
+'});',
+'document.addEventListener("mouseup",function(){drag=false;});',
+'document.addEventListener("contextmenu",function(e){e.preventDefault();});',
+'document.addEventListener("wheel",function(e){cr=Math.max(0.5,Math.min(500,cr*Math.pow(1.001,e.deltaY)));upC();},{passive:true});',
+// Touch
+'var tch={},lpd=null;',
+'document.addEventListener("touchstart",function(e){e.preventDefault();Array.from(e.changedTouches).forEach(function(t){tch[t.identifier]={x:t.clientX,y:t.clientY};});},{passive:false});',
+'document.addEventListener("touchmove",function(e){e.preventDefault();',
+'  if(e.touches.length===1&&Object.keys(tch).length===1){',
+'    var id=Object.keys(tch)[0],t=e.touches[0];',
+'    var dx=(t.clientX-tch[id].x)*0.006,dy=(t.clientY-tch[id].y)*0.006;',
+'    cth-=dx;cph=Math.max(0.05,Math.min(Math.PI-0.05,cph+dy));',
+'    tch[id]={x:t.clientX,y:t.clientY};upC();',
+'  }else if(e.touches.length===2){',
+'    var t0=e.touches[0],t1=e.touches[1];',
+'    var d=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);',
+'    if(lpd){cr=Math.max(0.5,Math.min(500,cr*(lpd/d)));upC();}lpd=d;',
+'    tch[t0.identifier]={x:t0.clientX,y:t0.clientY};',
+'    tch[t1.identifier]={x:t1.clientX,y:t1.clientY};',
+'  }',
+'},{passive:false});',
+'document.addEventListener("touchend",function(e){Array.from(e.changedTouches).forEach(function(t){delete tch[t.identifier];});if(Object.keys(tch).length<2)lpd=null;},{passive:false});',
+// Kamera-Presets
+'function sv(m){',
+'  ct.set(D.cx,D.rh*0.5,D.cz);',
+'  if(m===1){cph=0.02;cr=D.span*2;}',
+'  else if(m===2){cph=Math.PI/2;cth=0;cr=D.span*1.5;}',
+'  else if(m===3){cph=Math.PI/4;cth=Math.PI/4;cr=D.span*1.5;}',
+'  else{cph=Math.PI/3.5;cth=Math.PI/6;cr=D.span*1.5;}',
+'  upC();',
+'}',
+'function rst(){ct.set(D.cx,D.rh*0.5,D.cz);cr=D.span*1.5;cph=Math.PI/3.5;cth=Math.PI/6;upC();}',
+// Raycasting Tooltip
+'var ray=new THREE.Raycaster(),mv=new THREE.Vector2(),tip=document.getElementById("tip");',
+'document.addEventListener("mousemove",function(e){',
+'  mv.x=(e.clientX/W)*2-1;mv.y=-(e.clientY/H)*2+1;',
+'  ray.setFromCamera(mv,cam);',
+'  var all=[];["k","s"].forEach(function(k){ob[k].forEach(function(o){if(o.isMesh)all.push(o);});});',
+'  var h=ray.intersectObjects(all);',
+'  if(h.length&&h[0].object.userData.lbl){',
+'    var ud=h[0].object.userData,t=ud.lbl;',
+'    if(ud.cir)t+=" | SK "+ud.cir;if(ud.len)t+=" | "+ud.len+"m";if(ud.vl)t+=" | "+ud.vl;',
+'    tip.textContent=t;tip.style.display="block";',
+'  }else tip.style.display="none";',
+'});',
+// Resize
+'window.addEventListener("resize",function(){W=innerWidth;H=innerHeight;cam.aspect=W/H;cam.updateProjectionMatrix();R.setSize(W,H);});',
+// Animationsloop
+'(function loop(){requestAnimationFrame(loop);R.render(scene,cam);})();',
+'<\/script></body></html>'
+  ].join('\n');
 
-  // Symbol-Farben je Typ
-  var symColorMap = {
-    'steckdose':'#e74c3c','schalter':'#3498db','taster':'#2ecc71',
-    'leuchte':'#f1c40f','strahler':'#f39c12','lampe':'#f1c40f',
-    'verteiler':'#9b59b6','sicherung':'#e67e22','default':'#95a5a6'
-  };
+  if (!raeume.length && !symbols.length && !wires.length) {
+    alert('Keine Daten vorhanden. Bitte zuerst Räume definieren oder Symbole/Kabel platzieren.');
+    return;
+  }
 
-  var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
-    +'<title>3D-Ansicht — '+data3d.projName+'</title>'
-    +'<style>'
-    +'*{margin:0;padding:0;box-sizing:border-box}'
-    +'body{background:#0a0a14;color:#eee;font-family:Arial,sans-serif;overflow:hidden}'
-    +'#c3d{display:block;width:100vw;height:100vh}'
-    +'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px}'
-    +'.ui-panel{background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.4);border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px)}'
-    +'.ui-title{font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px}'
-    +'.ui-btn{display:block;width:100%;padding:6px 10px;margin-bottom:5px;border:1px solid rgba(155,89,182,.5);border-radius:5px;background:rgba(155,89,182,.15);color:#ccc;cursor:pointer;font-size:11px;text-align:left;transition:background .2s}'
-    +'.ui-btn:hover{background:rgba(155,89,182,.35)}'
-    +'.ui-btn.act{background:rgba(155,89,182,.4);color:#fff;border-color:#9b59b6}'
-    +'.ui-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 0}'
-    +'.cb-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#ccc;margin-bottom:5px;cursor:pointer}'
-    +'.cb-row input{accent-color:#9b59b6;cursor:pointer}'
-    +'#tooltip{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid #9b59b6;border-radius:6px;padding:7px 14px;font-size:11px;color:#eee;pointer-events:none;display:none;white-space:nowrap}'
-    +'#info{position:fixed;top:12px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#aaa;max-width:200px;line-height:1.6;backdrop-filter:blur(8px)}'
-    +'#legend{position:fixed;bottom:20px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(8px);max-height:60vh;overflow-y:auto}'
-    +'.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;color:#ccc}'
-    +'.leg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}'
-    +'</style></head><body>'
-    +'<canvas id="c3d"></canvas>'
-
-    +'<div id="ui">'
-    +'<div class="ui-panel">'
-    +'<div class="ui-title">🧊 3D-Kabelverlegung</div>'
-    +'<div style="font-size:10px;color:#888;margin-bottom:8px">'+data3d.projName+'</div>'
-    +'<button class="ui-btn" onclick="setCam(\'persp\')">👁 Perspektive</button>'
-    +'<button class="ui-btn" onclick="setCam(\'top\')">⬆ Draufsicht</button>'
-    +'<button class="ui-btn" onclick="setCam(\'front\')">⬛ Vorderansicht</button>'
-    +'<button class="ui-btn" onclick="setCam(\'iso\')">🔷 Isometrisch</button>'
-    +'<div class="ui-sep"></div>'
-    +'<button class="ui-btn" onclick="resetCam()">🎯 Zurücksetzen</button>'
-    +'</div>'
-    +'<div class="ui-panel">'
-    +'<div class="ui-title">Ebenen</div>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-walls" checked onchange="toggleLayer(\'walls\',this.checked)"> Wände/Räume</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-floor" checked onchange="toggleLayer(\'floor\',this.checked)"> Boden</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-wires" checked onchange="toggleLayer(\'wires\',this.checked)"> Kabellinien</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-symbols" checked onchange="toggleLayer(\'symbols\',this.checked)"> Elektrogeräte</label>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-labels" checked onchange="toggleLayer(\'labels\',this.checked)"> Beschriftungen</label>'
-    +'<div class="ui-sep"></div>'
-    +'<label class="cb-row"><input type="checkbox" id="cb-roof" onchange="toggleLayer(\'roof\',this.checked)"> Decke (transparent)</label>'
-    +'</div>'
-    +'</div>'
-
-    +'<div id="info">'
-    +'<div style="color:#9b59b6;font-weight:700;margin-bottom:5px">Steuerung</div>'
-    +'🖱 Linke Taste: Drehen<br>'
-    +'🖱 Rechte Taste: Verschieben<br>'
-    +'🖱 Scrollrad: Zoom<br>'
-    +'👆 Touch: 1 Finger = Drehen<br>'
-    +'👆 Touch: 2 Finger = Zoom'
-    +'</div>'
-
-    +'<div id="tooltip"></div>'
-    +'<div id="legend"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:7px">Kabeltypen</div><div id="leg-items"></div></div>'
-
-    +'<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>'
-    +'<script>'
-    +'var D = '+jsonStr+';'
-    +'var SC = D.scale; var layers3d = { walls:true, floor:true, wires:true, symbols:true, labels:true, roof:false };'
-    +'var layerObjs = { walls:[], floor:[], wires:[], symbols:[], labels:[], roof:[] };'
-
-    // Scene setup
-    +'var renderer = new THREE.WebGLRenderer({canvas:document.getElementById("c3d"),antialias:true});'
-    +'renderer.setPixelRatio(window.devicePixelRatio||1);'
-    +'renderer.setSize(window.innerWidth,window.innerHeight);'
-    +'renderer.shadowMap.enabled=true;'
-    +'renderer.setClearColor(0x0a0a14);'
-
-    +'var scene = new THREE.Scene();'
-    +'scene.fog = new THREE.FogExp2(0x0a0a14, 0.015);'
-
-    // Camera
-    +'var W=window.innerWidth,H=window.innerHeight;'
-    +'var camera = new THREE.PerspectiveCamera(55,W/H,0.1,500);'
-    +'var camDist = D.span * 1.2;'
-    +'camera.position.set(D.cx, camDist*0.7, D.cz + camDist);'
-    +'camera.lookAt(D.cx, 0, D.cz);'
-
-    // Lighting
-    +'scene.add(new THREE.AmbientLight(0xffffff,0.55));'
-    +'var dirL = new THREE.DirectionalLight(0xffffff,0.8);'
-    +'dirL.position.set(D.cx+20,30,D.cz+20); dirL.castShadow=true; scene.add(dirL);'
-    +'var fillL = new THREE.DirectionalLight(0x8888ff,0.3);'
-    +'fillL.position.set(D.cx-10,10,D.cz-10); scene.add(fillL);'
-    +'scene.add(new THREE.PointLight(0xf5a623,0.4,50));'
-
-    // Grid
-    +'var grid = new THREE.GridHelper(Math.max(D.span*3,30),30,0x223,0x112);'
-    +'grid.position.set(D.cx,0,D.cz); scene.add(grid);'
-
-    // Helper: px → world-m (centered)
-    +'function px(x){return x/SC;}'
-    +'function pz(y){return y/SC;}'
-
-    // ── BODEN ──
-    +'(function buildFloor(){'
-    +'  var geo = new THREE.PlaneGeometry(D.span*3,D.span*3);'
-    +'  var mat = new THREE.MeshLambertMaterial({color:0x1a1a2a,side:THREE.DoubleSide});'
-    +'  var mesh = new THREE.Mesh(geo,mat);'
-    +'  mesh.rotation.x=-Math.PI/2; mesh.position.set(D.cx,0,D.cz);'
-    +'  mesh.receiveShadow=true; scene.add(mesh); layerObjs.floor.push(mesh);'
-    +'})();'
-
-    // ── RÄUME → Wände ──
-    +'(function buildRooms(){'
-    +'  D.raeume.forEach(function(r){'
-    +'    if(!r.pts||!r.pts.length) return;'
-    +'    var rh = D.raumhoehe || 2.5;'
-    +'    var pts2d;'
-    +'    if(r.type==="rect"&&r.pts.length===2){'
-    +'      var x1=Math.min(r.pts[0].x,r.pts[1].x)/SC, z1=Math.min(r.pts[0].y,r.pts[1].y)/SC;'
-    +'      var x2=Math.max(r.pts[0].x,r.pts[1].x)/SC, z2=Math.max(r.pts[0].y,r.pts[1].y)/SC;'
-    +'      pts2d=[[x1,z1],[x2,z1],[x2,z2],[x1,z2]];'
-    +'    } else {'
-    +'      pts2d=r.pts.map(function(p){return[p.x/SC,p.y/SC];});'
-    +'    }'
-    +'    if(pts2d.length<3) return;'
-    +'    var colR=88,colG=166,colB=255;'
-    +'    if(r.color){var _m=r.color.match(/rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.]+)/i);if(_m){colR=parseInt(_m[1]);colG=parseInt(_m[2]);colB=parseInt(_m[3]);}else if(r.color.indexOf("#")===0){var _hx=parseInt(r.color.slice(1),16)||0x3fb950;colR=(_hx>>16)&255;colG=(_hx>>8)&255;colB=_hx&255;}}'
-    +'    var colHex=(colR<<16)|(colG<<8)|colB;'
-    +'    var shape=new THREE.Shape();'
-    +'    shape.moveTo(pts2d[0][0],pts2d[0][1]);'
-    +'    for(var i=1;i<pts2d.length;i++) shape.lineTo(pts2d[i][0],pts2d[i][1]);'
-    +'    shape.closePath();'
-    +'    var floorM=new THREE.MeshLambertMaterial({color:colHex,transparent:true,opacity:0.4,side:THREE.DoubleSide});'
-    +'    var floorMesh=new THREE.Mesh(new THREE.ShapeGeometry(shape),floorM);'
-    +'    floorMesh.rotation.x=-Math.PI/2; floorMesh.position.y=0.02; scene.add(floorMesh); layerObjs.walls.push(floorMesh);'
-    +'    for(var wi=0;wi<pts2d.length;wi++){'
-    +'      var p1=pts2d[wi],p2=pts2d[(wi+1)%pts2d.length];'
-    +'      var dx=p2[0]-p1[0],dz=p2[1]-p1[1],wlen=Math.sqrt(dx*dx+dz*dz);'
-    +'      if(wlen<0.01) continue;'
-    +'      var wm=new THREE.Mesh(new THREE.BoxGeometry(wlen,rh,0.08),new THREE.MeshLambertMaterial({color:0x334455,transparent:true,opacity:0.65}));'
-    +'      wm.position.set(p1[0]+dx/2,rh/2,p1[1]+dz/2); wm.rotation.y=-Math.atan2(dz,dx);'
-    +'      wm.castShadow=true; scene.add(wm); layerObjs.walls.push(wm);'
-    +'    }'
-    +'    var roofM=new THREE.MeshLambertMaterial({color:colHex,transparent:true,opacity:0.1,side:THREE.DoubleSide});'
-    +'    var roofMesh=new THREE.Mesh(new THREE.ShapeGeometry(shape),roofM);'
-    +'    roofMesh.rotation.x=-Math.PI/2; roofMesh.position.y=rh; roofMesh.visible=false;'
-    +'    scene.add(roofMesh); layerObjs.roof.push(roofMesh);'
-    +'    if(r.name){'
-    +'      var cx3=pts2d.reduce(function(a,p){return a+p[0];},0)/pts2d.length;'
-    +'      var cz3=pts2d.reduce(function(a,p){return a+p[1];},0)/pts2d.length;'
-    +'      makeLabel(r.name,cx3,0.1,cz3,"#3fb950",0.45);'
-    +'    }'
-    +'  });'
-    +'})();'
-
-    // ── KABEL ──
-    +'var wireLegend = {};'
-    +'(function buildWires(){'
-    +'  D.wires.forEach(function(wire,wi){'
-    +'    if(!wire.points||wire.points.length<2) return;'
-    +'    var vl = wire.verlegeart||"UP";'
-    +'    var col = new THREE.Color(wire.color||"#e74c3c");'
-    +'    var rh = (wire.srcRH||250)/100;'
-    +'    var hSrc = (wire.srcHoehe||40)/100;'
-    +'    var hDst = (wire.dstHoehe||40)/100;'
-    +'    var th  = (wire.trasseHoehe||20)/100;'
-    +'    if(!wireLegend[wire.label]) wireLegend[wire.label]=wire.color||"#e74c3c";'
-    // 3D-Punkte für Kabelweg berechnen
-    +'    var pts3 = [];'
-    +'    var n = wire.points.length;'
-    +'    wire.points.forEach(function(p,i){'
-    +'      var x3=p.x/SC, z3=p.y/SC;'
-    +'      var y3;'
-    +'      if(vl==="UP"||vl==="HR"||vl==="EZ"||vl==="HW"){'
-    // Unterputz: Start- und Endpunkt auf Gerätehöhe, Mitte unter der Decke
-    +'        if(i===0) y3=hSrc;'
-    +'        else if(i===n-1) y3=hDst;'
-    +'        else y3=rh-0.05;' // unter der Decke
-    +'      } else if(vl==="AP"){'
-    // Aufputz/Kabelkanal: direkt auf Höhe (linear interpoliert)
-    +'        var t=i/(n-1);'
-    +'        y3=hSrc+(hDst-hSrc)*t;'
-    +'      } else if(vl==="HD"){'
-    // Hohldecke: alles auf Deckenhöhe
-    +'        y3=rh;'
-    +'      } else if(vl==="FU"){'
-    // Fußboden: 3cm unter Boden
-    +'        y3=-0.03;'
-    +'      } else if(vl==="ER"){'
-    // Erdkabel: 60cm unter Boden
-    +'        y3=-0.6;'
-    +'      } else {'
-    +'        var t2=i/(n-1);'
-    +'        y3=rh-0.05;'
-    +'      }'
-    +'      pts3.push(new THREE.Vector3(x3,y3,z3));'
-    +'    });'
-    // Bei UP: Senkrechte Einführung am Start und Ende ergänzen
-    +'    if((vl==="UP"||vl==="HR"||vl==="HW")&&n>=2){'
-    +'      var p0=pts3[0].clone(); var pLast=pts3[pts3.length-1].clone();'
-    +'      pts3.unshift(new THREE.Vector3(p0.x,rh-0.05,p0.z));'
-    +'      pts3.push(new THREE.Vector3(pLast.x,rh-0.05,pLast.z));'
-    +'      pts3[1].y=hSrc; pts3[pts3.length-2].y=hDst;'
-    +'    }'
-    // TubeGeometry aus CatmullRomCurve
-    +'    var curve = new THREE.CatmullRomCurve3(pts3);'
-    +'    var tubeGeo = new THREE.TubeGeometry(curve, Math.max(pts3.length*4,8), 0.025, 6, false);'
-    +'    var tubeMat = new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:0.2});'
-    +'    var tube = new THREE.Mesh(tubeGeo,tubeMat);'
-    +'    tube.userData = { type:"wire", label:wire.label, circuit:wire.circuit, laenge:wire.laenge_m, verlegeart:vl };'
-    +'    tube.castShadow=true; scene.add(tube); layerObjs.wires.push(tube);'
-    // Stromkreis-Label in der Mitte
-    +'    if(wire.circuit){'
-    +'      var mid=pts3[Math.floor(pts3.length/2)];'
-    +'      makeLabel(wire.circuit, mid.x, mid.y+0.15, mid.z, wire.color||"#e74c3c", 0.2);'
-    +'    }'
-    +'  });'
-    // Legende aufbauen
-    +'  var legEl=document.getElementById("leg-items");'
-    +'  Object.keys(wireLegend).forEach(function(k){'
-    +'    legEl.innerHTML+=\'<div class="leg-row"><div class="leg-dot" style="background:\'+wireLegend[k]+\'"></div><span>\'+k+\'</span></div>\';'
-    +'  });'
-    +'})();'
-
-    // ── SYMBOLE (Elektrogeräte) ──
-    +'(function buildSymbols(){'
-    +'  var symColors={"steckdose":"#e74c3c","schalter":"#3498db","taster":"#2ecc71","leuchte":"#f1c40f","strahler":"#f39c12","lampe":"#f1c40f","verteiler":"#9b59b6","sicherung":"#e67e22","default":"#95a5a6"};'
-    +'  D.symbols.forEach(function(s){'
-    +'    var x3=s.x/SC, z3=s.y/SC;'
-    +'    var h=(s.hoehe||40)/100;'
-    +'    var colKey=Object.keys(symColors).find(function(k){return s.type&&s.type.toLowerCase().indexOf(k)>=0;});'
-    +'    var col=symColors[colKey||"default"];'
-    // Kleiner Würfel an der Wand-Position
-    +'    var geo = new THREE.BoxGeometry(0.12,0.12,0.08);'
-    +'    var mat = new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.4});'
-    +'    var mesh = new THREE.Mesh(geo,mat);'
-    +'    mesh.position.set(x3,h,z3);'
-    +'    mesh.userData={type:"symbol",label:s.label,hoehe:s.hoehe,montage:s.montage};'
-    +'    scene.add(mesh); layerObjs.symbols.push(mesh);'
-    // Vertikale Verbindungslinie (Installationspfad)
-    +'    var vGeo=new THREE.BufferGeometry().setFromPoints(['
-    +'      new THREE.Vector3(x3,0.01,z3),'
-    +'      new THREE.Vector3(x3,h,z3)'
-    +'    ]);'
-    +'    var vLine=new THREE.Line(vGeo,new THREE.LineBasicMaterial({color:0x444444,opacity:0.5,transparent:true}));'
-    +'    scene.add(vLine); layerObjs.symbols.push(vLine);'
-    // Glüh-Kugel am Symbol
-    +'    var sphereGeo=new THREE.SphereGeometry(0.07,8,8);'
-    +'    var sphereMat=new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.6,transparent:true,opacity:0.8});'
-    +'    var sphere=new THREE.Mesh(sphereGeo,sphereMat);'
-    +'    sphere.position.set(x3,h+0.12,z3);'
-    +'    scene.add(sphere); layerObjs.symbols.push(sphere);'
-    +'    if(s.label) makeLabel(s.label,x3,h+0.28,z3,"#ffffff",0.18);'
-    +'  });'
-    +'})();'
-
-    // ── SPRITE-LABELS ──
-    +'var labelSprites=[];'
-    +'function makeLabel(text,x,y,z,color,size){'
-    +'  var c2=document.createElement("canvas"); c2.width=256; c2.height=64;'
-    +'  var cx2=c2.getContext("2d");'
-    +'  cx2.clearRect(0,0,256,64);'
-    +'  cx2.fillStyle="rgba(0,0,0,.6)"; cx2.beginPath();'
-    +'  cx2.roundRect(2,2,252,60,8); cx2.fill();'
-    +'  cx2.fillStyle=color||"#fff"; cx2.font="bold 22px Arial";'
-    +'  cx2.textAlign="center"; cx2.textBaseline="middle";'
-    +'  cx2.fillText(text.substring(0,24),128,32);'
-    +'  var tex=new THREE.CanvasTexture(c2);'
-    +'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));'
-    +'  sp.position.set(x,y,z); sp.scale.set(size*4,size,1);'
-    +'  scene.add(sp); layerObjs.labels.push(sp); labelSprites.push(sp);'
-    +'}'
-
-    // ── KAMERA-STEUERUNG ──
-    +'var isDragging=false, isRightDrag=false;'
-    +'var lastMouse={x:0,y:0};'
-    +'var camTheta=0, camPhi=Math.PI/4;'
-    +'var camTarget=new THREE.Vector3(D.cx,0,D.cz);'
-    +'var camR=camDist;'
-
-    +'function updateCameraPos(){'
-    +'  camera.position.x=camTarget.x+camR*Math.sin(camPhi)*Math.sin(camTheta);'
-    +'  camera.position.y=camTarget.y+camR*Math.cos(camPhi);'
-    +'  camera.position.z=camTarget.z+camR*Math.sin(camPhi)*Math.cos(camTheta);'
-    +'  camera.lookAt(camTarget);'
-    +'}'
-
-    // Mouse
-    +'document.addEventListener("mousedown",function(e){'
-    +'  isDragging=true; isRightDrag=(e.button===2);'
-    +'  lastMouse={x:e.clientX,y:e.clientY};'
-    +'});'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  if(!isDragging) return;'
-    +'  var dx=(e.clientX-lastMouse.x)*0.005, dy=(e.clientY-lastMouse.y)*0.005;'
-    +'  lastMouse={x:e.clientX,y:e.clientY};'
-    +'  if(isRightDrag){'
-    +'    var right=new THREE.Vector3(); camera.getWorldDirection(right);'
-    +'    var up2=new THREE.Vector3(0,1,0);'
-    +'    right.cross(up2).normalize();'
-    +'    camTarget.addScaledVector(right,-dx*camR*0.5);'
-    +'    camTarget.y+=dy*camR*0.5;'
-    +'  } else {'
-    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
-    +'  }'
-    +'  updateCameraPos();'
-    +'});'
-    +'document.addEventListener("mouseup",function(){isDragging=false;});'
-    +'document.addEventListener("wheel",function(e){'
-    +'  camR=Math.max(1,Math.min(100,camR*(1+e.deltaY*0.001)));'
-    +'  updateCameraPos();'
-    +'},{passive:true});'
-    +'document.addEventListener("contextmenu",function(e){e.preventDefault();});'
-
-    // Touch
-    +'var touches={};'
-    +'var lastPinchDist=null;'
-    +'document.addEventListener("touchstart",function(e){'
-    +'  e.preventDefault();'
-    +'  Array.from(e.changedTouches).forEach(function(t){touches[t.identifier]={x:t.clientX,y:t.clientY};});'
-    +'},{passive:false});'
-    +'document.addEventListener("touchmove",function(e){'
-    +'  e.preventDefault();'
-    +'  var ids=Object.keys(touches);'
-    +'  if(ids.length===1&&e.touches.length===1){'
-    +'    var t=e.touches[0];'
-    +'    var dx=(t.clientX-touches[ids[0]].x)*0.006, dy=(t.clientY-touches[ids[0]].y)*0.006;'
-    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
-    +'    touches[ids[0]]={x:t.clientX,y:t.clientY};'
-    +'    updateCameraPos();'
-    +'  } else if(e.touches.length===2){'
-    +'    var t0=e.touches[0],t1=e.touches[1];'
-    +'    var dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);'
-    +'    if(lastPinchDist){camR=Math.max(1,Math.min(100,camR*(lastPinchDist/dist)));updateCameraPos();}'
-    +'    lastPinchDist=dist;'
-    +'    touches[t0.identifier]={x:t0.clientX,y:t0.clientY};'
-    +'    touches[t1.identifier]={x:t1.clientX,y:t1.clientY};'
-    +'  }'
-    +'},{passive:false});'
-    +'document.addEventListener("touchend",function(e){'
-    +'  Array.from(e.changedTouches).forEach(function(t){delete touches[t.identifier];});'
-    +'  if(Object.keys(touches).length<2) lastPinchDist=null;'
-    +'},{passive:false});'
-
-    // Kamera-Presets
-    +'function setCam(mode){'
-    +'  if(mode==="top"){camPhi=0.01;camR=D.span*2;}'
-    +'  else if(mode==="front"){camPhi=Math.PI/2;camTheta=0;camR=D.span*1.5;}'
-    +'  else if(mode==="iso"){camPhi=Math.PI/4;camTheta=Math.PI/4;camR=D.span*1.5;}'
-    +'  else{camPhi=Math.PI/3.5;camTheta=Math.PI/6;camR=D.span*1.2;}'
-    +'  updateCameraPos();'
-    +'}'
-    +'function resetCam(){camTarget.set(D.cx,0,D.cz);camR=camDist;camPhi=Math.PI/4;camTheta=0;updateCameraPos();}'
-
-    // Layer toggle
-    +'function toggleLayer(name,val){'
-    +'  layers3d[name]=val;'
-    +'  (layerObjs[name]||[]).forEach(function(o){o.visible=val;});'
-    +'}'
-
-    // Raycasting für Tooltip
-    +'var raycaster=new THREE.Raycaster();'
-    +'var mouse2=new THREE.Vector2();'
-    +'var tooltip=document.getElementById("tooltip");'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  mouse2.x=(e.clientX/window.innerWidth)*2-1;'
-    +'  mouse2.y=-(e.clientY/window.innerHeight)*2+1;'
-    +'  raycaster.setFromCamera(mouse2,camera);'
-    +'  var allMeshes=[];'
-    +'  ["wires","symbols"].forEach(function(k){layerObjs[k].forEach(function(o){if(o.isMesh)allMeshes.push(o);});});'
-    +'  var hits=raycaster.intersectObjects(allMeshes);'
-    +'  if(hits.length&&hits[0].object.userData.label){'
-    +'    var d=hits[0].object.userData;'
-    +'    var txt=d.label;'
-    +'    if(d.circuit) txt+=" · SK "+d.circuit;'
-    +'    if(d.laenge)  txt+=" · "+d.laenge+"m";'
-    +'    if(d.verlegeart) txt+=" · "+d.verlegeart;'
-    +'    if(d.hoehe)   txt+=" · "+d.hoehe+"cm";'
-    +'    tooltip.textContent=txt; tooltip.style.display="block";'
-    +'  } else { tooltip.style.display="none"; }'
-    +'});'
-
-    // Resize
-    +'window.addEventListener("resize",function(){'
-    +'  camera.aspect=window.innerWidth/window.innerHeight;'
-    +'  camera.updateProjectionMatrix();'
-    +'  renderer.setSize(window.innerWidth,window.innerHeight);'
-    +'});'
-
-    // Animate
-    +'updateCameraPos();'
-    +'(function animate(){'
-    +'  requestAnimationFrame(animate);'
-    +'  renderer.render(scene,camera);'
-    +'})();'
-    +'<\/script>'
-    +'</body></html>';
-
-  var w3 = window.open('', '_blank', 'width=1200,height=800');
+  var w3 = window.open('', '_blank', 'width=1280,height=800');
   if (!w3) { alert('Popup blockiert \u2014 bitte erlauben'); return; }
   w3.document.write(html);
   w3.document.close();
-}
-
-function gz3d_wireColor(wire) {
-  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
-  return PHASE_COLORS[wire.phase] || '#e74c3c';
 }
 
 
