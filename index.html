@@ -605,6 +605,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
+      <button class="btn" style="background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.5);font-size:11px;font-weight:600" onclick="openGrundrissdruckDialog()" title="Grundriss drucken / PDF">🖨 Grundriss PDF</button>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
       <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
       <button class="btn" style="background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.4);font-size:11px" onclick="openKTPanel()" title="Kabeltrasse zeichnen">🔲 Kabeltrasse</button>
@@ -3142,15 +3143,12 @@ function openWireInstModal(wIdx) {
   _iSel.trasseHoehe = wire.trasseHoehe || _pendingWI.trasseHoehe || 20;
   _iSel.rohrTyp     = wire.rohrTyp     || _pendingWI.rohrTyp || '';
   const len = wire.laenge_m ? wire.laenge_m+'m' : '—';
-  const lenDetail = (wire._h_m && wire._v_m)
-    ? ` <span style="font-size:9px;color:var(--tx3)">(↔ ${wire._h_m}m + ↕ ${wire._v_m}m Höhe)</span>`
-    : '';
   document.getElementById('instModalTitle').textContent = '🔌 Leitung — Verlegeeigenschaften';
   document.getElementById('instSymSec').style.display = 'none';
   document.getElementById('instWireSec').style.display = 'block';
   document.getElementById('iWireInfo').innerHTML =
     'Stromkreis: <strong>'+(wire.circuit||'—')+'</strong> · Phase: <strong>'+(wire.phase||'L1')+
-    '</strong> · Länge: <strong>'+len+'</strong>'+lenDetail+' · Kabel: <strong>'+(wire.kabel||'—')+'</strong>';
+    '</strong> · Länge: <strong>'+len+'</strong> · Kabel: <strong>'+(wire.kabel||'—')+'</strong>';
   document.getElementById('iTH').value = _iSel.trasseHoehe;
   document.getElementById('iRT').value = _iSel.rohrTyp;
   iUpdCards('verlegeart', _iSel.verlegeart, 'iw-');
@@ -3332,9 +3330,6 @@ function endWireDraw(pt) {
     adern: WIRE_TYPES[autoWireType]?.adern || 3,
     adernLabel: WIRE_TYPES[autoWireType]?.adernLabel || '',
   });
-
-  // Neu berechnen mit Höhenanteilen (srcId/dstId jetzt gesetzt)
-  recalcWireLength(state.wires[state.wires.length - 1]);
 
   const newIdx = state.wires.length - 1;
   _wirePts = []; _wireSrcId = null;
@@ -4979,49 +4974,13 @@ function hitTestWireMid(x, y) {
 }
 
 // Recalculate wire length after point move
-// ── Vertikaler Höhenanteil je Verlegeart ──
-// Gibt den zusätzlichen vertikalen Weg in Metern zurück,
-// der je nach Verlegeart über Decke / Boden / Wand anfällt.
-function calcVerticalAdd(wire) {
-  var srcSym = state.symbols.find(function(s){ return s.id === wire.srcId; });
-  var dstSym = state.symbols.find(function(s){ return s.id === wire.dstId; });
-  // Höhen in cm → m
-  var rh  = ((srcSym && srcSym.raumhoehe) || (dstSym && dstSym.raumhoehe) || state.raumhoehe || 250) / 100;
-  var hSrc = ((srcSym && srcSym.hoehe != null) ? srcSym.hoehe : 40) / 100;
-  var hDst = ((dstSym && dstSym.hoehe != null) ? dstSym.hoehe : 40) / 100;
-  var vl = wire.verlegeart || 'UP';
-
-  if (vl === 'UP' || vl === 'HR' || vl === 'EZ' || vl === 'HW') {
-    // Unterputz / Rohr / Hohlwand: hoch zur Decke, dann runter zum Ziel
-    return (rh - hSrc) + (rh - hDst);
-  } else if (vl === 'AP') {
-    // Aufputz / Kabelkanal: direkt auf Höhe, nur Höhendifferenz
-    return Math.abs(hSrc - hDst);
-  } else if (vl === 'HD') {
-    // Hohldecke: beide Seiten hoch zur Decke (Deckendurchführung)
-    return (rh - hSrc) + (rh - hDst);
-  } else if (vl === 'FU') {
-    // Fußboden / Estrich: runter zum Boden + hoch zum Ziel
-    return hSrc + hDst;
-  } else if (vl === 'ER') {
-    // Erdverlegung: kein Höhenaufschlag (Graben bereits flach)
-    return 0;
-  }
-  // Fallback: wie UP
-  return (rh - hSrc) + (rh - hDst);
-}
-
 function recalcWireLength(wire) {
   if (!state.scale) return;
-  var total = 0;
-  for (var i = 1; i < wire.points.length; i++) {
-    total += Math.hypot(wire.points[i].x - wire.points[i-1].x, wire.points[i].y - wire.points[i-1].y);
+  let total = 0;
+  for (let i = 1; i < wire.points.length; i++) {
+    total += Math.hypot(wire.points[i].x-wire.points[i-1].x, wire.points[i].y-wire.points[i-1].y);
   }
-  var horizontal_m = total / state.scale;
-  var vertical_m   = calcVerticalAdd(wire);
-  wire.laenge_m    = (horizontal_m + vertical_m).toFixed(2);
-  wire._h_m        = horizontal_m.toFixed(2);  // Horizontalanteil (für Tooltip)
-  wire._v_m        = vertical_m.toFixed(2);    // Vertikalanteil (für Tooltip)
+  wire.laenge_m = (total / state.scale).toFixed(2);
 }
 
 // Wire hit test
@@ -5884,24 +5843,18 @@ function buildSummaryData(syms, wires, byType, byKabel, wireTotal) {
     if (!geraeteByTyp[n]) geraeteByTyp[n] = { count:0, cat, abbr: SYMBOLS[s.type]?.abbr||'' };
     geraeteByTyp[n].count += (s.count||1);
   }
-  const totalGeraete = Object.values(geraeteByTyp).reduce((a,v)=>a+v.count,0);
+  const totalGeraete   = Object.values(geraeteByTyp).reduce((a,v)=>a+v.count,0);
 
-  // Kabel inkl. manueller Zuleitungen + 15% Bestellaufschlag (Verschnitt/Reserve)
-  const AUFSCHLAG = 1.15;
-  const kabelMapRaw = { ...byKabel };
-  const kabelMap = {};
-  for (const k of Object.keys(kabelMapRaw)) {
-    kabelMap[k] = kabelMapRaw[k] * AUFSCHLAG;
-  }
-  const totalKabel     = Object.values(kabelMap).reduce((a,v)=>a+v,0);
-  const totalKabelNetto = Object.values(kabelMapRaw).reduce((a,v)=>a+v,0);
+  // Kabel inkl. manueller Zuleitungen
+  const kabelMap = { ...byKabel };
+  const totalKabel = Object.values(kabelMap).reduce((a,v)=>a+v,0);
 
-  // Leitungen nach Typ + 15% Aufschlag
+  // Leitungen nach Typ
   const leitungByTyp = {};
   for (const w of wires) {
     const key = (WIRE_TYPES[w.wireType]?.label || w.wireType || 'Strom') + ' · ' + (w.kabel||'—');
     if (!leitungByTyp[key]) leitungByTyp[key] = { laenge:0, adern: w.adern||0, kabel: w.kabel||'—' };
-    leitungByTyp[key].laenge += parseFloat(w.laenge_m||0) * AUFSCHLAG;
+    leitungByTyp[key].laenge += parseFloat(w.laenge_m||0);
   }
 
   // Stromkreise
@@ -5909,17 +5862,16 @@ function buildSummaryData(syms, wires, byType, byKabel, wireTotal) {
 
   return {
     geraeteByTyp, totalGeraete,
-    kabelMap, totalKabel, totalKabelNetto,
+    kabelMap, totalKabel,
     leitungByTyp,
     skCount: skSet.size,
     wireCount: wires.length,
-    wireTotal,          // Netto-Verlegelänge (ohne Aufschlag, für Leitungsverzeichnis)
-    wireTotalBestell: wireTotal * AUFSCHLAG,  // Bestellmenge inkl. 15%
+    wireTotal,
   };
 }
 
 function renderSummaryHTML(sd, forPrint=false) {
-  const {geraeteByTyp, totalGeraete, kabelMap, totalKabel, totalKabelNetto, leitungByTyp, skCount, wireCount, wireTotal, wireTotalBestell} = sd;
+  const {geraeteByTyp, totalGeraete, kabelMap, totalKabel, leitungByTyp, skCount, wireCount, wireTotal} = sd;
   const BAR_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#2ecc71','#e91e63','#00bcd4'];
 
   const sf    = forPrint ? '#f8f8f8' : 'var(--sf)';
@@ -5943,13 +5895,13 @@ function renderSummaryHTML(sd, forPrint=false) {
     </div>
     <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
       <div style="font-size:26px;font-weight:700;font-family:${mono};color:${gr}">${totalKabel.toFixed(1)} m</div>
-      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Kabel Bestellmenge <span style="color:${ac}">+15%</span></div>
-      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">Netto: ${(totalKabelNetto||totalKabel/1.15).toFixed(1)} m · ${Object.keys(kabelMap).length} Kabeltypen</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Kabel gesamt</div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${Object.keys(kabelMap).length} Kabeltypen</div>
     </div>
     <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
-      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${bl}">${(wireTotalBestell||wireTotal*1.15).toFixed(1)} m</div>
-      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Leitungen Bestell. <span style="color:${ac}">+15%</span></div>
-      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">Verlegt: ${wireTotal.toFixed(1)} m · ${wireCount} Abschn.</div>
+      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${bl}">${wireTotal.toFixed(1)} m</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Leitungen verlegt</div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${wireCount} Abschnitte</div>
     </div>
   </div>`;
 
@@ -6018,7 +5970,7 @@ function renderSummaryHTML(sd, forPrint=false) {
         <td style="border-top:2px solid ${bd}"></td>
       </tr></tfoot>
     </table>
-    <div style="margin-top:8px;font-size:9px;color:${tx3};font-family:${mono}">ℹ️ Inkl. manueller Zuleitungen · 15% Verschnitt/Reserve bereits eingerechnet · Verlegewege mit Montagehöhen kalkuliert</div>
+    <div style="margin-top:8px;font-size:9px;color:${tx3};font-family:${mono}">ℹ️ Inkl. manueller Zuleitungen · zzgl. 10–15% Verschnitt empfohlen</div>
   </div>` : '';
 
   // ── Block 4: Leitungen nach Typ ──
@@ -7100,6 +7052,683 @@ function exportFloorplanPDF() {
     w.document.write(html);
     w.document.close();
   }, 200);
+}
+
+
+// ═══════════════════════════════════════════════════
+//  GRUNDRISS DRUCKEN — Layer-Auswahl + Bereichsauswahl
+// ═══════════════════════════════════════════════════
+
+// Globaler Druckzustand
+var _gz_print = {
+  cropRect: null,       // {x,y,w,h} in Canvas-Weltkoordinaten, null = alles
+  selecting: false,     // Bereichsauswahl aktiv
+  selStart:  null,
+  selEnd:    null,
+};
+
+// ── Bereichsauswahl-Modus starten ──
+function gz_startCropSelect() {
+  _gz_print.selecting = true;
+  _gz_print.selStart  = null;
+  _gz_print.selEnd    = null;
+  _gz_print.cropRect  = null;
+  canvas.style.cursor = 'crosshair';
+  setStatus('📐 Bereich auswählen: Klicken und ziehen, dann loslassen');
+
+  // Temporäre Overlay-Zeichnung
+  function onMouseDown(e) {
+    if (!_gz_print.selecting) return;
+    var pt = gz_canvasToWorld(e);
+    _gz_print.selStart = pt;
+    _gz_print.selEnd   = pt;
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+  }
+  function onMouseMove(e) {
+    if (!_gz_print.selStart) return;
+    _gz_print.selEnd = gz_canvasToWorld(e);
+    gz_drawCropOverlay();
+  }
+  function onMouseUp(e) {
+    _gz_print.selEnd = gz_canvasToWorld(e);
+    var x1 = Math.min(_gz_print.selStart.x, _gz_print.selEnd.x);
+    var y1 = Math.min(_gz_print.selStart.y, _gz_print.selEnd.y);
+    var x2 = Math.max(_gz_print.selStart.x, _gz_print.selEnd.x);
+    var y2 = Math.max(_gz_print.selStart.y, _gz_print.selEnd.y);
+    if (x2 - x1 > 10 && y2 - y1 > 10) {
+      _gz_print.cropRect = { x: x1, y: y1, w: x2-x1, h: y2-y1 };
+    }
+    _gz_print.selecting = false;
+    canvas.style.cursor = '';
+    canvas.removeEventListener('mousemove', onMouseMove);
+    canvas.removeEventListener('mouseup', onMouseUp);
+    canvas.removeEventListener('mousedown', onMouseDown);
+    gz_drawCropOverlay();
+    setStatus('✅ Bereich ausgewählt — jetzt Druckdialog öffnen');
+    // Dialog aktualisieren falls offen
+    var statusEl = document.getElementById('gz-crop-status');
+    if (statusEl) {
+      statusEl.textContent = _gz_print.cropRect
+        ? '✅ Bereich gewählt (' + Math.round(_gz_print.cropRect.w) + '×' + Math.round(_gz_print.cropRect.h) + ' px)'
+        : '⚠ Kein Bereich';
+      statusEl.style.color = '#27ae60';
+    }
+  }
+  canvas.addEventListener('mousedown', onMouseDown);
+}
+
+// Touch-Unterstützung für Bereichsauswahl
+function gz_startCropSelectTouch() {
+  _gz_print.selecting = true;
+  _gz_print.selStart  = null;
+  _gz_print.selEnd    = null;
+  _gz_print.cropRect  = null;
+  canvas.style.cursor = 'crosshair';
+  setStatus('📐 Bereich auswählen: Tippen und ziehen');
+
+  function toWorld(touch) {
+    var r = canvas.getBoundingClientRect();
+    var cx = (touch.clientX - r.left) * (canvas.width / r.width);
+    var cy = (touch.clientY - r.top)  * (canvas.height / r.height);
+    return { x: (cx - state.pan.x) / state.zoom, y: (cy - state.pan.y) / state.zoom };
+  }
+  function onTouchStart(e) {
+    e.preventDefault();
+    _gz_print.selStart = toWorld(e.touches[0]);
+    _gz_print.selEnd   = _gz_print.selStart;
+  }
+  function onTouchMove(e) {
+    e.preventDefault();
+    _gz_print.selEnd = toWorld(e.touches[0]);
+    gz_drawCropOverlay();
+  }
+  function onTouchEnd(e) {
+    var x1 = Math.min(_gz_print.selStart.x, _gz_print.selEnd.x);
+    var y1 = Math.min(_gz_print.selStart.y, _gz_print.selEnd.y);
+    var x2 = Math.max(_gz_print.selStart.x, _gz_print.selEnd.x);
+    var y2 = Math.max(_gz_print.selStart.y, _gz_print.selEnd.y);
+    if (x2-x1 > 10 && y2-y1 > 10) _gz_print.cropRect = {x:x1,y:y1,w:x2-x1,h:y2-y1};
+    _gz_print.selecting = false;
+    canvas.style.cursor = '';
+    canvas.removeEventListener('touchstart', onTouchStart);
+    canvas.removeEventListener('touchmove', onTouchMove);
+    canvas.removeEventListener('touchend', onTouchEnd);
+    gz_drawCropOverlay();
+    var statusEl = document.getElementById('gz-crop-status');
+    if (statusEl) {
+      statusEl.textContent = _gz_print.cropRect ? '✅ Bereich gewählt' : '⚠ Kein Bereich';
+      statusEl.style.color = '#27ae60';
+    }
+  }
+  canvas.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvas.addEventListener('touchmove',  onTouchMove,  {passive:false});
+  canvas.addEventListener('touchend',   onTouchEnd);
+}
+
+function gz_canvasToWorld(e) {
+  var r = canvas.getBoundingClientRect();
+  var cx = (e.clientX - r.left) * (canvas.width  / r.width);
+  var cy = (e.clientY - r.top)  * (canvas.height / r.height);
+  return { x: (cx - state.pan.x) / state.zoom, y: (cy - state.pan.y) / state.zoom };
+}
+
+function gz_drawCropOverlay() {
+  render(); // normales Render
+  if (!_gz_print.selStart) return;
+  var s = _gz_print.selStart, e2 = _gz_print.selEnd || s;
+  var x1w = Math.min(s.x,e2.x), y1w = Math.min(s.y,e2.y);
+  var x2w = Math.max(s.x,e2.x), y2w = Math.max(s.y,e2.y);
+  // In Canvas-Pixel umrechnen
+  var x1 = x1w*state.zoom + state.pan.x, y1 = y1w*state.zoom + state.pan.y;
+  var x2 = x2w*state.zoom + state.pan.x, y2 = y2w*state.zoom + state.pan.y;
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  // Abdunkelung außerhalb
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0,0,canvas.width,y1);
+  ctx.fillRect(0,y2,canvas.width,canvas.height-y2);
+  ctx.fillRect(0,y1,x1,y2-y1);
+  ctx.fillRect(x2,y1,canvas.width-x2,y2-y1);
+  // Rahmen
+  ctx.strokeStyle = '#f5a623';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6,3]);
+  ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+  ctx.setLineDash([]);
+  // Ecken-Griffe
+  [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(function(pt) {
+    ctx.fillStyle = '#f5a623';
+    ctx.fillRect(pt[0]-5, pt[1]-5, 10, 10);
+  });
+  ctx.restore();
+}
+
+// ── Druckdialog öffnen ──
+function openGrundrissdruckDialog() {
+  var cw = canvas.width, ch = canvas.height;
+  var orient = cw > ch ? 'landscape' : 'portrait';
+  var cropActive = !!_gz_print.cropRect;
+
+  var dlg = document.getElementById('gz-druck-dlg');
+  if (dlg) dlg.remove();
+
+  var html = '<div id="gz-druck-dlg" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center">'
+    + '<div style="background:var(--bg);border:1px solid var(--bd2);border-radius:12px;padding:22px 24px;width:520px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+
+    // Titel
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<h2 style="font-size:14px;font-weight:700;color:var(--tx);margin:0">🖨 Grundriss drucken / PDF</h2>'
+    + '<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;line-height:1;padding:0 4px">✕</button>'
+    + '</div>'
+
+    // ── Bereichsauswahl ──
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">📐 Druckbereich</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    + '<button onclick="document.getElementById(\'gz-druck-dlg\').remove();gz_startCropSelect()" style="padding:7px 12px;border:1px solid #f5a623;border-radius:6px;background:rgba(245,166,35,.12);color:#f5a623;cursor:pointer;font-size:11px;font-weight:600">✂ Bereich auswählen</button>'
+    + '<button onclick="document.getElementById(\'gz-druck-dlg\').remove();gz_startCropSelectTouch()" style="padding:7px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx2);cursor:pointer;font-size:11px">👆 Touch-Auswahl</button>'
+    + '<button onclick="_gz_print.cropRect=null;_gz_print.selStart=null;_gz_print.selEnd=null;render();var s=document.getElementById(\'gz-crop-status\');if(s){s.textContent=\'Ganzer Grundriss\';s.style.color=\'var(--tx3)\';}" style="padding:7px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx2);cursor:pointer;font-size:11px">✕ Zurücksetzen</button>'
+    + '</div>'
+    + '<div id="gz-crop-status" style="margin-top:7px;font-size:10px;color:'+(cropActive?'#27ae60':'var(--tx3)')+'">'+( cropActive ? '✅ Bereich gewählt ('+Math.round(_gz_print.cropRect.w)+'×'+Math.round(_gz_print.cropRect.h)+' px)' : 'Ganzer Grundriss (kein Bereich gewählt)' )+'</div>'
+    + '</div>'
+
+    // ── Layer / Ebenen ──
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">🗂 Ebenen (Layer)</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    + gz_layerCheck('gz-l-floorplan', '🗺 Grundrissbild', true)
+    + gz_layerCheck('gz-l-raeume',    '⬜ Räume / Flächen', true)
+    + gz_layerCheck('gz-l-symbols',   '⚡ Elektrosymbole', true)
+    + gz_layerCheck('gz-l-labels',    '🔤 Symbolbeschrift.', true)
+    + gz_layerCheck('gz-l-wires',     '〰 Kabellinien', true)
+    + gz_layerCheck('gz-l-circuit',   '🔢 Stromkr.-Badges', true)
+    + gz_layerCheck('gz-l-wirelabel', '📏 Kabel-Längen', true)
+    + gz_layerCheck('gz-l-montage',   '📐 Montagehöhen', false)
+    + gz_layerCheck('gz-l-trassen',   '📦 Kabeltrassen', true)
+    + gz_layerCheck('gz-l-grid',      '⊞ Raster', false)
+    + '</div>'
+    + '<div style="margin-top:8px;display:flex;gap:8px">'
+    + '<button onclick="gz_setAllLayers(true)" style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle ein</button>'
+    + '<button onclick="gz_setAllLayers(false)" style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle aus</button>'
+    + '<button onclick="gz_setLayer_Grundrissonly()" style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Nur Grundriss</button>'
+    + '<button onclick="gz_setLayer_Elektroonly()" style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Nur Elektro</button>'
+    + '</div></div>'
+
+    // ── Papierformat + Skalierung ──
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px">Papierformat</div>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:5px"><input type="radio" name="gz-orient" value="portrait"  '+(orient==='portrait'?'checked':'')+' style="accent-color:#f5a623"> 📄 Hochformat A4</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px"><input type="radio" name="gz-orient" value="landscape" '+(orient==='landscape'?'checked':'')+' style="accent-color:#f5a623"> 📄 Querformat A4</label>'
+    + '</div>'
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px">Skalierung</div>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:4px"><input type="radio" name="gz-scale" value="fit" checked style="accent-color:#f5a623"> Seite füllen</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:4px"><input type="radio" name="gz-scale" value="75" style="accent-color:#f5a623"> 75%</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px"><input type="radio" name="gz-scale" value="50" style="accent-color:#f5a623"> 50%</label>'
+    + '</div></div>'
+
+    // ── Rand + Optionen ──
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">'
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px">Seitenrand</div>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:4px"><input type="radio" name="gz-margin" value="5" style="accent-color:#f5a623"> Schmal (5mm)</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:4px"><input type="radio" name="gz-margin" value="10" checked style="accent-color:#f5a623"> Normal (10mm)</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px"><input type="radio" name="gz-margin" value="20" style="accent-color:#f5a623"> Breit (20mm)</label>'
+    + '</div>'
+    + '<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px">'
+    + '<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px">Optionen</div>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:5px"><input type="checkbox" id="gz-opt-kopf"    checked style="accent-color:#f5a623"> Kopfzeile</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:5px"><input type="checkbox" id="gz-opt-legende" checked style="accent-color:#f5a623"> Legende</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:5px"><input type="checkbox" id="gz-opt-fuss"    checked style="accent-color:#f5a623"> Fußzeile</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px"><input type="checkbox" id="gz-opt-rahmen" checked style="accent-color:#f5a623"> Rahmen</label>'
+    + '</div></div>'
+
+    // ── Buttons ──
+    + '<div style="display:flex;gap:10px">'
+    + '<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="flex:1;padding:11px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer;font-size:12px">Abbrechen</button>'
+    + '<button onclick="druckGrundrissNurPDF()" style="flex:2;padding:11px;border:none;border-radius:6px;background:#f5a623;color:#fff;cursor:pointer;font-size:12px;font-weight:700">🖨 Drucken / Als PDF speichern</button>'
+    + '</div>'
+    + '</div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function gz_layerCheck(id, label, checked) {
+  return '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:5px">'
+    + '<input type="checkbox" id="' + id + '" ' + (checked?'checked':'') + ' style="accent-color:#f5a623"> ' + label + '</label>';
+}
+
+function gz_setAllLayers(val) {
+  ['gz-l-floorplan','gz-l-raeume','gz-l-symbols','gz-l-labels','gz-l-wires','gz-l-circuit','gz-l-wirelabel','gz-l-montage','gz-l-trassen','gz-l-grid'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.checked = val;
+  });
+}
+function gz_setLayer_Grundrissonly() {
+  gz_setAllLayers(false);
+  ['gz-l-floorplan','gz-l-raeume'].forEach(function(id){ var el=document.getElementById(id);if(el)el.checked=true; });
+}
+function gz_setLayer_Elektroonly() {
+  gz_setAllLayers(false);
+  ['gz-l-symbols','gz-l-labels','gz-l-wires','gz-l-circuit','gz-l-wirelabel','gz-l-trassen'].forEach(function(id){ var el=document.getElementById(id);if(el)el.checked=true; });
+}
+
+// ── Haupt-Exportfunktion ──
+function druckGrundrissNurPDF() {
+  // Einstellungen
+  var orient    = document.querySelector('input[name="gz-orient"]:checked').value;
+  var scaleOpt  = document.querySelector('input[name="gz-scale"]:checked').value;
+  var margin    = parseInt(document.querySelector('input[name="gz-margin"]:checked').value);
+  var showKopf    = document.getElementById('gz-opt-kopf').checked;
+  var showLegende = document.getElementById('gz-opt-legende').checked;
+  var showFuss    = document.getElementById('gz-opt-fuss').checked;
+  var showRahmen  = document.getElementById('gz-opt-rahmen').checked;
+
+  // Layer-Einstellungen
+  var layers = {
+    floorplan : document.getElementById('gz-l-floorplan').checked,
+    raeume    : document.getElementById('gz-l-raeume').checked,
+    symbols   : document.getElementById('gz-l-symbols').checked,
+    labels    : document.getElementById('gz-l-labels').checked,
+    wires     : document.getElementById('gz-l-wires').checked,
+    circuit   : document.getElementById('gz-l-circuit').checked,
+    wirelabel : document.getElementById('gz-l-wirelabel').checked,
+    montage   : document.getElementById('gz-l-montage').checked,
+    trassen   : document.getElementById('gz-l-trassen').checked,
+    grid      : document.getElementById('gz-l-grid').checked,
+  };
+
+  document.getElementById('gz-druck-dlg').remove();
+
+  // Print-Canvas mit gewählten Layern rendern
+  var imgData = gz_renderPrintCanvas(layers, _gz_print.cropRect);
+
+  var pn = document.getElementById('projName').value || 'Grundriss';
+  var pd = projData || {};
+  var heute = new Date().toLocaleDateString('de-DE');
+  var planName = pn;
+  if (state.activeFloorplanId && state.floorplans) {
+    var fp = state.floorplans.find(function(f){ return f.id === state.activeFloorplanId; });
+    if (fp && fp.name) planName = pn + ' \u2014 ' + fp.name;
+  }
+
+  // Legende
+  var legendeHTML = '';
+  if (showLegende && layers.symbols) {
+    var symCounts = {};
+    state.symbols.forEach(function(s) {
+      var nm = (SYMBOLS[s.type] && SYMBOLS[s.type].name) || s.type;
+      symCounts[nm] = (symCounts[nm] || 0) + (s.count || 1);
+    });
+    var keys = Object.keys(symCounts);
+    if (keys.length) {
+      var rows = keys.map(function(k) {
+        return '<tr><td style="padding:2px 6px;font-size:8px;border:1px solid #e0e0e0">' + k + '</td>'
+          + '<td style="padding:2px 6px;font-size:8px;font-weight:700;text-align:right;font-family:monospace;border:1px solid #e0e0e0">' + symCounts[k] + '</td></tr>';
+      }).join('');
+      legendeHTML = '<div style="width:130px;flex-shrink:0;padding-left:8px">'
+        + '<div style="font-size:7px;font-weight:700;color:#f5a623;text-transform:uppercase;letter-spacing:.5px;border-bottom:1.5px solid #f5a623;padding-bottom:2px;margin-bottom:4px">Legende</div>'
+        + '<table style="border-collapse:collapse;width:100%"><thead>'
+        + '<tr><th style="background:#f5a623;color:#fff;padding:2px 6px;font-size:7px;text-align:left;border:1px solid #f5a623">Symbol</th>'
+        + '<th style="background:#f5a623;color:#fff;padding:2px 6px;font-size:7px;border:1px solid #f5a623">Anz.</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>'
+        + (layers.wires && state.wires.length ? (function(){
+            var total = state.wires.reduce(function(a,w){return a+parseFloat(w.laenge_m||0);},0);
+            return '<div style="margin-top:6px;font-size:7px;color:#555;border-top:1px solid #ddd;padding-top:4px">'
+              + '🔌 Leitungen: <strong>' + state.wires.length + '</strong><br>'
+              + '📏 Gesamt: <strong>' + total.toFixed(1) + ' m</strong></div>';
+          })() : '')
+        + '</div>';
+    }
+  }
+
+  // Kopfzeile
+  var kopfHTML = '';
+  if (showKopf) {
+    var metaParts = [];
+    if (pd.kundenname) metaParts.push(pd.kundenname + (pd.firma ? ' \u2014 ' + pd.firma : ''));
+    if (pd.strasse)    metaParts.push(pd.strasse + (pd.ort ? ', ' + pd.ort : ''));
+    metaParts.push('Erstellt: ' + heute);
+    if (_gz_print.cropRect) metaParts.push('Ausschnitt');
+    kopfHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #f5a623;padding-bottom:5px;margin-bottom:8px;page-break-inside:avoid">'
+      + '<div style="font-size:13px;font-weight:700;color:#f5a623">&#9889; ' + planName + '</div>'
+      + '<div style="font-size:8px;color:#666;text-align:right">' + metaParts.join(' &nbsp;|&nbsp; ') + '</div>'
+      + '</div>';
+  }
+
+  // Fußzeile
+  var fussHTML = '';
+  if (showFuss) {
+    fussHTML = '<div style="border-top:1px solid #ddd;margin-top:8px;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#aaa;page-break-inside:avoid">'
+      + '<span>&#9889; Elektro-Grundriss Planer \u2014 Anvolt GmbH</span>'
+      + '<span>' + planName + '</span>'
+      + '<span>Erstellt: ' + heute + '</span>'
+      + '</div>';
+  }
+
+  var imgBorder = showRahmen ? 'border:1px solid #bbb;' : '';
+  var imgStyle  = 'display:block;' + imgBorder;
+  if (scaleOpt === 'fit') {
+    imgStyle += 'width:100%;height:auto;';
+  } else {
+    imgStyle += 'max-width:' + scaleOpt + '%;height:auto;';
+  }
+
+  var mm = margin;
+  var css = '@page{size:A4 ' + orient + ';margin:' + mm + 'mm}'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'html,body{width:100%;background:#fff;font-family:Arial,sans-serif;color:#222}'
+    + '.plan-row{display:flex;align-items:flex-start;width:100%}'
+    + '.plan-img-wrap{flex:1;min-width:0}'
+    + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+
+  var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
+    + '<title>' + planName + '</title>'
+    + '<style>' + css + '</style>'
+    + '</head><body>'
+    + kopfHTML
+    + '<div class="plan-row">'
+    + '<div class="plan-img-wrap"><img src="' + imgData + '" style="' + imgStyle + '" id="pimg"></div>'
+    + legendeHTML
+    + '</div>'
+    + fussHTML
+    + '<script>window.onload=function(){'
+    + 'var img=document.getElementById("pimg");'
+    + 'if(img.complete){setTimeout(function(){window.print();},200);}'
+    + 'else{img.onload=function(){setTimeout(function(){window.print();},200);};}'
+    + '};<\/script>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { alert('Popup-Fenster blockiert \u2014 bitte Popup f\u00fcr diese Seite erlauben.'); return; }
+  w.document.write(html);
+  w.document.close();
+
+  // Canvas-Overlay zurücksetzen
+  render();
+}
+
+// ── Layer-selektiver Canvas-Render ──
+function gz_renderPrintCanvas(layers, cropRect) {
+  // Ziel-Koordinaten im Weltkoordinatensystem
+  var worldX, worldY, worldW, worldH;
+  if (cropRect) {
+    worldX = cropRect.x; worldY = cropRect.y;
+    worldW = cropRect.w; worldH = cropRect.h;
+  } else {
+    // Bounding Box aller Inhalte
+    worldX = -state.pan.x / state.zoom;
+    worldY = -state.pan.y / state.zoom;
+    worldW = canvas.width  / state.zoom;
+    worldH = canvas.height / state.zoom;
+  }
+
+  // Hochauflösender Export-Canvas (2× für Schärfe)
+  var DPR = 2;
+  var EW = Math.round(worldW * state.zoom * DPR);
+  var EH = Math.round(worldH * state.zoom * DPR);
+  var MAX = 6000;
+  if (EW > MAX || EH > MAX) { var sc = MAX / Math.max(EW,EH); EW=Math.round(EW*sc); EH=Math.round(EH*sc); DPR*=sc; }
+
+  var ec = document.createElement('canvas');
+  ec.width  = EW;
+  ec.height = EH;
+  var ectx = ec.getContext('2d');
+
+  // Weißer Hintergrund
+  ectx.fillStyle = '#ffffff';
+  ectx.fillRect(0, 0, EW, EH);
+
+  // Transformation: Weltkoordinaten → Export-Canvas
+  var scl = state.zoom * DPR;
+  ectx.save();
+  ectx.translate(-worldX * scl, -worldY * scl);
+  ectx.scale(1, 1); // Welt-Koordinaten direkt
+
+  // Hilfsfunktion: ctx temporär auf ectx umschalten
+  var origCtx = ctx;
+  var origCanvas = canvas;
+  // Wir nutzen das bestehende ctx, indem wir eine "gemockte" Umgebung anlegen
+  // Stattdessen: direkt neu zeichnen mit ectx
+  ectx.restore();
+
+  // ── Neu zeichnen mit angepasster Transform ──
+  ectx.save();
+  ectx.setTransform(scl, 0, 0, scl, -worldX * scl, -worldY * scl);
+
+  // Raster
+  if (layers.grid) {
+    gz_drawGridOn(ectx, worldX, worldY, worldW, worldH, scl);
+  }
+
+  // Räume
+  if (layers.raeume) gz_drawRaeumeOn(ectx);
+
+  // Grundrissbild (hochgeladenes Foto)
+  if (layers.floorplan && state.floorplan) {
+    ectx.drawImage(state.floorplan.img, 0, 0, state.floorplan.w, state.floorplan.h);
+  }
+
+  // Kabeltrassen
+  if (layers.trassen) gz_drawTrassenOn(ectx);
+
+  // Kabellinien
+  if (layers.wires) gz_drawWiresOn(ectx, layers.wirelabel, layers.circuit);
+
+  // Symbole + Labels
+  if (layers.symbols) gz_drawSymbolsOn(ectx, layers.labels, layers.circuit, layers.montage, layers.wirelabel);
+
+  ectx.restore();
+
+  return ec.toDataURL('image/png');
+}
+
+// ── Raster zeichnen ──
+function gz_drawGridOn(ectx, wx, wy, ww, wh, scl) {
+  var gridSize = state.gridSize || 50;
+  ectx.save();
+  ectx.strokeStyle = 'rgba(180,180,200,0.25)';
+  ectx.lineWidth = 0.5 / state.zoom;
+  var x0 = Math.floor(wx / gridSize) * gridSize;
+  var y0 = Math.floor(wy / gridSize) * gridSize;
+  for (var gx = x0; gx < wx+ww+gridSize; gx += gridSize) {
+    ectx.beginPath(); ectx.moveTo(gx, wy); ectx.lineTo(gx, wy+wh); ectx.stroke();
+  }
+  for (var gy = y0; gy < wy+wh+gridSize; gy += gridSize) {
+    ectx.beginPath(); ectx.moveTo(wx, gy); ectx.lineTo(wx+ww, gy); ectx.stroke();
+  }
+  ectx.restore();
+}
+
+// ── Räume zeichnen ──
+function gz_drawRaeumeOn(ectx) {
+  if (!state.raeume || !state.raeume.length) return;
+  for (var i = 0; i < state.raeume.length; i++) {
+    var r = state.raeume[i];
+    if (!r.pts || !r.pts.length) continue;
+    ectx.save();
+    ectx.strokeStyle = 'rgba(63,185,80,.5)';
+    ectx.lineWidth = 1.5 / state.zoom;
+    ectx.setLineDash([4/state.zoom, 3/state.zoom]);
+    ectx.fillStyle = r.color || 'rgba(63,185,80,.08)';
+    if (r.type === 'rect' && r.pts.length === 2) {
+      var rx1 = Math.min(r.pts[0].x, r.pts[1].x), ry1 = Math.min(r.pts[0].y, r.pts[1].y);
+      var rw = Math.abs(r.pts[1].x-r.pts[0].x), rh2 = Math.abs(r.pts[1].y-r.pts[0].y);
+      ectx.beginPath(); ectx.rect(rx1,ry1,rw,rh2); ectx.fill(); ectx.stroke();
+      ectx.setLineDash([]);
+      ectx.fillStyle = 'rgba(63,185,80,.8)';
+      ectx.font = 'bold ' + (10/state.zoom) + 'px IBM Plex Mono,monospace';
+      ectx.textAlign = 'center';
+      ectx.fillText(r.name + (r.flaeche?' ('+r.flaeche+'m²)':''), rx1+rw/2, ry1+rh2/2);
+    } else {
+      ectx.beginPath(); ectx.moveTo(r.pts[0].x, r.pts[0].y);
+      r.pts.forEach(function(p){ ectx.lineTo(p.x,p.y); }); ectx.closePath();
+      ectx.fill(); ectx.stroke();
+      var cx2 = r.pts.reduce(function(a,p){return a+p.x;},0)/r.pts.length;
+      var cy2 = r.pts.reduce(function(a,p){return a+p.y;},0)/r.pts.length;
+      ectx.setLineDash([]);
+      ectx.fillStyle='rgba(63,185,80,.8)'; ectx.font='bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';
+      ectx.textAlign='center'; ectx.fillText(r.name, cx2, cy2);
+    }
+    ectx.textAlign = 'left';
+    ectx.restore();
+  }
+}
+
+// ── Trassen zeichnen ──
+function gz_drawTrassenOn(ectx) {
+  if (!state.trassen || !state.trassen.length) return;
+  for (var i = 0; i < state.trassen.length; i++) {
+    var kt = state.trassen[i];
+    ectx.save();
+    var col = kt.color || '#888';
+    ectx.fillStyle = col + '33';
+    ectx.strokeStyle = col;
+    ectx.lineWidth = 1.5 / state.zoom;
+    var hw = (kt.breite || 60) / 2;
+    var len = kt.laenge_m ? kt.laenge_m * (state.scale || 100) : 100;
+    ectx.translate(kt.x, kt.y);
+    ectx.rotate((kt.rotation || 0) * Math.PI / 180);
+    ectx.beginPath(); ectx.rect(-len/2, -hw, len, hw*2); ectx.fill(); ectx.stroke();
+    ectx.restore();
+  }
+}
+
+// ── Leitungen zeichnen ──
+function gz_drawWiresOn(ectx, showWireLabel, showCircuit) {
+  for (var i = 0; i < state.wires.length; i++) {
+    var wire = state.wires[i];
+    if (!wire.points || wire.points.length < 2) continue;
+    var wt = WIRE_TYPES[wire.wireType] || WIRE_TYPES.strom;
+    var col = getWireColor(wire);
+    var dash = getWireDash(wire);
+    var lw = getWireWidth(wire);
+
+    ectx.save();
+    ectx.strokeStyle = col;
+    ectx.lineWidth = lw / state.zoom;
+    ectx.setLineDash(dash);
+    ectx.lineCap = 'round';
+    ectx.lineJoin = 'round';
+    ectx.beginPath();
+    ectx.moveTo(wire.points[0].x, wire.points[0].y);
+    for (var j = 1; j < wire.points.length; j++) ectx.lineTo(wire.points[j].x, wire.points[j].y);
+    ectx.stroke();
+    ectx.setLineDash([]);
+
+    // Länge-Label
+    if (showWireLabel && wire.laenge_m && state.scale) {
+      var mx = (wire.points[0].x + wire.points[wire.points.length-1].x) / 2;
+      var my = (wire.points[0].y + wire.points[wire.points.length-1].y) / 2;
+      ectx.font = (7/state.zoom) + 'px IBM Plex Mono,monospace';
+      ectx.fillStyle = '#27ae60';
+      ectx.textAlign = 'center';
+      ectx.fillText(wire.laenge_m + 'm', mx, my - 5/state.zoom);
+      ectx.textAlign = 'left';
+    }
+
+    // Stromkreis-Badge auf der Leitung
+    if (showCircuit && wire.circuit) {
+      var mid = Math.floor(wire.points.length / 2);
+      var mp = wire.points[mid] || wire.points[0];
+      var ph = wire.phase || 'L1';
+      var bc = PHASE_COLORS[ph] || PHASE_COLORS.default;
+      ectx.font = 'bold ' + (7/state.zoom) + 'px IBM Plex Mono,monospace';
+      var tw = ectx.measureText(wire.circuit).width;
+      var bw = tw + 8/state.zoom;
+      var bh = 11/state.zoom;
+      ectx.fillStyle = bc;
+      ectx.beginPath();
+      if (ectx.roundRect) ectx.roundRect(mp.x - bw/2, mp.y - bh/2, bw, bh, 3/state.zoom);
+      else ectx.rect(mp.x - bw/2, mp.y - bh/2, bw, bh);
+      ectx.fill();
+      ectx.fillStyle = '#fff';
+      ectx.textAlign = 'center';
+      ectx.fillText(wire.circuit, mp.x, mp.y + 4/state.zoom);
+      ectx.textAlign = 'left';
+    }
+    ectx.restore();
+  }
+}
+
+// ── Symbole zeichnen ──
+function gz_drawSymbolsOn(ectx, showLabels, showCircuit, showMontage, showWireLabel) {
+  var SZ_BASE = 36;
+  for (var i = 0; i < state.symbols.length; i++) {
+    var sym = state.symbols[i];
+    var def = SYMBOLS[sym.type];
+    if (!def) continue;
+    var SZ = SZ_BASE * (sym.size || 1);
+    ectx.save();
+    ectx.translate(sym.x, sym.y);
+    if (sym.rotation) ectx.rotate(sym.rotation * Math.PI / 180);
+
+    // Symbol-Bild
+    ectx.shadowColor = 'rgba(0,0,0,.3)';
+    ectx.shadowBlur = 4 / state.zoom;
+    var offsc = getSymbolCanvas(sym.type, def, SZ);
+    ectx.drawImage(offsc, -SZ/2, -SZ/2, SZ, SZ);
+    ectx.shadowBlur = 0;
+
+    // Label
+    if (showLabels) {
+      ectx.font = 'bold ' + (9/state.zoom) + 'px IBM Plex Sans,sans-serif';
+      ectx.fillStyle = '#1a1a2e';
+      ectx.textAlign = 'center';
+      var lbl = (sym.label || def.name).substring(0, 16);
+      ectx.fillText(lbl, 0, SZ/2 + 10/state.zoom);
+    }
+
+    // Montagehöhe
+    if (showMontage && (sym.montage || sym.hoehe != null)) {
+      ectx.font = (7/state.zoom) + 'px IBM Plex Mono,monospace';
+      ectx.fillStyle = '#0077cc';
+      ectx.textAlign = 'center';
+      ectx.fillText((sym.montage||'') + (sym.hoehe!=null?' '+sym.hoehe+'cm':''), 0, SZ/2 + 20/state.zoom);
+    }
+
+    // Stromkreis-Badge
+    if (showCircuit && sym.circuit && def.circuits) {
+      var ph2 = sym.phase || 'L1';
+      var bc2 = PHASE_COLORS[ph2] || PHASE_COLORS.default;
+      var bw2 = (sym.circuit.length + 2) * 5.5 / state.zoom;
+      ectx.fillStyle = bc2;
+      ectx.beginPath();
+      if (ectx.roundRect) ectx.roundRect(-bw2/2, SZ/2+13/state.zoom, bw2, 12/state.zoom, 3/state.zoom);
+      else ectx.rect(-bw2/2, SZ/2+13/state.zoom, bw2, 12/state.zoom);
+      ectx.fill();
+      ectx.fillStyle = '#fff';
+      ectx.font = 'bold ' + (8/state.zoom) + 'px IBM Plex Mono,monospace';
+      ectx.textAlign = 'center';
+      ectx.fillText(sym.circuit, 0, SZ/2 + 21/state.zoom);
+    } else if (showCircuit && sym.circuit && sym.circuit !== 'SK1') {
+      ectx.font = (7/state.zoom) + 'px IBM Plex Mono,monospace';
+      ectx.fillStyle = '#e67e22';
+      ectx.textAlign = 'center';
+      ectx.fillText(sym.circuit, 0, SZ/2 + 29/state.zoom);
+    }
+
+    // Kabelzuleitung-Pfeil + Länge
+    if (showWireLabel && sym.kabelPosition) {
+      var dirs2 = {unten:{dx:0,dy:1},oben:{dx:0,dy:-1},links:{dx:-1,dy:0},rechts:{dx:1,dy:0}};
+      var d2 = dirs2[sym.kabelPosition] || dirs2.unten;
+      var arrLen = 18/state.zoom;
+      var ax2 = d2.dx*(SZ/2+6/state.zoom), ay2 = d2.dy*(SZ/2+6/state.zoom);
+      ectx.strokeStyle = '#0077cc'; ectx.lineWidth = 1.8/state.zoom;
+      ectx.setLineDash([3/state.zoom,2/state.zoom]);
+      ectx.beginPath(); ectx.moveTo(ax2,ay2); ectx.lineTo(ax2+d2.dx*arrLen, ay2+d2.dy*arrLen); ectx.stroke();
+      ectx.setLineDash([]);
+      if (sym.kabelLaenge) {
+        ectx.font = (7/state.zoom)+'px IBM Plex Mono,monospace'; ectx.fillStyle='#27ae60';
+        ectx.textAlign = d2.dx < 0 ? 'right' : 'left';
+        ectx.fillText(sym.kabelLaenge+'m', ax2+d2.dx*(arrLen/2), ay2+d2.dy*(arrLen/2)+8/state.zoom);
+      }
+    }
+
+    ectx.textAlign = 'left';
+    ectx.restore();
+  }
 }
 
 // ═══════════════════════════════════════════════════
