@@ -605,6 +605,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
+      <button class="btn" style="background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.5);font-size:11px;font-weight:600" onclick="openGrundrissdruckDialog()" title="Grundriss drucken / PDF">🖨 PDF</button>
       <button class="btn" style="background:rgba(155,89,182,.2);color:#9b59b6;border:1px solid rgba(155,89,182,.4);font-size:11px;font-weight:600" onclick="open3DView()" title="3D-Ansicht der Kabelverlegung">🧊 3D-Ansicht</button>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
       <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
@@ -802,39 +803,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
       <canvas id="raumOverlayCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:113;display:none"></canvas>
       <!-- RAUM Banner -->
       <div id="raumDrawBanner" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(63,185,80,.95);color:#000;font-weight:700;font-size:12px;padding:9px 22px;border-radius:24px;z-index:134;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4)">⬜ Raum zeichnen…</div>
-      <!-- RAUM Panel (rechts, unter LV) -->
-      <div id="raumPanel" style="position:absolute;top:12px;left:300px;z-index:120;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:14px 16px;width:230px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none">
-        <h4 style="font-size:13px;font-weight:700;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:7px">⬜ Raum definieren
-          <button onclick="closeRaumPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px">✕</button>
-        </h4>
-        <div class="kt-field"><label>Farbe</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="raumColorPicker">
-            <div class="raum-col-btn" data-col="rgba(88,166,255,.12)" onclick="raumSelCol(this)" style="background:rgba(88,166,255,.3);border:2px solid #58a6ff;width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(63,185,80,.12)"  onclick="raumSelCol(this)" style="background:rgba(63,185,80,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(245,166,35,.12)" onclick="raumSelCol(this)" style="background:rgba(245,166,35,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(188,140,255,.12)"onclick="raumSelCol(this)" style="background:rgba(188,140,255,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(255,87,34,.10)"  onclick="raumSelCol(this)" style="background:rgba(255,87,34,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-            <div class="raum-col-btn" data-col="rgba(200,200,200,.15)"onclick="raumSelCol(this)" style="background:rgba(200,200,200,.3);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:5px;margin-top:10px">
-          <button class="btn ba" style="flex:1;font-size:11px" id="raumStartBtn" onclick="raumStartDraw()">✏ Punkte setzen</button>
-          <button class="btn bg" style="font-size:11px" onclick="raumUndoLast()">↩</button>
-        </div>
-        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:5px" id="raumStatus">Ecken anklicken, Doppelklick zum Schließen</div>
-      </div>
-
-      <!-- Raum-Namenseingabe: erscheint nach Schließen des Polygons -->
-      <div id="raumNamePanel" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:130;background:var(--sf);border:1px solid var(--bd2);border-radius:8px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,.6);min-width:260px">
-        <div style="font-size:11px;font-weight:700;color:#3fb950;margin-bottom:8px">⬜ Raum benennen</div>
-        <input class="rp-input" id="raumNameInput" placeholder="z.B. Wohnzimmer" style="margin-bottom:8px;width:100%;box-sizing:border-box">
-        <div style="display:flex;gap:6px">
-          <button class="btn ba" style="flex:1" onclick="confirmRaumName()">✓ Raum speichern</button>
-          <button class="btn bg" onclick="cancelRaumNaming()">Abbrechen</button>
-        </div>
-      </div>
-
-
       <!-- LV: Hinweis-Banner oben -->
       <div id="lvDrawBanner">💡 Linie 1 ziehen — Raumbreite</div>
 
@@ -941,6 +909,37 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
   <!-- RIGHT PROPERTIES PANEL -->
   <div class="rpanel" id="rpanel">
+    <!-- Raum-Panel direkt in rechter Leiste (kein floatendes Div mehr) -->
+    <div id="raumPanel" style="display:none;border-bottom:2px solid var(--bd);background:var(--sf2)">
+      <div style="padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd)">
+        <span style="font-size:11px;font-weight:700;color:#3fb950">⬜ Raum definieren</span>
+        <button onclick="closeRaumPanel()" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:15px;line-height:1;padding:0 3px">✕</button>
+      </div>
+      <div style="padding:10px 12px">
+        <div class="rp-row"><label class="rp-lbl">Raumname</label>
+          <input class="rp-input" id="raumNameInput" placeholder="z.B. Wohnzimmer">
+        </div>
+        <div class="rp-row"><label class="rp-lbl">Farbe</label>
+          <div style="display:flex;gap:5px;flex-wrap:wrap" id="raumColorPicker">
+            <div class="raum-col-btn" data-col="rgba(88,166,255,.12)"  onclick="raumSelCol(this)" style="background:rgba(88,166,255,.35);border:2px solid #58a6ff;width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+            <div class="raum-col-btn" data-col="rgba(63,185,80,.12)"   onclick="raumSelCol(this)" style="background:rgba(63,185,80,.35);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+            <div class="raum-col-btn" data-col="rgba(245,166,35,.12)"  onclick="raumSelCol(this)" style="background:rgba(245,166,35,.35);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+            <div class="raum-col-btn" data-col="rgba(188,140,255,.12)" onclick="raumSelCol(this)" style="background:rgba(188,140,255,.35);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+            <div class="raum-col-btn" data-col="rgba(255,87,34,.10)"   onclick="raumSelCol(this)" style="background:rgba(255,87,34,.35);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+            <div class="raum-col-btn" data-col="rgba(200,200,200,.15)" onclick="raumSelCol(this)" style="background:rgba(200,200,200,.35);border:2px solid var(--bd);width:22px;height:22px;border-radius:3px;cursor:pointer"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;margin-bottom:6px">
+          <button class="btn ba" style="flex:1;font-size:11px" id="raumStartBtn" onclick="raumStartDraw()">✏ Punkte setzen</button>
+          <button class="btn bg" style="font-size:11px" onclick="raumUndoLast()">↩</button>
+        </div>
+        <div id="raumSaveRow" style="display:none;gap:5px;margin-bottom:6px">
+          <button class="btn ba" style="flex:1;font-size:11px" onclick="confirmRaumName()">✓ Raum speichern</button>
+          <button class="btn bg" style="font-size:11px" onclick="cancelRaumNaming()">✕</button>
+        </div>
+        <div style="font-size:9px;color:var(--tx3);font-family:var(--mono)" id="raumStatus">Ecken anklicken · Doppelklick zum Schließen</div>
+      </div>
+    </div>
     <div class="rp-hdr">🔧 Eigenschaften</div>
     <div class="rp-body" id="rpBody">
       <div style="color:var(--tx3);font-size:11px;text-align:center;padding:20px">Element auswählen</div>
@@ -3097,8 +3096,7 @@ let _iMode = 'sym';   // 'sym' | 'wire'
 let _iSymId = null;
 let _iWireIdx = null;
 let _iSel = { montage:'UP', kbzf:'unten', hoehe:40, raumhoehe:250, verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
-// Gespeicherte Symbolgrößen pro Typ
-var _symSizeMemory = {};
+var _symSizeMemory = {}; // Größe pro Symboltyp merken
 // Remembered wire install settings (reused for next wire)
 let _pendingWI = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'', wireType:'strom' };
 
@@ -3631,46 +3629,34 @@ function setupEvents() {
     }
     if (e.key === 'Escape') { state.wirePoints = []; state.selectedId = null; render(); }
     if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undoAction(); }
-
-    // ── Strg+C / Cmd+C — Symbol kopieren ──
+    // Strg+C — kopieren
     if ((e.ctrlKey||e.metaKey) && e.key==='c') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
       if (state.selectedId) {
         e.preventDefault();
-        var s = state.symbols.find(function(s){return s.id===state.selectedId;});
-        if (s) { window._symClipboard = JSON.parse(JSON.stringify(s)); setStatus('⎘ ' + (s.label||s.type) + ' kopiert — Strg+V zum Einfügen'); }
+        const s = state.symbols.find(s=>s.id===state.selectedId);
+        if (s) { window._symClipboard = JSON.parse(JSON.stringify(s)); setStatus('⎘ '+( s.label||s.type)+' kopiert — Strg+V zum Einfügen'); }
       }
     }
-
-    // ── Strg+V / Cmd+V — Symbol einfügen ──
+    // Strg+V — einfügen
     if ((e.ctrlKey||e.metaKey) && e.key==='v') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
       if (window._symClipboard) {
         e.preventDefault();
         saveUndo();
-        var offset = 40 / state.zoom;
-        var copy = Object.assign({}, window._symClipboard, {
-          id: gid(),
-          x: window._symClipboard.x + offset,
-          y: window._symClipboard.y + offset,
-        });
+        const off = 40/state.zoom;
+        const copy = Object.assign({}, window._symClipboard, { id:gid(), x:window._symClipboard.x+off, y:window._symClipboard.y+off });
         state.symbols.push(copy);
-        if (copy.size && copy.size !== 1) _symSizeMemory[copy.type] = copy.size;
-        selectSymbol(copy.id);
-        render();
-        setStatus('📋 ' + (copy.label||copy.type) + ' eingefügt — nochmal Strg+V für weitere Kopien');
+        if (copy.size && copy.size!==1) _symSizeMemory[copy.type]=copy.size;
+        selectSymbol(copy.id); render();
+        setStatus('📋 '+(copy.label||copy.type)+' eingefügt — Strg+V für weitere');
       }
     }
-
-    // ── Strg+D / Cmd+D — direkt duplizieren (ohne Zwischenablage) ──
+    // Strg+D — direkt duplizieren
     if ((e.ctrlKey||e.metaKey) && e.key==='d') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
-      if (state.selectedId) {
-        e.preventDefault();
-        copySymbol(state.selectedId);
-      }
+      if (state.selectedId) { e.preventDefault(); copySymbol(state.selectedId); }
     }
-
     if (e.key==='Delete'||e.key==='Backspace') {
       if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
       e.preventDefault();
@@ -4319,8 +4305,9 @@ function placeSymbol(key, x, y) {
     nennstrom, kabel,
     kabelHinweis: autoK?.kabelHinweis || '',
     lsKurve: autoK?.lsKurve || 'B',
-    kabelPosition: 'unten',
-    kabelLaenge: '',
+    // Kabelausführung (Position am Symbol)
+    kabelPosition: 'unten', // oben | unten | links | rechts
+    kabelLaenge: '',        // Zuleitung in m (manuell, wenn kein Maßstab)
     kommentar: '', count: 1,
     size: _symSizeMemory[key] || 1,
   };
@@ -5283,8 +5270,8 @@ function renderProps(sym) {
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(-90)">↺ -90°</button>
         <button class="btn bg" style="flex:1;font-size:10px" onclick="rotateSelected(90)">↻ +90°</button>
       </div>
-      <button class="btn bg" style="width:100%;margin-top:6px;font-size:10px;color:var(--bl);border-color:var(--bl);border-width:1px" onclick="copySymbol('${sym.id}')">⎘ Kopieren &nbsp;<span style="opacity:.6;font-size:9px">Strg+C / Strg+D</span></button>
-      <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:6px;font-size:10px" onclick="deleteSelected()">🗑 Löschen</button>
+      <button class="btn bg" style="width:100%;margin-top:5px;font-size:10px;color:var(--bl);border:1px solid var(--bl)" onclick="copySymbol('${sym.id}')">⎘ Kopieren &nbsp;<span style="opacity:.55;font-size:9px">Strg+C / Strg+D</span></button>
+      <button class="btn" style="width:100%;background:var(--rd);color:white;margin-top:5px;font-size:10px" onclick="deleteSelected()">🗑 Löschen</button>
     </div>
     <div class="rp-divider"></div>
     <div style="font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">⚡ Installation</div>
@@ -7116,282 +7103,594 @@ function exportFloorplanPDF() {
 //  3D-ANSICHT — Three.js Kabelverlegung
 // ═══════════════════════════════════════════════════
 function open3DView() {
-  var sc = state.scale || 100;
-  var defRH = (state.raumhoehe || 250) / 100;
+  var sc = state.scale || 100; // px pro Meter
+  var defRH = (state.raumhoehe || 250) / 100; // Raumhöhe in Metern
+
+  // Daten sammeln
   var raeume  = state.raeume  || [];
   var wires   = state.wires   || [];
   var symbols = state.symbols || [];
 
-  // Bounding Box für Kamera
+  // Welt-Bounding-Box bestimmen (für Kamera-Zentrierung)
   var allX = [], allZ = [];
-  raeume.forEach(function(r){ if(r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
+  raeume.forEach(function(r) {
+    if (r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); });
+  });
   symbols.forEach(function(s){ allX.push(s.x/sc); allZ.push(s.y/sc); });
   wires.forEach(function(w){ if(w.points) w.points.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
-  if (!allX.length) { allX=[0,10]; allZ=[0,10]; }
 
-  var minX=Math.min.apply(null,allX), maxX=Math.max.apply(null,allX);
-  var minZ=Math.min.apply(null,allZ), maxZ=Math.max.apply(null,allZ);
-  var cx=(minX+maxX)/2, cz=(minZ+maxZ)/2;
-  var span=Math.max(maxX-minX, maxZ-minZ, 5);
+  var minX = allX.length ? Math.min.apply(null,allX) : 0;
+  var maxX = allX.length ? Math.max.apply(null,allX) : 10;
+  var minZ = allZ.length ? Math.min.apply(null,allZ) : 0;
+  var maxZ = allZ.length ? Math.max.apply(null,allZ) : 10;
+  var cx = (minX+maxX)/2, cz = (minZ+maxZ)/2;
+  var span = Math.max(maxX-minX, maxZ-minZ, 5);
 
+  // JSON-Daten für das 3D-Fenster serialisieren
   var data3d = {
-    raeume: raeume,
-    wires: wires.map(function(w){
-      var src=symbols.find(function(s){return s.id===w.srcId;});
-      var dst=symbols.find(function(s){return s.id===w.dstId;});
+    raeume:  raeume,
+    wires:   wires.map(function(w){
+      var src = symbols.find(function(s){return s.id===w.srcId;});
+      var dst = symbols.find(function(s){return s.id===w.dstId;});
       return {
-        points:w.points, verlegeart:w.verlegeart||'UP', trasseHoehe:w.trasseHoehe||20,
-        color:gz3d_wireColor(w), label:w.kabel||w.wireType||'Leitung',
-        circuit:w.circuit||'', laenge_m:w.laenge_m||'',
-        srcHoehe:src?(src.hoehe!=null?src.hoehe:40):40,
-        dstHoehe:dst?(dst.hoehe!=null?dst.hoehe:40):40,
-        srcRH:src?(src.raumhoehe||defRH*100):defRH*100,
-        dstRH:dst?(dst.raumhoehe||defRH*100):defRH*100,
+        points:     w.points,
+        verlegeart: w.verlegeart || 'UP',
+        trasseHoehe:w.trasseHoehe || 20,
+        color:      gz3d_wireColor(w),
+        label:      w.kabel || w.wireType || 'Leitung',
+        circuit:    w.circuit || '',
+        laenge_m:   w.laenge_m || '',
+        srcHoehe:   src ? (src.hoehe != null ? src.hoehe : 40) : 40,
+        dstHoehe:   dst ? (dst.hoehe != null ? dst.hoehe : 40) : 40,
+        srcRH:      src ? (src.raumhoehe || defRH*100) : defRH*100,
+        dstRH:      dst ? (dst.raumhoehe || defRH*100) : defRH*100,
       };
     }),
     symbols: symbols.map(function(s){
-      var def=SYMBOLS[s.type]||{};
-      return { x:s.x, y:s.y, hoehe:s.hoehe!=null?s.hoehe:40,
-        raumhoehe:s.raumhoehe!=null?s.raumhoehe:defRH*100,
-        label:s.label||def.name||s.type, type:s.type, montage:s.montage||'UP' };
+      var def = SYMBOLS[s.type] || {};
+      return {
+        x: s.x, y: s.y,
+        hoehe:    s.hoehe     != null ? s.hoehe     : 40,
+        raumhoehe:s.raumhoehe != null ? s.raumhoehe : defRH*100,
+        label:    s.label || def.name || s.type,
+        type:     s.type,
+        montage:  s.montage || 'UP',
+      };
     }),
-    scale:sc, raumhoehe:defRH, cx:cx, cz:cz, span:span,
-    projName: document.getElementById('projName').value||'Grundriss',
+    scale: sc,
+    raumhoehe: defRH,
+    cx: cx, cz: cz, span: span,
+    projName: document.getElementById('projName').value || 'Grundriss',
   };
 
-  var J = JSON.stringify(data3d).replace(/</g,'\\u003c').replace(/>/g,'\\u003e');
+  var jsonStr = JSON.stringify(data3d).replace(/</g,'\\u003c').replace(/>/g,'\\u003e');
+
+  // Symbol-Farben je Typ
+  var symColorMap = {
+    'steckdose':'#e74c3c','schalter':'#3498db','taster':'#2ecc71',
+    'leuchte':'#f1c40f','strahler':'#f39c12','lampe':'#f1c40f',
+    'verteiler':'#9b59b6','sicherung':'#e67e22','default':'#95a5a6'
+  };
 
   var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
-    +'<title>3D \u2014 '+data3d.projName+'</title>'
+    +'<title>3D-Ansicht — '+data3d.projName+'</title>'
     +'<style>'
     +'*{margin:0;padding:0;box-sizing:border-box}'
     +'body{background:#0a0a14;color:#eee;font-family:Arial,sans-serif;overflow:hidden}'
     +'#c3d{display:block;width:100vw;height:100vh}'
-    +'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 24px);overflow-y:auto}'
-    +'.panel{background:rgba(10,10,20,.88);border:1px solid rgba(155,89,182,.4);border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px)}'
-    +'.ptit{font-size:12px;font-weight:700;color:#9b59b6;margin-bottom:8px}'
-    +'.pbtn{display:block;width:100%;padding:6px 10px;margin-bottom:4px;border:1px solid rgba(155,89,182,.4);border-radius:5px;background:rgba(155,89,182,.12);color:#ccc;cursor:pointer;font-size:11px;text-align:left}'
-    +'.pbtn:hover{background:rgba(155,89,182,.3);color:#fff}'
-    +'.sep{height:1px;background:rgba(255,255,255,.07);margin:6px 0}'
-    +'.cbl{display:flex;align-items:center;gap:7px;font-size:11px;color:#ccc;margin-bottom:5px;cursor:pointer;user-select:none}'
-    +'.cbl input{accent-color:#9b59b6}'
-    +'#tip{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.82);border:1px solid #9b59b6;border-radius:6px;padding:7px 14px;font-size:11px;pointer-events:none;display:none;white-space:nowrap}'
-    +'#inf{position:fixed;top:12px;right:12px;background:rgba(10,10,20,.88);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#999;line-height:1.7;backdrop-filter:blur(8px)}'
-    +'#leg{position:fixed;bottom:20px;right:12px;background:rgba(10,10,20,.88);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(8px);max-height:55vh;overflow-y:auto}'
-    +'.lr{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;color:#ccc}'
-    +'.ld{width:12px;height:12px;border-radius:50%;flex-shrink:0}'
+    +'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px}'
+    +'.ui-panel{background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.4);border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px)}'
+    +'.ui-title{font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px}'
+    +'.ui-btn{display:block;width:100%;padding:6px 10px;margin-bottom:5px;border:1px solid rgba(155,89,182,.5);border-radius:5px;background:rgba(155,89,182,.15);color:#ccc;cursor:pointer;font-size:11px;text-align:left;transition:background .2s}'
+    +'.ui-btn:hover{background:rgba(155,89,182,.35)}'
+    +'.ui-btn.act{background:rgba(155,89,182,.4);color:#fff;border-color:#9b59b6}'
+    +'.ui-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 0}'
+    +'.cb-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#ccc;margin-bottom:5px;cursor:pointer}'
+    +'.cb-row input{accent-color:#9b59b6;cursor:pointer}'
+    +'#tooltip{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid #9b59b6;border-radius:6px;padding:7px 14px;font-size:11px;color:#eee;pointer-events:none;display:none;white-space:nowrap}'
+    +'#info{position:fixed;top:12px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#aaa;max-width:200px;line-height:1.6;backdrop-filter:blur(8px)}'
+    +'#legend{position:fixed;bottom:20px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(8px);max-height:60vh;overflow-y:auto}'
+    +'.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;color:#ccc}'
+    +'.leg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}'
     +'</style></head><body>'
     +'<canvas id="c3d"></canvas>'
+
     +'<div id="ui">'
-    +'<div class="panel"><div class="ptit">🧊 3D-Kabelverlegung</div>'
-    +'<div style="font-size:10px;color:#666;margin-bottom:8px">'+data3d.projName+'</div>'
-    +'<button class="pbtn" onclick="setV(\'p\')">👁 Perspektive</button>'
-    +'<button class="pbtn" onclick="setV(\'t\')">⬆ Draufsicht</button>'
-    +'<button class="pbtn" onclick="setV(\'f\')">⬛ Vorderansicht</button>'
-    +'<button class="pbtn" onclick="setV(\'i\')">🔷 Isometrisch</button>'
-    +'<div class="sep"></div>'
-    +'<button class="pbtn" onclick="resetV()">🎯 Reset</button></div>'
-    +'<div class="panel"><div class="ptit">Ebenen</div>'
-    +'<label class="cbl"><input type="checkbox" id="cw" checked onchange="tgl(\'w\',this.checked)"> Wände</label>'
-    +'<label class="cbl"><input type="checkbox" id="cf" checked onchange="tgl(\'f\',this.checked)"> Boden</label>'
-    +'<label class="cbl"><input type="checkbox" id="ck" checked onchange="tgl(\'k\',this.checked)"> Kabel</label>'
-    +'<label class="cbl"><input type="checkbox" id="cs" checked onchange="tgl(\'s\',this.checked)"> Symbole</label>'
-    +'<label class="cbl"><input type="checkbox" id="cl" checked onchange="tgl(\'l\',this.checked)"> Labels</label>'
-    +'<div class="sep"></div>'
-    +'<label class="cbl"><input type="checkbox" id="cd" onchange="tgl(\'d\',this.checked)"> Decke</label>'
-    +'</div></div>'
-    +'<div id="inf"><div style="color:#9b59b6;font-weight:700;margin-bottom:4px">Steuerung</div>'
-    +'🖱 Links: Drehen<br>🖱 Rechts: Verschieben<br>🖱 Rad: Zoom<br>'
-    +'👆 1 Finger: Drehen<br>👆 2 Finger: Zoom</div>'
-    +'<div id="tip"></div>'
-    +'<div id="leg"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:6px">Kabeltypen</div>'
-    +'<div id="li"></div></div>'
+    +'<div class="ui-panel">'
+    +'<div class="ui-title">🧊 3D-Kabelverlegung</div>'
+    +'<div style="font-size:10px;color:#888;margin-bottom:8px">'+data3d.projName+'</div>'
+    +'<button class="ui-btn" onclick="setCam(\'persp\')">👁 Perspektive</button>'
+    +'<button class="ui-btn" onclick="setCam(\'top\')">⬆ Draufsicht</button>'
+    +'<button class="ui-btn" onclick="setCam(\'front\')">⬛ Vorderansicht</button>'
+    +'<button class="ui-btn" onclick="setCam(\'iso\')">🔷 Isometrisch</button>'
+    +'<div class="ui-sep"></div>'
+    +'<button class="ui-btn" onclick="resetCam()">🎯 Zurücksetzen</button>'
+    +'</div>'
+    +'<div class="ui-panel">'
+    +'<div class="ui-title">Ebenen</div>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-walls" checked onchange="toggleLayer(\'walls\',this.checked)"> Wände/Räume</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-floor" checked onchange="toggleLayer(\'floor\',this.checked)"> Boden</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-wires" checked onchange="toggleLayer(\'wires\',this.checked)"> Kabellinien</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-symbols" checked onchange="toggleLayer(\'symbols\',this.checked)"> Elektrogeräte</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-labels" checked onchange="toggleLayer(\'labels\',this.checked)"> Beschriftungen</label>'
+    +'<div class="ui-sep"></div>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-roof" onchange="toggleLayer(\'roof\',this.checked)"> Decke (transparent)</label>'
+    +'</div>'
+    +'</div>'
+
+    +'<div id="info">'
+    +'<div style="color:#9b59b6;font-weight:700;margin-bottom:5px">Steuerung</div>'
+    +'🖱 Linke Taste: Drehen<br>'
+    +'🖱 Rechte Taste: Verschieben<br>'
+    +'🖱 Scrollrad: Zoom<br>'
+    +'👆 Touch: 1 Finger = Drehen<br>'
+    +'👆 Touch: 2 Finger = Zoom'
+    +'</div>'
+
+    +'<div id="tooltip"></div>'
+    +'<div id="legend"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:7px">Kabeltypen</div><div id="leg-items"></div></div>'
+
     +'<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>'
     +'<script>'
-    +'var D='+J+';'
-    +'var SC=D.scale, objs={w:[],f:[],k:[],s:[],l:[],d:[]};'
-    +'var R=new THREE.WebGLRenderer({canvas:document.getElementById("c3d"),antialias:true});'
-    +'R.setPixelRatio(window.devicePixelRatio||1);R.setSize(innerWidth,innerHeight);'
-    +'R.shadowMap.enabled=true;R.setClearColor(0x0a0a14);'
-    +'var scene=new THREE.Scene();'
-    +'scene.fog=new THREE.FogExp2(0x0a0a14,0.012);'
-    +'var cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,500);'
-    +'var cd=D.span*1.2, ct=new THREE.Vector3(D.cx,0,D.cz), cr=cd, cth=0, cph=Math.PI/4;'
-    +'function upCam(){cam.position.set(ct.x+cr*Math.sin(cph)*Math.sin(cth),ct.y+cr*Math.cos(cph),ct.z+cr*Math.sin(cph)*Math.cos(cth));cam.lookAt(ct);}'
-    +'upCam();'
+    +'var D = '+jsonStr+';'
+    +'var SC = D.scale; var layers3d = { walls:true, floor:true, wires:true, symbols:true, labels:true, roof:false };'
+    +'var layerObjs = { walls:[], floor:[], wires:[], symbols:[], labels:[], roof:[] };'
+
+    // Scene setup
+    +'var renderer = new THREE.WebGLRenderer({canvas:document.getElementById("c3d"),antialias:true});'
+    +'renderer.setPixelRatio(window.devicePixelRatio||1);'
+    +'renderer.setSize(window.innerWidth,window.innerHeight);'
+    +'renderer.shadowMap.enabled=true;'
+    +'renderer.setClearColor(0x0a0a14);'
+
+    +'var scene = new THREE.Scene();'
+    +'scene.fog = new THREE.FogExp2(0x0a0a14, 0.015);'
+
+    // Camera
+    +'var W=window.innerWidth,H=window.innerHeight;'
+    +'var camera = new THREE.PerspectiveCamera(55,W/H,0.1,500);'
+    +'var camDist = D.span * 1.2;'
+    +'camera.position.set(D.cx, camDist*0.7, D.cz + camDist);'
+    +'camera.lookAt(D.cx, 0, D.cz);'
+
+    // Lighting
     +'scene.add(new THREE.AmbientLight(0xffffff,0.55));'
-    +'var dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(D.cx+20,30,D.cz+20);dl.castShadow=true;scene.add(dl);'
-    +'scene.add(new THREE.DirectionalLight(0x8888ff,0.25).position.set(D.cx-10,10,D.cz-10)||dl);'
-    +'var grid=new THREE.GridHelper(D.span*3,30,0x223,0x112);grid.position.set(D.cx,0,D.cz);scene.add(grid);'
-    // Boden
-    +'var fm=new THREE.Mesh(new THREE.PlaneGeometry(D.span*3,D.span*3),new THREE.MeshLambertMaterial({color:0x111122,side:THREE.DoubleSide}));'
-    +'fm.rotation.x=-Math.PI/2;fm.position.set(D.cx,0,D.cz);fm.receiveShadow=true;scene.add(fm);objs.f.push(fm);'
-    // Räume
-    +'D.raeume.forEach(function(r){'
-    +'  if(!r.pts||!r.pts.length)return;'
-    +'  var rh=(r.hoehe||D.raumhoehe*100)/100, pts;'
-    +'  if(r.type==="rect"&&r.pts.length===2){'
-    +'    var x1=Math.min(r.pts[0].x,r.pts[1].x)/SC,z1=Math.min(r.pts[0].y,r.pts[1].y)/SC;'
-    +'    var x2=Math.max(r.pts[0].x,r.pts[1].x)/SC,z2=Math.max(r.pts[0].y,r.pts[1].y)/SC;'
-    +'    pts=[[x1,z1],[x2,z1],[x2,z2],[x1,z2]];'
-    +'  }else{pts=r.pts.map(function(p){return[p.x/SC,p.y/SC];});}'
-    // Bodenfläche
-    +'  var sh=new THREE.Shape();sh.moveTo(pts[0][0],pts[0][1]);'
-    +'  for(var i=1;i<pts.length;i++)sh.lineTo(pts[i][0],pts[i][1]);sh.closePath();'
-    +'  var col=0x1e3a2e;'
-    +'  var flm=new THREE.Mesh(new THREE.ShapeGeometry(sh),new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.3,side:THREE.DoubleSide}));'
-    +'  flm.rotation.x=-Math.PI/2;flm.position.y=0.01;scene.add(flm);objs.w.push(flm);'
-    // Wände
-    +'  var wmat=new THREE.MeshLambertMaterial({color:0x2a3a4a,transparent:true,opacity:0.55});'
-    +'  for(var wi=0;wi<pts.length;wi++){'
-    +'    var p1=pts[wi],p2=pts[(wi+1)%pts.length];'
-    +'    var dx=p2[0]-p1[0],dz=p2[1]-p1[1],wl=Math.sqrt(dx*dx+dz*dz);'
-    +'    if(wl<0.01)continue;'
-    +'    var wm=new THREE.Mesh(new THREE.BoxGeometry(wl,rh,0.1),wmat);'
-    +'    wm.position.set(p1[0]+dx/2,rh/2,p1[1]+dz/2);wm.rotation.y=-Math.atan2(dz,dx);'
-    +'    wm.castShadow=true;scene.add(wm);objs.w.push(wm);'
-    +'  }'
-    // Decke
-    +'  var dm=new THREE.Mesh(new THREE.ShapeGeometry(sh),new THREE.MeshLambertMaterial({color:0x1a2a3a,transparent:true,opacity:0.12,side:THREE.DoubleSide}));'
-    +'  dm.rotation.x=-Math.PI/2;dm.position.y=rh;dm.visible=false;scene.add(dm);objs.d.push(dm);'
+    +'var dirL = new THREE.DirectionalLight(0xffffff,0.8);'
+    +'dirL.position.set(D.cx+20,30,D.cz+20); dirL.castShadow=true; scene.add(dirL);'
+    +'var fillL = new THREE.DirectionalLight(0x8888ff,0.3);'
+    +'fillL.position.set(D.cx-10,10,D.cz-10); scene.add(fillL);'
+    +'scene.add(new THREE.PointLight(0xf5a623,0.4,50));'
+
+    // Grid
+    +'var grid = new THREE.GridHelper(Math.max(D.span*3,30),30,0x223,0x112);'
+    +'grid.position.set(D.cx,0,D.cz); scene.add(grid);'
+
+    // Helper: px → world-m (centered)
+    +'function px(x){return x/SC;}'
+    +'function pz(y){return y/SC;}'
+
+    // ── BODEN ──
+    +'(function buildFloor(){'
+    +'  var geo = new THREE.PlaneGeometry(D.span*3,D.span*3);'
+    +'  var mat = new THREE.MeshLambertMaterial({color:0x1a1a2a,side:THREE.DoubleSide});'
+    +'  var mesh = new THREE.Mesh(geo,mat);'
+    +'  mesh.rotation.x=-Math.PI/2; mesh.position.set(D.cx,0,D.cz);'
+    +'  mesh.receiveShadow=true; scene.add(mesh); layerObjs.floor.push(mesh);'
+    +'})();'
+
+    // ── RÄUME → Wände ──
+    +'(function buildRooms(){'
+    +'  D.raeume.forEach(function(r){'
+    +'    if(!r.pts||!r.pts.length) return;'
+    +'    var rh = (r.hoehe||D.raumhoehe*100)/100;'
+    +'    var pts2d;'
+    +'    if(r.type==="rect"&&r.pts.length===2){'
+    +'      var x1=Math.min(r.pts[0].x,r.pts[1].x)/SC, z1=Math.min(r.pts[0].y,r.pts[1].y)/SC;'
+    +'      var x2=Math.max(r.pts[0].x,r.pts[1].x)/SC, z2=Math.max(r.pts[0].y,r.pts[1].y)/SC;'
+    +'      pts2d=[[x1,z1],[x2,z1],[x2,z2],[x1,z2]];'
+    +'    } else {'
+    +'      pts2d=r.pts.map(function(p){return[p.x/SC,p.y/SC];});'
+    +'    }'
+    // Boden des Raums
+    +'    var shape = new THREE.Shape();'
+    +'    shape.moveTo(pts2d[0][0],pts2d[0][1]);'
+    +'    for(var i=1;i<pts2d.length;i++) shape.lineTo(pts2d[i][0],pts2d[i][1]);'
+    +'    shape.closePath();'
+    +'    var floorGeo = new THREE.ShapeGeometry(shape);'
+    +'    var colHex = r.color ? parseInt(r.color.replace("#","0x"))||0x1e3a2e : 0x1e3a2e;'
+    +'    var floorMat = new THREE.MeshLambertMaterial({color:colHex,transparent:true,opacity:0.35,side:THREE.DoubleSide});'
+    +'    var floorMesh = new THREE.Mesh(floorGeo,floorMat);'
+    +'    floorMesh.rotation.x=-Math.PI/2; floorMesh.position.y=0.01; scene.add(floorMesh);'
+    +'    layerObjs.walls.push(floorMesh);'
+    // Wände als dünne Boxen entlang der Kanten
+    +'    var wallMat = new THREE.MeshLambertMaterial({color:0x2a3a4a,transparent:true,opacity:0.55});'
+    +'    var wallW = 0.12;'
+    +'    for(var wi=0;wi<pts2d.length;wi++){'
+    +'      var p1=pts2d[wi], p2=pts2d[(wi+1)%pts2d.length];'
+    +'      var dx=p2[0]-p1[0], dz=p2[1]-p1[1];'
+    +'      var len=Math.sqrt(dx*dx+dz*dz);'
+    +'      if(len<0.01) continue;'
+    +'      var wGeo = new THREE.BoxGeometry(len,rh,wallW);'
+    +'      var wMesh = new THREE.Mesh(wGeo,wallMat);'
+    +'      wMesh.position.set(p1[0]+dx/2, rh/2, p1[1]+dz/2);'
+    +'      wMesh.rotation.y = -Math.atan2(dz,dx);'
+    +'      wMesh.castShadow=true; wMesh.receiveShadow=true;'
+    +'      scene.add(wMesh); layerObjs.walls.push(wMesh);'
+    +'    }'
+    // Decke (optional)
+    +'    var roofMat = new THREE.MeshLambertMaterial({color:0x1a2a3a,transparent:true,opacity:0.15,side:THREE.DoubleSide});'
+    +'    var roofMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape),roofMat);'
+    +'    roofMesh.rotation.x=-Math.PI/2; roofMesh.position.y=rh; roofMesh.visible=false;'
+    +'    scene.add(roofMesh); layerObjs.roof.push(roofMesh);'
     // Raumname
-    +'  if(r.name){var cx2=pts.reduce(function(a,p){return a+p[0];},0)/pts.length,cz2=pts.reduce(function(a,p){return a+p[1];},0)/pts.length;mkL(r.name,cx2,0.05,cz2,"#3fb950",0.35);}'
-    +'});'
-    // Legende Init
-    +'var wleg={};'
-    // Kabel
-    +'D.wires.forEach(function(wire){'
-    +'  if(!wire.points||wire.points.length<2)return;'
-    +'  var vl=wire.verlegeart||"UP",col=new THREE.Color(wire.color||"#e74c3c");'
-    +'  var rh=(wire.srcRH||250)/100,hS=(wire.srcHoehe||40)/100,hD=(wire.dstHoehe||40)/100;'
-    +'  if(!wleg[wire.label])wleg[wire.label]=wire.color||"#e74c3c";'
-    +'  var p3=wire.points.map(function(p,i){'
-    +'    var x3=p.x/SC,z3=p.y/SC,y3,n=wire.points.length;'
-    +'    if(vl==="UP"||vl==="HR"||vl==="EZ"||vl==="HW"){'
-    +'      y3=(i===0)?hS:(i===n-1)?hD:rh-0.05;'
-    +'    }else if(vl==="AP"){var t=i/(n-1);y3=hS+(hD-hS)*t;}'
-    +'    else if(vl==="HD"){y3=rh;}'
-    +'    else if(vl==="FU"){y3=-0.03;}'
-    +'    else if(vl==="ER"){y3=-0.6;}'
-    +'    else{y3=rh-0.05;}'
-    +'    return new THREE.Vector3(x3,y3,z3);'
+    +'    if(r.name){'
+    +'      var cx3=pts2d.reduce(function(a,p){return a+p[0];},0)/pts2d.length;'
+    +'      var cz3=pts2d.reduce(function(a,p){return a+p[1];},0)/pts2d.length;'
+    +'      makeLabel(r.name, cx3, 0.05, cz3, "#3fb950", 0.35);'
+    +'    }'
     +'  });'
-    // Senkrechte UP-Einführungen
-    +'  if((vl==="UP"||vl==="HR"||vl==="HW")&&p3.length>=2){'
-    +'    var p0=p3[0].clone(),pL=p3[p3.length-1].clone();'
-    +'    var full=[];'
-    +'    full.push(new THREE.Vector3(p0.x,hS,p0.z));'
-    +'    full.push(new THREE.Vector3(p0.x,rh-0.05,p0.z));'
-    +'    p3.forEach(function(v,i){if(i>0&&i<p3.length-1)full.push(v);});'
-    +'    full.push(new THREE.Vector3(pL.x,rh-0.05,pL.z));'
-    +'    full.push(new THREE.Vector3(pL.x,hD,pL.z));'
-    +'    p3=full;'
-    +'  }'
-    +'  var curve=new THREE.CatmullRomCurve3(p3);'
-    +'  var tg=new THREE.TubeGeometry(curve,Math.max(p3.length*4,8),0.025,6,false);'
-    +'  var tm=new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:0.25});'
-    +'  var tube=new THREE.Mesh(tg,tm);'
-    +'  tube.userData={label:wire.label,circuit:wire.circuit,laenge:wire.laenge_m,vl:vl};'
-    +'  tube.castShadow=true;scene.add(tube);objs.k.push(tube);'
-    +'  if(wire.circuit){'
-    +'    var mid=p3[Math.floor(p3.length/2)];'
-    +'    mkL(wire.circuit,mid.x,mid.y+0.15,mid.z,wire.color||"#e74c3c",0.18);'
-    +'  }'
-    +'});'
+    +'})();'
+
+    // ── KABEL ──
+    +'var wireLegend = {};'
+    +'(function buildWires(){'
+    +'  D.wires.forEach(function(wire,wi){'
+    +'    if(!wire.points||wire.points.length<2) return;'
+    +'    var vl = wire.verlegeart||"UP";'
+    +'    var col = new THREE.Color(wire.color||"#e74c3c");'
+    +'    var rh = (wire.srcRH||250)/100;'
+    +'    var hSrc = (wire.srcHoehe||40)/100;'
+    +'    var hDst = (wire.dstHoehe||40)/100;'
+    +'    var th  = (wire.trasseHoehe||20)/100;'
+    +'    if(!wireLegend[wire.label]) wireLegend[wire.label]=wire.color||"#e74c3c";'
+    // 3D-Punkte für Kabelweg berechnen
+    +'    var pts3 = [];'
+    +'    var n = wire.points.length;'
+    +'    wire.points.forEach(function(p,i){'
+    +'      var x3=p.x/SC, z3=p.y/SC;'
+    +'      var y3;'
+    +'      if(vl==="UP"||vl==="HR"||vl==="EZ"||vl==="HW"){'
+    // Unterputz: Start- und Endpunkt auf Gerätehöhe, Mitte unter der Decke
+    +'        if(i===0) y3=hSrc;'
+    +'        else if(i===n-1) y3=hDst;'
+    +'        else y3=rh-0.05;' // unter der Decke
+    +'      } else if(vl==="AP"){'
+    // Aufputz/Kabelkanal: direkt auf Höhe (linear interpoliert)
+    +'        var t=i/(n-1);'
+    +'        y3=hSrc+(hDst-hSrc)*t;'
+    +'      } else if(vl==="HD"){'
+    // Hohldecke: alles auf Deckenhöhe
+    +'        y3=rh;'
+    +'      } else if(vl==="FU"){'
+    // Fußboden: 3cm unter Boden
+    +'        y3=-0.03;'
+    +'      } else if(vl==="ER"){'
+    // Erdkabel: 60cm unter Boden
+    +'        y3=-0.6;'
+    +'      } else {'
+    +'        var t2=i/(n-1);'
+    +'        y3=rh-0.05;'
+    +'      }'
+    +'      pts3.push(new THREE.Vector3(x3,y3,z3));'
+    +'    });'
+    // Bei UP: Senkrechte Einführung am Start und Ende ergänzen
+    +'    if((vl==="UP"||vl==="HR"||vl==="HW")&&n>=2){'
+    +'      var p0=pts3[0].clone(); var pLast=pts3[pts3.length-1].clone();'
+    +'      pts3.unshift(new THREE.Vector3(p0.x,rh-0.05,p0.z));'
+    +'      pts3.push(new THREE.Vector3(pLast.x,rh-0.05,pLast.z));'
+    +'      pts3[1].y=hSrc; pts3[pts3.length-2].y=hDst;'
+    +'    }'
+    // TubeGeometry aus CatmullRomCurve
+    +'    var curve = new THREE.CatmullRomCurve3(pts3);'
+    +'    var tubeGeo = new THREE.TubeGeometry(curve, Math.max(pts3.length*4,8), 0.025, 6, false);'
+    +'    var tubeMat = new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:0.2});'
+    +'    var tube = new THREE.Mesh(tubeGeo,tubeMat);'
+    +'    tube.userData = { type:"wire", label:wire.label, circuit:wire.circuit, laenge:wire.laenge_m, verlegeart:vl };'
+    +'    tube.castShadow=true; scene.add(tube); layerObjs.wires.push(tube);'
+    // Stromkreis-Label in der Mitte
+    +'    if(wire.circuit){'
+    +'      var mid=pts3[Math.floor(pts3.length/2)];'
+    +'      makeLabel(wire.circuit, mid.x, mid.y+0.15, mid.z, wire.color||"#e74c3c", 0.2);'
+    +'    }'
+    +'  });'
     // Legende aufbauen
-    +'(function(){var el=document.getElementById("li");Object.keys(wleg).forEach(function(k){'
-    +'  el.innerHTML+=\'<div class="lr"><div class="ld" style="background:\'+wleg[k]+\'"></div><span>\'+k+\'</span></div>\';'
-    +'});})();'
-    // Symbole
-    +'var sc2={steckdose:"#e74c3c",schalter:"#3498db",taster:"#2ecc71",leuchte:"#f1c40f",strahler:"#f39c12",lampe:"#f1c40f",verteiler:"#9b59b6",sicherung:"#e67e22"};'
-    +'D.symbols.forEach(function(s){'
-    +'  var x3=s.x/SC,z3=s.y/SC,h=(s.hoehe||40)/100;'
-    +'  var ck=Object.keys(sc2).find(function(k){return s.type&&s.type.toLowerCase().indexOf(k)>=0;})||"default";'
-    +'  var c=sc2[ck]||"#95a5a6";'
-    +'  var box=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,0.08),new THREE.MeshLambertMaterial({color:new THREE.Color(c),emissive:new THREE.Color(c),emissiveIntensity:0.45}));'
-    +'  box.position.set(x3,h,z3);box.userData={label:s.label,hoehe:s.hoehe,montage:s.montage};'
-    +'  scene.add(box);objs.s.push(box);'
-    +'  var vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x3,0.01,z3),new THREE.Vector3(x3,h,z3)]);'
-    +'  var vl2=new THREE.Line(vg,new THREE.LineBasicMaterial({color:0x444,transparent:true,opacity:0.4}));'
-    +'  scene.add(vl2);objs.s.push(vl2);'
-    +'  var sp=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8),new THREE.MeshLambertMaterial({color:new THREE.Color(c),emissive:new THREE.Color(c),emissiveIntensity:0.7,transparent:true,opacity:0.85}));'
-    +'  sp.position.set(x3,h+0.12,z3);scene.add(sp);objs.s.push(sp);'
-    +'  if(s.label)mkL(s.label,x3,h+0.3,z3,"#ffffff",0.18);'
-    +'});'
-    // Labels
-    +'var lsprites=[];'
-    +'function mkL(text,x,y,z,color,size){'
-    +'  var c2=document.createElement("canvas");c2.width=256;c2.height=64;'
-    +'  var cx3=c2.getContext("2d");cx3.clearRect(0,0,256,64);'
-    +'  cx3.fillStyle="rgba(0,0,0,.65)";cx3.beginPath();if(cx3.roundRect)cx3.roundRect(2,2,252,60,8);else cx3.rect(2,2,252,60);cx3.fill();'
-    +'  cx3.fillStyle=color||"#fff";cx3.font="bold 22px Arial";cx3.textAlign="center";cx3.textBaseline="middle";'
-    +'  cx3.fillText(text.substring(0,24),128,32);'
-    +'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c2),transparent:true,depthWrite:false}));'
-    +'  sp.position.set(x,y,z);sp.scale.set(size*4,size,1);'
-    +'  scene.add(sp);objs.l.push(sp);lsprites.push(sp);'
+    +'  var legEl=document.getElementById("leg-items");'
+    +'  Object.keys(wireLegend).forEach(function(k){'
+    +'    legEl.innerHTML+=\'<div class="leg-row"><div class="leg-dot" style="background:\'+wireLegend[k]+\'"></div><span>\'+k+\'</span></div>\';'
+    +'  });'
+    +'})();'
+
+    // ── SYMBOLE (Elektrogeräte) ──
+    +'(function buildSymbols(){'
+    +'  var symColors={"steckdose":"#e74c3c","schalter":"#3498db","taster":"#2ecc71","leuchte":"#f1c40f","strahler":"#f39c12","lampe":"#f1c40f","verteiler":"#9b59b6","sicherung":"#e67e22","default":"#95a5a6"};'
+    +'  D.symbols.forEach(function(s){'
+    +'    var x3=s.x/SC, z3=s.y/SC;'
+    +'    var h=(s.hoehe||40)/100;'
+    +'    var colKey=Object.keys(symColors).find(function(k){return s.type&&s.type.toLowerCase().indexOf(k)>=0;});'
+    +'    var col=symColors[colKey||"default"];'
+    // Kleiner Würfel an der Wand-Position
+    +'    var geo = new THREE.BoxGeometry(0.12,0.12,0.08);'
+    +'    var mat = new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.4});'
+    +'    var mesh = new THREE.Mesh(geo,mat);'
+    +'    mesh.position.set(x3,h,z3);'
+    +'    mesh.userData={type:"symbol",label:s.label,hoehe:s.hoehe,montage:s.montage};'
+    +'    scene.add(mesh); layerObjs.symbols.push(mesh);'
+    // Vertikale Verbindungslinie (Installationspfad)
+    +'    var vGeo=new THREE.BufferGeometry().setFromPoints(['
+    +'      new THREE.Vector3(x3,0.01,z3),'
+    +'      new THREE.Vector3(x3,h,z3)'
+    +'    ]);'
+    +'    var vLine=new THREE.Line(vGeo,new THREE.LineBasicMaterial({color:0x444444,opacity:0.5,transparent:true}));'
+    +'    scene.add(vLine); layerObjs.symbols.push(vLine);'
+    // Glüh-Kugel am Symbol
+    +'    var sphereGeo=new THREE.SphereGeometry(0.07,8,8);'
+    +'    var sphereMat=new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.6,transparent:true,opacity:0.8});'
+    +'    var sphere=new THREE.Mesh(sphereGeo,sphereMat);'
+    +'    sphere.position.set(x3,h+0.12,z3);'
+    +'    scene.add(sphere); layerObjs.symbols.push(sphere);'
+    +'    if(s.label) makeLabel(s.label,x3,h+0.28,z3,"#ffffff",0.18);'
+    +'  });'
+    +'})();'
+
+    // ── SPRITE-LABELS ──
+    +'var labelSprites=[];'
+    +'function makeLabel(text,x,y,z,color,size){'
+    +'  var c2=document.createElement("canvas"); c2.width=256; c2.height=64;'
+    +'  var cx2=c2.getContext("2d");'
+    +'  cx2.clearRect(0,0,256,64);'
+    +'  cx2.fillStyle="rgba(0,0,0,.6)"; cx2.beginPath();'
+    +'  cx2.roundRect(2,2,252,60,8); cx2.fill();'
+    +'  cx2.fillStyle=color||"#fff"; cx2.font="bold 22px Arial";'
+    +'  cx2.textAlign="center"; cx2.textBaseline="middle";'
+    +'  cx2.fillText(text.substring(0,24),128,32);'
+    +'  var tex=new THREE.CanvasTexture(c2);'
+    +'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));'
+    +'  sp.position.set(x,y,z); sp.scale.set(size*4,size,1);'
+    +'  scene.add(sp); layerObjs.labels.push(sp); labelSprites.push(sp);'
     +'}'
-    // Layer toggle
-    +'function tgl(name,val){(objs[name]||[]).forEach(function(o){o.visible=val;});}'
-    // Kamera-Steuerung
-    +'var drag=false,rDrag=false,last={x:0,y:0};'
-    +'document.addEventListener("mousedown",function(e){drag=true;rDrag=e.button===2;last={x:e.clientX,y:e.clientY};});'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  if(!drag)return;'
-    +'  var dx=(e.clientX-last.x)*0.005,dy=(e.clientY-last.y)*0.005;last={x:e.clientX,y:e.clientY};'
-    +'  if(rDrag){var r2=new THREE.Vector3();cam.getWorldDirection(r2);r2.cross(new THREE.Vector3(0,1,0)).normalize();ct.addScaledVector(r2,-dx*cr*0.5);ct.y+=dy*cr*0.5;}'
-    +'  else{cth-=dx;cph=Math.max(0.05,Math.min(Math.PI-0.05,cph+dy));}'
-    +'  upCam();'
+
+    // ── KAMERA-STEUERUNG ──
+    +'var isDragging=false, isRightDrag=false;'
+    +'var lastMouse={x:0,y:0};'
+    +'var camTheta=0, camPhi=Math.PI/4;'
+    +'var camTarget=new THREE.Vector3(D.cx,0,D.cz);'
+    +'var camR=camDist;'
+
+    +'function updateCameraPos(){'
+    +'  camera.position.x=camTarget.x+camR*Math.sin(camPhi)*Math.sin(camTheta);'
+    +'  camera.position.y=camTarget.y+camR*Math.cos(camPhi);'
+    +'  camera.position.z=camTarget.z+camR*Math.sin(camPhi)*Math.cos(camTheta);'
+    +'  camera.lookAt(camTarget);'
+    +'}'
+
+    // Mouse
+    +'document.addEventListener("mousedown",function(e){'
+    +'  isDragging=true; isRightDrag=(e.button===2);'
+    +'  lastMouse={x:e.clientX,y:e.clientY};'
     +'});'
-    +'document.addEventListener("mouseup",function(){drag=false;});'
-    +'document.addEventListener("wheel",function(e){cr=Math.max(0.5,Math.min(100,cr*(1+e.deltaY*0.001)));upCam();},{passive:true});'
+    +'document.addEventListener("mousemove",function(e){'
+    +'  if(!isDragging) return;'
+    +'  var dx=(e.clientX-lastMouse.x)*0.005, dy=(e.clientY-lastMouse.y)*0.005;'
+    +'  lastMouse={x:e.clientX,y:e.clientY};'
+    +'  if(isRightDrag){'
+    +'    var right=new THREE.Vector3(); camera.getWorldDirection(right);'
+    +'    var up2=new THREE.Vector3(0,1,0);'
+    +'    right.cross(up2).normalize();'
+    +'    camTarget.addScaledVector(right,-dx*camR*0.5);'
+    +'    camTarget.y+=dy*camR*0.5;'
+    +'  } else {'
+    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
+    +'  }'
+    +'  updateCameraPos();'
+    +'});'
+    +'document.addEventListener("mouseup",function(){isDragging=false;});'
+    +'document.addEventListener("wheel",function(e){'
+    +'  camR=Math.max(1,Math.min(100,camR*(1+e.deltaY*0.001)));'
+    +'  updateCameraPos();'
+    +'},{passive:true});'
     +'document.addEventListener("contextmenu",function(e){e.preventDefault();});'
+
     // Touch
-    +'var touches={},lpd=null;'
-    +'document.addEventListener("touchstart",function(e){e.preventDefault();Array.from(e.changedTouches).forEach(function(t){touches[t.identifier]={x:t.clientX,y:t.clientY};});},{passive:false});'
-    +'document.addEventListener("touchmove",function(e){e.preventDefault();'
-    +'  if(e.touches.length===1&&Object.keys(touches).length===1){'
-    +'    var id=Object.keys(touches)[0],t=e.touches[0];'
-    +'    var dx=(t.clientX-touches[id].x)*0.006,dy=(t.clientY-touches[id].y)*0.006;'
-    +'    cth-=dx;cph=Math.max(0.05,Math.min(Math.PI-0.05,cph+dy));'
-    +'    touches[id]={x:t.clientX,y:t.clientY};upCam();'
-    +'  }else if(e.touches.length===2){'
+    +'var touches={};'
+    +'var lastPinchDist=null;'
+    +'document.addEventListener("touchstart",function(e){'
+    +'  e.preventDefault();'
+    +'  Array.from(e.changedTouches).forEach(function(t){touches[t.identifier]={x:t.clientX,y:t.clientY};});'
+    +'},{passive:false});'
+    +'document.addEventListener("touchmove",function(e){'
+    +'  e.preventDefault();'
+    +'  var ids=Object.keys(touches);'
+    +'  if(ids.length===1&&e.touches.length===1){'
+    +'    var t=e.touches[0];'
+    +'    var dx=(t.clientX-touches[ids[0]].x)*0.006, dy=(t.clientY-touches[ids[0]].y)*0.006;'
+    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
+    +'    touches[ids[0]]={x:t.clientX,y:t.clientY};'
+    +'    updateCameraPos();'
+    +'  } else if(e.touches.length===2){'
     +'    var t0=e.touches[0],t1=e.touches[1];'
-    +'    var d=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);'
-    +'    if(lpd){cr=Math.max(0.5,Math.min(100,cr*(lpd/d)));upCam();}lpd=d;'
+    +'    var dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);'
+    +'    if(lastPinchDist){camR=Math.max(1,Math.min(100,camR*(lastPinchDist/dist)));updateCameraPos();}'
+    +'    lastPinchDist=dist;'
     +'    touches[t0.identifier]={x:t0.clientX,y:t0.clientY};'
     +'    touches[t1.identifier]={x:t1.clientX,y:t1.clientY};'
     +'  }'
     +'},{passive:false});'
-    +'document.addEventListener("touchend",function(e){Array.from(e.changedTouches).forEach(function(t){delete touches[t.identifier];});if(Object.keys(touches).length<2)lpd=null;},{passive:false});'
-    // Kamera-Presets
-    +'function setV(m){if(m==="t"){cph=0.01;cr=D.span*2;}else if(m==="f"){cph=Math.PI/2;cth=0;cr=D.span*1.5;}else if(m==="i"){cph=Math.PI/4;cth=Math.PI/4;cr=D.span*1.5;}else{cph=Math.PI/3.5;cth=Math.PI/6;cr=D.span*1.2;}upCam();}'
-    +'function resetV(){ct.set(D.cx,0,D.cz);cr=cd;cph=Math.PI/4;cth=0;upCam();}'
-    // Raycasting Tooltip
-    +'var ray=new THREE.Raycaster(),mv=new THREE.Vector2(),tip=document.getElementById("tip");'
-    +'document.addEventListener("mousemove",function(e){'
-    +'  mv.x=(e.clientX/innerWidth)*2-1;mv.y=-(e.clientY/innerHeight)*2+1;'
-    +'  ray.setFromCamera(mv,cam);'
-    +'  var all=[];["k","s"].forEach(function(k){objs[k].forEach(function(o){if(o.isMesh)all.push(o);});});'
-    +'  var h=ray.intersectObjects(all);'
-    +'  if(h.length&&h[0].object.userData.label){'
-    +'    var ud=h[0].object.userData,t=ud.label;'
-    +'    if(ud.circuit)t+=" · SK "+ud.circuit;if(ud.laenge)t+=" · "+ud.laenge+"m";if(ud.vl)t+=" · "+ud.vl;if(ud.hoehe)t+=" · "+ud.hoehe+"cm";'
-    +'    tip.textContent=t;tip.style.display="block";'
-    +'  }else tip.style.display="none";'
-    +'});'
-    // Resize + Animate
-    +'window.addEventListener("resize",function(){cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});'
-    +'(function loop(){requestAnimationFrame(loop);R.render(scene,cam);})();'
-    +'<\/script></body></html>';
+    +'document.addEventListener("touchend",function(e){'
+    +'  Array.from(e.changedTouches).forEach(function(t){delete touches[t.identifier];});'
+    +'  if(Object.keys(touches).length<2) lastPinchDist=null;'
+    +'},{passive:false});'
 
-  var w3=window.open('','_blank','width=1200,height=800');
-  if(!w3){alert('Popup blockiert \u2014 bitte erlauben');return;}
-  w3.document.write(html);w3.document.close();
+    // Kamera-Presets
+    +'function setCam(mode){'
+    +'  if(mode==="top"){camPhi=0.01;camR=D.span*2;}'
+    +'  else if(mode==="front"){camPhi=Math.PI/2;camTheta=0;camR=D.span*1.5;}'
+    +'  else if(mode==="iso"){camPhi=Math.PI/4;camTheta=Math.PI/4;camR=D.span*1.5;}'
+    +'  else{camPhi=Math.PI/3.5;camTheta=Math.PI/6;camR=D.span*1.2;}'
+    +'  updateCameraPos();'
+    +'}'
+    +'function resetCam(){camTarget.set(D.cx,0,D.cz);camR=camDist;camPhi=Math.PI/4;camTheta=0;updateCameraPos();}'
+
+    // Layer toggle
+    +'function toggleLayer(name,val){'
+    +'  layers3d[name]=val;'
+    +'  (layerObjs[name]||[]).forEach(function(o){o.visible=val;});'
+    +'}'
+
+    // Raycasting für Tooltip
+    +'var raycaster=new THREE.Raycaster();'
+    +'var mouse2=new THREE.Vector2();'
+    +'var tooltip=document.getElementById("tooltip");'
+    +'document.addEventListener("mousemove",function(e){'
+    +'  mouse2.x=(e.clientX/window.innerWidth)*2-1;'
+    +'  mouse2.y=-(e.clientY/window.innerHeight)*2+1;'
+    +'  raycaster.setFromCamera(mouse2,camera);'
+    +'  var allMeshes=[];'
+    +'  ["wires","symbols"].forEach(function(k){layerObjs[k].forEach(function(o){if(o.isMesh)allMeshes.push(o);});});'
+    +'  var hits=raycaster.intersectObjects(allMeshes);'
+    +'  if(hits.length&&hits[0].object.userData.label){'
+    +'    var d=hits[0].object.userData;'
+    +'    var txt=d.label;'
+    +'    if(d.circuit) txt+=" · SK "+d.circuit;'
+    +'    if(d.laenge)  txt+=" · "+d.laenge+"m";'
+    +'    if(d.verlegeart) txt+=" · "+d.verlegeart;'
+    +'    if(d.hoehe)   txt+=" · "+d.hoehe+"cm";'
+    +'    tooltip.textContent=txt; tooltip.style.display="block";'
+    +'  } else { tooltip.style.display="none"; }'
+    +'});'
+
+    // Resize
+    +'window.addEventListener("resize",function(){'
+    +'  camera.aspect=window.innerWidth/window.innerHeight;'
+    +'  camera.updateProjectionMatrix();'
+    +'  renderer.setSize(window.innerWidth,window.innerHeight);'
+    +'});'
+
+    // Animate
+    +'updateCameraPos();'
+    +'(function animate(){'
+    +'  requestAnimationFrame(animate);'
+    +'  renderer.render(scene,camera);'
+    +'})();'
+    +'<\/script>'
+    +'</body></html>';
+
+  var w3 = window.open('', '_blank', 'width=1200,height=800');
+  if (!w3) { alert('Popup blockiert \u2014 bitte erlauben'); return; }
+  w3.document.write(html);
+  w3.document.close();
 }
 
 function gz3d_wireColor(wire) {
   if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
-  return (PHASE_COLORS && PHASE_COLORS[wire.phase]) || '#e74c3c';
+  return PHASE_COLORS[wire.phase] || '#e74c3c';
+}
+
+
+// ═══════════════════════════════════════════════════
+//  GRUNDRISS PDF DRUCK
+// ═══════════════════════════════════════════════════
+function openGrundrissdruckDialog() {
+  var orient = canvas.width > canvas.height ? 'landscape' : 'portrait';
+  var dlg = document.getElementById('gz-druck-dlg');
+  if (dlg) dlg.remove();
+  function ro(name,val,label,chk){ return '<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="radio" name="'+name+'" value="'+val+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>'; }
+  function cb(id,label,chk){ return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623;width:14px;height:14px"> '+label+'</label>'; }
+  function lrow(id,label,chk){ return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>'; }
+  var h = '<div id="gz-druck-dlg" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center">'
+    +'<div style="background:var(--bg);border:1px solid var(--bd2);border-radius:12px;padding:22px 24px;width:520px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<h2 style="font-size:14px;font-weight:700;color:var(--tx);margin:0">🖨 Grundriss drucken / PDF</h2>'
+    +'<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer">✕</button></div>'
+    // Ebenen
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">🗂 Ebenen</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +lrow('gz-l-fp','🗺 Grundrissbild',true)+lrow('gz-l-rm','⬜ Räume',true)
+    +lrow('gz-l-sy','⚡ Symbole',true)+lrow('gz-l-lb','🔤 Beschriftung',true)
+    +lrow('gz-l-wi','〰 Kabellinien',true)+lrow('gz-l-ci','🔢 Stromkreise',true)
+    +lrow('gz-l-wl','📏 Kabellängen',true)+lrow('gz-l-tr','📦 Trassen',true)
+    +'</div>'
+    +'<div style="margin-top:7px;display:flex;gap:6px">'
+    +'<button onclick="[\'gz-l-fp\',\'gz-l-rm\',\'gz-l-sy\',\'gz-l-lb\',\'gz-l-wi\',\'gz-l-ci\',\'gz-l-wl\',\'gz-l-tr\'].forEach(function(i){var e=document.getElementById(i);if(e)e.checked=true;})" style="font-size:10px;padding:3px 9px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle ein</button>'
+    +'<button onclick="[\'gz-l-fp\',\'gz-l-rm\',\'gz-l-sy\',\'gz-l-lb\',\'gz-l-wi\',\'gz-l-ci\',\'gz-l-wl\',\'gz-l-tr\'].forEach(function(i){var e=document.getElementById(i);if(e)e.checked=false;})" style="font-size:10px;padding:3px 9px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle aus</button>'
+    +'</div></div>'
+    // Format + Skalierung + Rand
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Format</div>'
+    +ro('gz-or','portrait','📄 Hochformat',orient==='portrait')+ro('gz-or','landscape','📄 Querformat',orient==='landscape')+'</div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Skalierung</div>'
+    +ro('gz-sc','fit','Seite füllen',true)+ro('gz-sc','75','75%',false)+ro('gz-sc','50','50%',false)+'</div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Rand</div>'
+    +ro('gz-mg','5','Schmal 5mm',false)+ro('gz-mg','10','Normal 10mm',true)+ro('gz-mg','20','Breit 20mm',false)+'</div></div>'
+    // Optionen
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 14px;margin-bottom:16px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Optionen</div>'
+    +'<div style="display:flex;gap:16px;flex-wrap:wrap">'
+    +cb('gz-ok','Kopfzeile',true)+cb('gz-ol','Legende',true)+cb('gz-of','Fußzeile',true)+cb('gz-or2','Rahmen',true)
+    +'</div></div>'
+    // Buttons
+    +'<div style="display:flex;gap:10px">'
+    +'<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="flex:1;padding:11px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer;font-size:12px">Abbrechen</button>'
+    +'<button onclick="druckGrundrissNurPDF()" style="flex:2;padding:11px;border:none;border-radius:6px;background:#f5a623;color:#fff;cursor:pointer;font-size:12px;font-weight:700">🖨 Drucken / Als PDF speichern</button>'
+    +'</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
+}
+
+function druckGrundrissNurPDF() {
+  var orient = document.querySelector('input[name="gz-or"]:checked').value;
+  var scale  = document.querySelector('input[name="gz-sc"]:checked').value;
+  var margin = document.querySelector('input[name="gz-mg"]:checked').value;
+  var showK = document.getElementById('gz-ok').checked;
+  var showL = document.getElementById('gz-ol').checked;
+  var showF = document.getElementById('gz-of').checked;
+  var showR = document.getElementById('gz-or2').checked;
+  var layers = {
+    fp: document.getElementById('gz-l-fp').checked,
+    rm: document.getElementById('gz-l-rm').checked,
+    sy: document.getElementById('gz-l-sy').checked,
+    lb: document.getElementById('gz-l-lb').checked,
+    wi: document.getElementById('gz-l-wi').checked,
+    ci: document.getElementById('gz-l-ci').checked,
+    wl: document.getElementById('gz-l-wl').checked,
+    tr: document.getElementById('gz-l-tr').checked,
+  };
+  document.getElementById('gz-druck-dlg').remove();
+
+  // Canvas rendern
+  var ec = document.createElement('canvas');
+  ec.width = canvas.width; ec.height = canvas.height;
+  var ex = ec.getContext('2d');
+  ex.fillStyle = '#fff'; ex.fillRect(0,0,ec.width,ec.height);
+  ex.drawImage(canvas,0,0);
+  var imgData = ec.toDataURL('image/png');
+
+  var pn = document.getElementById('projName').value || 'Grundriss';
+  var pd = projData || {};
+  var heute = new Date().toLocaleDateString('de-DE');
+  var planName = pn;
+  if (state.activeFloorplanId && state.floorplans) {
+    var fp2 = state.floorplans.find(function(f){return f.id===state.activeFloorplanId;});
+    if (fp2 && fp2.name) planName = pn + ' \u2014 ' + fp2.name;
+  }
+  // Legende
+  var legHTML = '';
+  if (showL && state.symbols.length) {
+    var sc2 = {};
+    state.symbols.forEach(function(s){ var n=(SYMBOLS[s.type]&&SYMBOLS[s.type].name)||s.type; sc2[n]=(sc2[n]||0)+(s.count||1); });
+    var rows = Object.keys(sc2).map(function(k){ return '<tr><td style="padding:2px 5px;font-size:8px;border:1px solid #e0e0e0">'+k+'</td><td style="padding:2px 5px;font-size:8px;font-weight:700;text-align:right;border:1px solid #e0e0e0">'+sc2[k]+'</td></tr>'; }).join('');
+    legHTML = '<div style="width:130px;flex-shrink:0;padding-left:8px"><div style="font-size:7px;font-weight:700;color:#f5a623;text-transform:uppercase;border-bottom:1.5px solid #f5a623;padding-bottom:2px;margin-bottom:4px">Legende</div><table style="border-collapse:collapse;width:100%"><thead><tr><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px;text-align:left">Symbol</th><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px">Anz.</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }
+  var kopf = showK ? '<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #f5a623;padding-bottom:5px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;color:#f5a623">&#9889; '+planName+'</div><div style="font-size:8px;color:#666">'+heute+(pd.kundenname?' | '+pd.kundenname:'')+'</div></div>' : '';
+  var fuss = showF ? '<div style="border-top:1px solid #ddd;margin-top:8px;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#aaa"><span>&#9889; Anvolt GmbH</span><span>'+planName+'</span><span>'+heute+'</span></div>' : '';
+  var imgStyle = (showR?'border:1px solid #bbb;':'')+'display:block;'+(scale==='fit'?'width:100%;height:auto;':'max-width:'+scale+'%;height:auto;');
+  var css = '@page{size:A4 '+orient+';margin:'+margin+'mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#222;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+planName+'</title><style>'+css+'</style></head><body>'+kopf+'<div style="display:flex;align-items:flex-start"><div style="flex:1;min-width:0"><img id="pi" src="'+imgData+'" style="'+imgStyle+'"></div>'+legHTML+'</div>'+fuss+'<script>var i=document.getElementById("pi");function dp(){setTimeout(function(){window.print();},200);}if(i.complete)dp();else i.onload=dp;<\/script></body></html>';
+  var w=window.open('','_blank');
+  if(!w){alert('Popup blockiert');return;}
+  w.document.write(html);w.document.close();
 }
 
 // ═══════════════════════════════════════════════════
@@ -9292,10 +9591,12 @@ function raumFinishPoly() {
     return;
   }
   document.getElementById('raumDrawBanner').style.display = 'none';
-  document.getElementById('raumNamePanel').style.display = 'block';
-  const input = document.getElementById('raumNameInput');
-  input.value = '';
-  input.focus();
+  // Speichern-Zeile im Seitenpanel einblenden
+  var sr = document.getElementById('raumSaveRow');
+  if (sr) sr.style.display = 'flex';
+  var inp = document.getElementById('raumNameInput');
+  if (inp) { inp.value = ''; inp.focus(); }
+  document.getElementById('raumStatus').textContent = '✏ Name eingeben → Raum speichern';
 }
 
 // Name bestätigt → Raum endgültig speichern
@@ -9306,15 +9607,19 @@ function confirmRaumName() {
   state.raeume.push(r);
   saveUndo();
   render();
-  document.getElementById('raumNamePanel').style.display = 'none';
-  document.getElementById('raumStatus').textContent = '✅ Raum "'+name+'" angelegt';
+  var sr = document.getElementById('raumSaveRow');
+  if (sr) sr.style.display = 'none';
+  var inp = document.getElementById('raumNameInput');
+  if (inp) inp.value = '';
+  document.getElementById('raumStatus').textContent = '✅ "'+name+'" angelegt — weiter zeichnen';
   setStatus('✅ Raum "'+name+'" definiert');
   raumStopDraw();
 }
 
-// Namenseingabe abgebrochen → Punkte verwerfen, zurück zum Zeichnen-Panel
+// Namenseingabe abgebrochen
 function cancelRaumNaming() {
-  document.getElementById('raumNamePanel').style.display = 'none';
+  var sr = document.getElementById('raumSaveRow');
+  if (sr) sr.style.display = 'none';
   _raum.polyPts = [];
   raumStopDraw();
 }
