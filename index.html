@@ -3096,6 +3096,7 @@ let _iMode = 'sym';   // 'sym' | 'wire'
 let _iSymId = null;
 let _iWireIdx = null;
 let _iSel = { montage:'UP', kbzf:'unten', hoehe:40, raumhoehe:250, verlegeart:'UP', trasseHoehe:20, rohrTyp:'' };
+var _gz_print = { cropRect: null, active: false, _handlers: null }; // Druckbereich-Auswahl
 var _symSizeMemory = {}; // Größe pro Symboltyp merken
 // Remembered wire install settings (reused for next wire)
 let _pendingWI = { verlegeart:'UP', trasseHoehe:20, rohrTyp:'', wireType:'strom' };
@@ -7580,19 +7581,93 @@ function gz3d_wireColor(wire) {
 // ═══════════════════════════════════════════════════
 //  GRUNDRISS PDF DRUCK
 // ═══════════════════════════════════════════════════
+// ── Bereichsauswahl mit Pointer Events (Maus + Touch) ──
+function gz_startCropSelect() {
+  gz_stopCropSelect();
+  _gz_print.active = true;
+  _gz_print.cropRect = null;
+  var start = null;
+  canvas.style.cursor = 'crosshair';
+  setStatus('✂ Bereich markieren: Drücken und ziehen — loslassen zum Bestätigen');
+  function getPos(e) {
+    var r=canvas.getBoundingClientRect(), src=e.touches?e.touches[0]:e;
+    var cx=(src.clientX-r.left)*(canvas.width/r.width);
+    var cy=(src.clientY-r.top)*(canvas.height/r.height);
+    return {x:(cx-state.pan.x)/state.zoom, y:(cy-state.pan.y)/state.zoom};
+  }
+  function onDown(e) { if(!_gz_print.active)return; e.preventDefault(); e.stopPropagation(); start=getPos(e); gz_drawCropOverlay(start,start); }
+  function onMove(e) { if(!start||!_gz_print.active)return; e.preventDefault(); e.stopPropagation(); gz_drawCropOverlay(start,getPos(e)); }
+  function onUp(e) {
+    if(!start)return; e.preventDefault(); e.stopPropagation();
+    var src=e.changedTouches?e.changedTouches[0]:e;
+    var r=canvas.getBoundingClientRect();
+    var cx=(src.clientX-r.left)*(canvas.width/r.width);
+    var cy=(src.clientY-r.top)*(canvas.height/r.height);
+    var end={x:(cx-state.pan.x)/state.zoom, y:(cy-state.pan.y)/state.zoom};
+    var x1=Math.min(start.x,end.x),y1=Math.min(start.y,end.y);
+    var x2=Math.max(start.x,end.x),y2=Math.max(start.y,end.y);
+    if(x2-x1>10&&y2-y1>10) _gz_print.cropRect={x:x1,y:y1,w:x2-x1,h:y2-y1};
+    gz_stopCropSelect(); gz_drawCropOverlay(start,end); start=null;
+    setStatus(_gz_print.cropRect?'✅ Bereich markiert — jetzt 🖨 PDF klicken':'⚠ Bereich zu klein — nochmal versuchen');
+    setTimeout(function(){openGrundrissdruckDialog();},200);
+  }
+  canvas.addEventListener('pointerdown',onDown,{passive:false});
+  canvas.addEventListener('pointermove',onMove,{passive:false});
+  canvas.addEventListener('pointerup',onUp,{passive:false});
+  canvas.addEventListener('pointercancel',function(){gz_stopCropSelect();render();},{passive:false});
+  _gz_print._handlers={down:onDown,move:onMove,up:onUp};
+}
+function gz_stopCropSelect() {
+  _gz_print.active=false; canvas.style.cursor='';
+  if(_gz_print._handlers){
+    canvas.removeEventListener('pointerdown',_gz_print._handlers.down);
+    canvas.removeEventListener('pointermove',_gz_print._handlers.move);
+    canvas.removeEventListener('pointerup',_gz_print._handlers.up);
+    _gz_print._handlers=null;
+  }
+}
+function gz_drawCropOverlay(s,e2) {
+  render(); if(!s||!e2)return;
+  var x1w=Math.min(s.x,e2.x),y1w=Math.min(s.y,e2.y);
+  var x2w=Math.max(s.x,e2.x),y2w=Math.max(s.y,e2.y);
+  var x1=x1w*state.zoom+state.pan.x,y1=y1w*state.zoom+state.pan.y;
+  var x2=x2w*state.zoom+state.pan.x,y2=y2w*state.zoom+state.pan.y;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.fillRect(0,0,canvas.width,y1); ctx.fillRect(0,y2,canvas.width,canvas.height-y2);
+  ctx.fillRect(0,y1,x1,y2-y1); ctx.fillRect(x2,y1,canvas.width-x2,y2-y1);
+  ctx.strokeStyle='#f5a623'; ctx.lineWidth=2; ctx.setLineDash([7,3]);
+  ctx.strokeRect(x1,y1,x2-x1,y2-y1); ctx.setLineDash([]);
+  [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(function(p){ctx.fillStyle='#f5a623';ctx.fillRect(p[0]-5,p[1]-5,10,10);});
+  var wm=state.scale?((x2w-x1w)/state.scale).toFixed(1)+'m x '+((y2w-y1w)/state.scale).toFixed(1)+'m':Math.round(x2w-x1w)+'x'+Math.round(y2w-y1w)+'px';
+  ctx.fillStyle='rgba(0,0,0,.75)'; ctx.fillRect(x1+4,y1+4,wm.length*7+8,18);
+  ctx.fillStyle='#f5a623'; ctx.font='bold 11px monospace'; ctx.fillText(wm,x1+8,y1+16);
+  ctx.restore();
+}
+function gz_clearCrop() { _gz_print.cropRect=null; render(); }
+
 function openGrundrissdruckDialog() {
-  var orient = canvas.width > canvas.height ? 'landscape' : 'portrait';
-  var dlg = document.getElementById('gz-druck-dlg');
-  if (dlg) dlg.remove();
-  function ro(name,val,label,chk){ return '<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="radio" name="'+name+'" value="'+val+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>'; }
-  function cb(id,label,chk){ return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623;width:14px;height:14px"> '+label+'</label>'; }
-  function lrow(id,label,chk){ return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>'; }
-  var h = '<div id="gz-druck-dlg" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center">'
-    +'<div style="background:var(--bg);border:1px solid var(--bd2);border-radius:12px;padding:22px 24px;width:520px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+  var orient=canvas.width>canvas.height?'landscape':'portrait';
+  var crop=_gz_print.cropRect;
+  var dlg=document.getElementById('gz-druck-dlg'); if(dlg)dlg.remove();
+  function ro(name,val,label,chk){return '<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="radio" name="'+name+'" value="'+val+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>';}
+  function cb(id,label,chk){return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;margin-bottom:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623;width:14px;height:14px"> '+label+'</label>';}
+  function lrow(id,label,chk){return '<label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:5px"><input type="checkbox" id="'+id+'" '+(chk?'checked':'')+' style="accent-color:#f5a623"> '+label+'</label>';}
+  var cropStatus=crop?('✅ Bereich: '+(state.scale?((crop.w/state.scale).toFixed(1)+'m x '+(crop.h/state.scale).toFixed(1)+'m'):(Math.round(crop.w)+'x'+Math.round(crop.h)+'px'))):'Ganzer Grundriss';
+  var h='<div id="gz-druck-dlg" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center">'
+    +'<div style="background:var(--bg);border:1px solid var(--bd2);border-radius:12px;padding:22px 24px;width:530px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
     +'<h2 style="font-size:14px;font-weight:700;color:var(--tx);margin:0">🖨 Grundriss drucken / PDF</h2>'
-    +'<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer">✕</button></div>'
-    // Ebenen
+    +'<button onclick="gz_stopCropSelect();render();document.getElementById(\'gz-druck-dlg\').remove()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer">✕</button></div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">✂ Druckbereich</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<button onclick="document.getElementById(\'gz-druck-dlg\').style.display=\'none\';gz_startCropSelect()" style="padding:8px 14px;border:1.5px solid #f5a623;border-radius:6px;background:rgba(245,166,35,.12);color:#f5a623;cursor:pointer;font-size:11px;font-weight:700">✂ Bereich markieren</button>'
+    +'<button onclick="gz_clearCrop();document.getElementById(\'gz-crop-status\').textContent=\'Ganzer Grundriss\';document.getElementById(\'gz-crop-status\').style.color=\'var(--tx3)\';" style="padding:8px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx2);cursor:pointer;font-size:11px">✕ Zurücksetzen</button>'
+    +'</div>'
+    +'<div style="font-size:9px;color:var(--tx3);margin-bottom:5px">Klick auf Bereich markieren, dann auf dem Grundriss Rechteck ziehen</div>'
+    +'<div id="gz-crop-status" style="font-size:11px;font-weight:600;color:'+(crop?'#27ae60':'var(--tx3)')+'">'+cropStatus+'</div>'
+    +'</div>'
     +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
     +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">🗂 Ebenen</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
@@ -7605,87 +7680,87 @@ function openGrundrissdruckDialog() {
     +'<button onclick="[\'gz-l-fp\',\'gz-l-rm\',\'gz-l-sy\',\'gz-l-lb\',\'gz-l-wi\',\'gz-l-ci\',\'gz-l-wl\',\'gz-l-tr\'].forEach(function(i){var e=document.getElementById(i);if(e)e.checked=true;})" style="font-size:10px;padding:3px 9px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle ein</button>'
     +'<button onclick="[\'gz-l-fp\',\'gz-l-rm\',\'gz-l-sy\',\'gz-l-lb\',\'gz-l-wi\',\'gz-l-ci\',\'gz-l-wl\',\'gz-l-tr\'].forEach(function(i){var e=document.getElementById(i);if(e)e.checked=false;})" style="font-size:10px;padding:3px 9px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer">Alle aus</button>'
     +'</div></div>'
-    // Format + Skalierung + Rand
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">'
-    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Format</div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px"><div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Format</div>'
     +ro('gz-or','portrait','📄 Hochformat',orient==='portrait')+ro('gz-or','landscape','📄 Querformat',orient==='landscape')+'</div>'
-    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Skalierung</div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px"><div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Skalierung</div>'
     +ro('gz-sc','fit','Seite füllen',true)+ro('gz-sc','75','75%',false)+ro('gz-sc','50','50%',false)+'</div>'
-    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-    +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Rand</div>'
+    +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px"><div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Rand</div>'
     +ro('gz-mg','5','Schmal 5mm',false)+ro('gz-mg','10','Normal 10mm',true)+ro('gz-mg','20','Breit 20mm',false)+'</div></div>'
-    // Optionen
     +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 14px;margin-bottom:16px">'
     +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Optionen</div>'
     +'<div style="display:flex;gap:16px;flex-wrap:wrap">'
     +cb('gz-ok','Kopfzeile',true)+cb('gz-ol','Legende',true)+cb('gz-of','Fußzeile',true)+cb('gz-or2','Rahmen',true)
     +'</div></div>'
-    // Buttons
     +'<div style="display:flex;gap:10px">'
-    +'<button onclick="document.getElementById(\'gz-druck-dlg\').remove()" style="flex:1;padding:11px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer;font-size:12px">Abbrechen</button>'
+    +'<button onclick="gz_stopCropSelect();render();document.getElementById(\'gz-druck-dlg\').remove()" style="flex:1;padding:11px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer;font-size:12px">Abbrechen</button>'
     +'<button onclick="druckGrundrissNurPDF()" style="flex:2;padding:11px;border:none;border-radius:6px;background:#f5a623;color:#fff;cursor:pointer;font-size:12px;font-weight:700">🖨 Drucken / Als PDF speichern</button>'
     +'</div></div></div>';
-  document.body.insertAdjacentHTML('beforeend', h);
+  document.body.insertAdjacentHTML('beforeend',h);
+  canvas.addEventListener('pointerup',function _rd(){
+    canvas.removeEventListener('pointerup',_rd);
+    var d=document.getElementById('gz-druck-dlg');
+    if(d&&d.style.display==='none')setTimeout(function(){d.style.display='flex';},250);
+  });
 }
 
 function druckGrundrissNurPDF() {
-  var orient = document.querySelector('input[name="gz-or"]:checked').value;
-  var scale  = document.querySelector('input[name="gz-sc"]:checked').value;
-  var margin = document.querySelector('input[name="gz-mg"]:checked').value;
-  var showK = document.getElementById('gz-ok').checked;
-  var showL = document.getElementById('gz-ol').checked;
-  var showF = document.getElementById('gz-of').checked;
-  var showR = document.getElementById('gz-or2').checked;
-  var layers = {
-    fp: document.getElementById('gz-l-fp').checked,
-    rm: document.getElementById('gz-l-rm').checked,
-    sy: document.getElementById('gz-l-sy').checked,
-    lb: document.getElementById('gz-l-lb').checked,
-    wi: document.getElementById('gz-l-wi').checked,
-    ci: document.getElementById('gz-l-ci').checked,
-    wl: document.getElementById('gz-l-wl').checked,
-    tr: document.getElementById('gz-l-tr').checked,
-  };
+  var orient=document.querySelector('input[name="gz-or"]:checked').value;
+  var scale=document.querySelector('input[name="gz-sc"]:checked').value;
+  var margin=document.querySelector('input[name="gz-mg"]:checked').value;
+  var showK=document.getElementById('gz-ok').checked;
+  var showL=document.getElementById('gz-ol').checked;
+  var showF=document.getElementById('gz-of').checked;
+  var showR=document.getElementById('gz-or2').checked;
   document.getElementById('gz-druck-dlg').remove();
-
-  // Canvas rendern
-  var ec = document.createElement('canvas');
-  ec.width = canvas.width; ec.height = canvas.height;
-  var ex = ec.getContext('2d');
-  ex.fillStyle = '#fff'; ex.fillRect(0,0,ec.width,ec.height);
-  ex.drawImage(canvas,0,0);
-  var imgData = ec.toDataURL('image/png');
-
-  var pn = document.getElementById('projName').value || 'Grundriss';
-  var pd = projData || {};
-  var heute = new Date().toLocaleDateString('de-DE');
-  var planName = pn;
-  if (state.activeFloorplanId && state.floorplans) {
-    var fp2 = state.floorplans.find(function(f){return f.id===state.activeFloorplanId;});
-    if (fp2 && fp2.name) planName = pn + ' \u2014 ' + fp2.name;
+  gz_stopCropSelect();
+  var crop=_gz_print.cropRect;
+  var srcX,srcY,srcW,srcH;
+  if(crop){
+    srcX=Math.round(crop.x*state.zoom+state.pan.x);
+    srcY=Math.round(crop.y*state.zoom+state.pan.y);
+    srcW=Math.round(crop.w*state.zoom);
+    srcH=Math.round(crop.h*state.zoom);
+    srcX=Math.max(0,srcX); srcY=Math.max(0,srcY);
+    srcW=Math.min(srcW,canvas.width-srcX);
+    srcH=Math.min(srcH,canvas.height-srcY);
+  } else { srcX=0; srcY=0; srcW=canvas.width; srcH=canvas.height; }
+  var DPR=2;
+  var ec=document.createElement('canvas');
+  ec.width=srcW*DPR; ec.height=srcH*DPR;
+  var ex=ec.getContext('2d');
+  ex.fillStyle='#ffffff'; ex.fillRect(0,0,ec.width,ec.height);
+  ex.drawImage(canvas,srcX,srcY,srcW,srcH,0,0,ec.width,ec.height);
+  var imgData=ec.toDataURL('image/png');
+  render();
+  var pn=document.getElementById('projName').value||'Grundriss';
+  var pd=projData||{};
+  var heute=new Date().toLocaleDateString('de-DE');
+  var planName=pn;
+  if(state.activeFloorplanId&&state.floorplans){
+    var fp2=state.floorplans.find(function(f){return f.id===state.activeFloorplanId;});
+    if(fp2&&fp2.name)planName=pn+' \u2014 '+fp2.name;
   }
-  // Legende
-  var legHTML = '';
-  if (showL && state.symbols.length) {
-    var sc2 = {};
-    state.symbols.forEach(function(s){ var n=(SYMBOLS[s.type]&&SYMBOLS[s.type].name)||s.type; sc2[n]=(sc2[n]||0)+(s.count||1); });
-    var rows = Object.keys(sc2).map(function(k){ return '<tr><td style="padding:2px 5px;font-size:8px;border:1px solid #e0e0e0">'+k+'</td><td style="padding:2px 5px;font-size:8px;font-weight:700;text-align:right;border:1px solid #e0e0e0">'+sc2[k]+'</td></tr>'; }).join('');
-    legHTML = '<div style="width:130px;flex-shrink:0;padding-left:8px"><div style="font-size:7px;font-weight:700;color:#f5a623;text-transform:uppercase;border-bottom:1.5px solid #f5a623;padding-bottom:2px;margin-bottom:4px">Legende</div><table style="border-collapse:collapse;width:100%"><thead><tr><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px;text-align:left">Symbol</th><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px">Anz.</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  if(crop)planName+=' (Ausschnitt)';
+  var legHTML='';
+  if(showL&&state.symbols.length){
+    var sc2={};
+    state.symbols.forEach(function(s){var n=(SYMBOLS[s.type]&&SYMBOLS[s.type].name)||s.type;sc2[n]=(sc2[n]||0)+(s.count||1);});
+    var rows=Object.keys(sc2).map(function(k){return '<tr><td style="padding:2px 5px;font-size:8px;border:1px solid #e0e0e0">'+k+'</td><td style="padding:2px 5px;font-size:8px;font-weight:700;text-align:right;border:1px solid #e0e0e0">'+sc2[k]+'</td></tr>';}).join('');
+    legHTML='<div style="width:130px;flex-shrink:0;padding-left:8px"><div style="font-size:7px;font-weight:700;color:#f5a623;text-transform:uppercase;border-bottom:1.5px solid #f5a623;padding-bottom:2px;margin-bottom:4px">Legende</div><table style="border-collapse:collapse;width:100%"><thead><tr><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px;text-align:left">Symbol</th><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px">Anz.</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   }
-  var kopf = showK ? '<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #f5a623;padding-bottom:5px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;color:#f5a623">&#9889; '+planName+'</div><div style="font-size:8px;color:#666">'+heute+(pd.kundenname?' | '+pd.kundenname:'')+'</div></div>' : '';
-  var fuss = showF ? '<div style="border-top:1px solid #ddd;margin-top:8px;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#aaa"><span>&#9889; Anvolt GmbH</span><span>'+planName+'</span><span>'+heute+'</span></div>' : '';
-  var imgStyle = (showR?'border:1px solid #bbb;':'')+'display:block;'+(scale==='fit'?'width:100%;height:auto;':'max-width:'+scale+'%;height:auto;');
-  var css = '@page{size:A4 '+orient+';margin:'+margin+'mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#222;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+planName+'</title><style>'+css+'</style></head><body>'+kopf+'<div style="display:flex;align-items:flex-start"><div style="flex:1;min-width:0"><img id="pi" src="'+imgData+'" style="'+imgStyle+'"></div>'+legHTML+'</div>'+fuss+'<script>var i=document.getElementById("pi");function dp(){setTimeout(function(){window.print();},200);}if(i.complete)dp();else i.onload=dp;<\/script></body></html>';
+  var metaStr=heute+(pd.kundenname?' | '+pd.kundenname:'');
+  if(crop&&state.scale)metaStr+=' | '+(crop.w/state.scale).toFixed(1)+'m x '+(crop.h/state.scale).toFixed(1)+'m';
+  var kopf=showK?'<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #f5a623;padding-bottom:5px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;color:#f5a623">&#9889; '+planName+'</div><div style="font-size:8px;color:#666">'+metaStr+'</div></div>':'';
+  var fuss=showF?'<div style="border-top:1px solid #ddd;margin-top:8px;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#aaa"><span>&#9889; Anvolt GmbH</span><span>'+planName+'</span><span>'+heute+'</span></div>':'';
+  var imgStyle=(showR?'border:1px solid #bbb;':'')+'display:block;'+(scale==='fit'?'width:100%;height:auto;':'max-width:'+scale+'%;height:auto;');
+  var css='@page{size:A4 '+orient+';margin:'+margin+'mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#222;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+planName+'</title><style>'+css+'</style></head><body>'+kopf+'<div style="display:flex;align-items:flex-start"><div style="flex:1;min-width:0"><img id="pi" src="'+imgData+'" style="'+imgStyle+'"></div>'+legHTML+'</div>'+fuss+'<script>var i=document.getElementById("pi");function dp(){setTimeout(function(){window.print();},200);}if(i.complete)dp();else i.onload=dp;<\/script></body></html>';
   var w=window.open('','_blank');
   if(!w){alert('Popup blockiert');return;}
   w.document.write(html);w.document.close();
 }
 
-// ═══════════════════════════════════════════════════
-//  XML EXPORT
 // ═══════════════════════════════════════════════════
 function exportXML() {
   const pn = document.getElementById('projName').value;
