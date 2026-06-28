@@ -605,7 +605,6 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
-      <button class="btn" style="background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.4);font-size:11px" onclick="exportGrundrissNurPDF()" title="Grundriss als PDF exportieren">🖨 PDF</button>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
       <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
       <button class="btn" style="background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.4);font-size:11px" onclick="openKTPanel()" title="Kabeltrasse zeichnen">🔲 Kabeltrasse</button>
@@ -3143,12 +3142,15 @@ function openWireInstModal(wIdx) {
   _iSel.trasseHoehe = wire.trasseHoehe || _pendingWI.trasseHoehe || 20;
   _iSel.rohrTyp     = wire.rohrTyp     || _pendingWI.rohrTyp || '';
   const len = wire.laenge_m ? wire.laenge_m+'m' : '—';
+  const lenDetail = (wire._h_m && wire._v_m)
+    ? ` <span style="font-size:9px;color:var(--tx3)">(↔ ${wire._h_m}m + ↕ ${wire._v_m}m Höhe)</span>`
+    : '';
   document.getElementById('instModalTitle').textContent = '🔌 Leitung — Verlegeeigenschaften';
   document.getElementById('instSymSec').style.display = 'none';
   document.getElementById('instWireSec').style.display = 'block';
   document.getElementById('iWireInfo').innerHTML =
     'Stromkreis: <strong>'+(wire.circuit||'—')+'</strong> · Phase: <strong>'+(wire.phase||'L1')+
-    '</strong> · Länge: <strong>'+len+'</strong> · Kabel: <strong>'+(wire.kabel||'—')+'</strong>';
+    '</strong> · Länge: <strong>'+len+'</strong>'+lenDetail+' · Kabel: <strong>'+(wire.kabel||'—')+'</strong>';
   document.getElementById('iTH').value = _iSel.trasseHoehe;
   document.getElementById('iRT').value = _iSel.rohrTyp;
   iUpdCards('verlegeart', _iSel.verlegeart, 'iw-');
@@ -3330,6 +3332,9 @@ function endWireDraw(pt) {
     adern: WIRE_TYPES[autoWireType]?.adern || 3,
     adernLabel: WIRE_TYPES[autoWireType]?.adernLabel || '',
   });
+
+  // Neu berechnen mit Höhenanteilen (srcId/dstId jetzt gesetzt)
+  recalcWireLength(state.wires[state.wires.length - 1]);
 
   const newIdx = state.wires.length - 1;
   _wirePts = []; _wireSrcId = null;
@@ -4974,13 +4979,49 @@ function hitTestWireMid(x, y) {
 }
 
 // Recalculate wire length after point move
+// ── Vertikaler Höhenanteil je Verlegeart ──
+// Gibt den zusätzlichen vertikalen Weg in Metern zurück,
+// der je nach Verlegeart über Decke / Boden / Wand anfällt.
+function calcVerticalAdd(wire) {
+  var srcSym = state.symbols.find(function(s){ return s.id === wire.srcId; });
+  var dstSym = state.symbols.find(function(s){ return s.id === wire.dstId; });
+  // Höhen in cm → m
+  var rh  = ((srcSym && srcSym.raumhoehe) || (dstSym && dstSym.raumhoehe) || state.raumhoehe || 250) / 100;
+  var hSrc = ((srcSym && srcSym.hoehe != null) ? srcSym.hoehe : 40) / 100;
+  var hDst = ((dstSym && dstSym.hoehe != null) ? dstSym.hoehe : 40) / 100;
+  var vl = wire.verlegeart || 'UP';
+
+  if (vl === 'UP' || vl === 'HR' || vl === 'EZ' || vl === 'HW') {
+    // Unterputz / Rohr / Hohlwand: hoch zur Decke, dann runter zum Ziel
+    return (rh - hSrc) + (rh - hDst);
+  } else if (vl === 'AP') {
+    // Aufputz / Kabelkanal: direkt auf Höhe, nur Höhendifferenz
+    return Math.abs(hSrc - hDst);
+  } else if (vl === 'HD') {
+    // Hohldecke: beide Seiten hoch zur Decke (Deckendurchführung)
+    return (rh - hSrc) + (rh - hDst);
+  } else if (vl === 'FU') {
+    // Fußboden / Estrich: runter zum Boden + hoch zum Ziel
+    return hSrc + hDst;
+  } else if (vl === 'ER') {
+    // Erdverlegung: kein Höhenaufschlag (Graben bereits flach)
+    return 0;
+  }
+  // Fallback: wie UP
+  return (rh - hSrc) + (rh - hDst);
+}
+
 function recalcWireLength(wire) {
   if (!state.scale) return;
-  let total = 0;
-  for (let i = 1; i < wire.points.length; i++) {
-    total += Math.hypot(wire.points[i].x-wire.points[i-1].x, wire.points[i].y-wire.points[i-1].y);
+  var total = 0;
+  for (var i = 1; i < wire.points.length; i++) {
+    total += Math.hypot(wire.points[i].x - wire.points[i-1].x, wire.points[i].y - wire.points[i-1].y);
   }
-  wire.laenge_m = (total / state.scale).toFixed(2);
+  var horizontal_m = total / state.scale;
+  var vertical_m   = calcVerticalAdd(wire);
+  wire.laenge_m    = (horizontal_m + vertical_m).toFixed(2);
+  wire._h_m        = horizontal_m.toFixed(2);  // Horizontalanteil (für Tooltip)
+  wire._v_m        = vertical_m.toFixed(2);    // Vertikalanteil (für Tooltip)
 }
 
 // Wire hit test
@@ -5843,18 +5884,24 @@ function buildSummaryData(syms, wires, byType, byKabel, wireTotal) {
     if (!geraeteByTyp[n]) geraeteByTyp[n] = { count:0, cat, abbr: SYMBOLS[s.type]?.abbr||'' };
     geraeteByTyp[n].count += (s.count||1);
   }
-  const totalGeraete   = Object.values(geraeteByTyp).reduce((a,v)=>a+v.count,0);
+  const totalGeraete = Object.values(geraeteByTyp).reduce((a,v)=>a+v.count,0);
 
-  // Kabel inkl. manueller Zuleitungen
-  const kabelMap = { ...byKabel };
-  const totalKabel = Object.values(kabelMap).reduce((a,v)=>a+v,0);
+  // Kabel inkl. manueller Zuleitungen + 15% Bestellaufschlag (Verschnitt/Reserve)
+  const AUFSCHLAG = 1.15;
+  const kabelMapRaw = { ...byKabel };
+  const kabelMap = {};
+  for (const k of Object.keys(kabelMapRaw)) {
+    kabelMap[k] = kabelMapRaw[k] * AUFSCHLAG;
+  }
+  const totalKabel     = Object.values(kabelMap).reduce((a,v)=>a+v,0);
+  const totalKabelNetto = Object.values(kabelMapRaw).reduce((a,v)=>a+v,0);
 
-  // Leitungen nach Typ
+  // Leitungen nach Typ + 15% Aufschlag
   const leitungByTyp = {};
   for (const w of wires) {
     const key = (WIRE_TYPES[w.wireType]?.label || w.wireType || 'Strom') + ' · ' + (w.kabel||'—');
     if (!leitungByTyp[key]) leitungByTyp[key] = { laenge:0, adern: w.adern||0, kabel: w.kabel||'—' };
-    leitungByTyp[key].laenge += parseFloat(w.laenge_m||0);
+    leitungByTyp[key].laenge += parseFloat(w.laenge_m||0) * AUFSCHLAG;
   }
 
   // Stromkreise
@@ -5862,16 +5909,17 @@ function buildSummaryData(syms, wires, byType, byKabel, wireTotal) {
 
   return {
     geraeteByTyp, totalGeraete,
-    kabelMap, totalKabel,
+    kabelMap, totalKabel, totalKabelNetto,
     leitungByTyp,
     skCount: skSet.size,
     wireCount: wires.length,
-    wireTotal,
+    wireTotal,          // Netto-Verlegelänge (ohne Aufschlag, für Leitungsverzeichnis)
+    wireTotalBestell: wireTotal * AUFSCHLAG,  // Bestellmenge inkl. 15%
   };
 }
 
 function renderSummaryHTML(sd, forPrint=false) {
-  const {geraeteByTyp, totalGeraete, kabelMap, totalKabel, leitungByTyp, skCount, wireCount, wireTotal} = sd;
+  const {geraeteByTyp, totalGeraete, kabelMap, totalKabel, totalKabelNetto, leitungByTyp, skCount, wireCount, wireTotal, wireTotalBestell} = sd;
   const BAR_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#2ecc71','#e91e63','#00bcd4'];
 
   const sf    = forPrint ? '#f8f8f8' : 'var(--sf)';
@@ -5895,13 +5943,13 @@ function renderSummaryHTML(sd, forPrint=false) {
     </div>
     <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
       <div style="font-size:26px;font-weight:700;font-family:${mono};color:${gr}">${totalKabel.toFixed(1)} m</div>
-      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Kabel gesamt</div>
-      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${Object.keys(kabelMap).length} Kabeltypen</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Kabel Bestellmenge <span style="color:${ac}">+15%</span></div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">Netto: ${(totalKabelNetto||totalKabel/1.15).toFixed(1)} m · ${Object.keys(kabelMap).length} Kabeltypen</div>
     </div>
     <div style="background:${sf};border:1px solid ${bd};border-radius:8px;padding:12px 14px">
-      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${bl}">${wireTotal.toFixed(1)} m</div>
-      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Leitungen verlegt</div>
-      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">${wireCount} Abschnitte</div>
+      <div style="font-size:26px;font-weight:700;font-family:${mono};color:${bl}">${(wireTotalBestell||wireTotal*1.15).toFixed(1)} m</div>
+      <div style="font-size:10px;color:${tx3};text-transform:uppercase;letter-spacing:.7px">Leitungen Bestell. <span style="color:${ac}">+15%</span></div>
+      <div style="font-size:10px;color:${tx2};font-family:${mono};margin-top:2px">Verlegt: ${wireTotal.toFixed(1)} m · ${wireCount} Abschn.</div>
     </div>
   </div>`;
 
@@ -5970,7 +6018,7 @@ function renderSummaryHTML(sd, forPrint=false) {
         <td style="border-top:2px solid ${bd}"></td>
       </tr></tfoot>
     </table>
-    <div style="margin-top:8px;font-size:9px;color:${tx3};font-family:${mono}">ℹ️ Inkl. manueller Zuleitungen · zzgl. 10–15% Verschnitt empfohlen</div>
+    <div style="margin-top:8px;font-size:9px;color:${tx3};font-family:${mono}">ℹ️ Inkl. manueller Zuleitungen · 15% Verschnitt/Reserve bereits eingerechnet · Verlegewege mit Montagehöhen kalkuliert</div>
   </div>` : '';
 
   // ── Block 4: Leitungen nach Typ ──
@@ -7052,110 +7100,6 @@ function exportFloorplanPDF() {
     w.document.write(html);
     w.document.close();
   }, 200);
-}
-
-// ═══════════════════════════════════════════════════
-//  GRUNDRISS-ONLY PDF EXPORT (nur Canvas, kein Stückliste)
-// ═══════════════════════════════════════════════════
-function exportGrundrissNurPDF() {
-  var pn = document.getElementById("projName").value || "Grundriss";
-  var pd = projData || {};
-  var heute = new Date().toLocaleDateString("de-DE");
-
-  var exportCanvas = document.createElement("canvas");
-  exportCanvas.width  = canvas.width;
-  exportCanvas.height = canvas.height;
-  var ectx = exportCanvas.getContext("2d");
-  ectx.fillStyle = "#ffffff";
-  ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-  ectx.drawImage(canvas, 0, 0);
-  var imgData = exportCanvas.toDataURL("image/png");
-
-  var symCounts = {};
-  for (var i = 0; i < state.symbols.length; i++) {
-    var s = state.symbols[i];
-    var nm = (SYMBOLS[s.type] && SYMBOLS[s.type].name) || s.type;
-    symCounts[nm] = (symCounts[nm] || 0) + (s.count || 1);
-  }
-  var legendeRows = Object.keys(symCounts).map(function(k) {
-    return "<tr><td>" + k + "</td><td style='text-align:right;font-weight:700'>" + symCounts[k] + "</td></tr>";
-  }).join("");
-  var legendeHTML = legendeRows
-    ? "<div class='legende'><h3>Legende</h3><table><thead><tr><th>Symbol</th><th>Anzahl</th></tr></thead><tbody>" + legendeRows + "</tbody></table></div>"
-    : "";
-
-  var scaleInfo = "";
-  if (state.scale && state.scale.px_per_m) {
-    scaleInfo = " | Massstab: " + state.scale.px_per_m.toFixed(1) + " px/m";
-  }
-
-  var planName = pn;
-  if (state.activeFloorplanId && state.floorplans) {
-    var fp = state.floorplans.find(function(f){ return f.id === state.activeFloorplanId; });
-    if (fp && fp.name) planName = pn + " — " + fp.name;
-  }
-
-  var infoBar = "";
-  if (pd.auftragsnr || pd.auftraggeber || pd.planer || pd.etage || pd.gewerk) {
-    infoBar = "<div class='info-bar'>";
-    if (pd.auftragsnr)   infoBar += "<span>Auftrag: <strong>" + pd.auftragsnr + "</strong></span>";
-    if (pd.auftraggeber) infoBar += "<span>Auftraggeber: <strong>" + pd.auftraggeber + "</strong></span>";
-    if (pd.planer)       infoBar += "<span>Planer: <strong>" + pd.planer + "</strong></span>";
-    if (pd.etage)        infoBar += "<span>Etage: <strong>" + pd.etage + "</strong></span>";
-    if (pd.gewerk)       infoBar += "<span>Gewerk: <strong>" + pd.gewerk + "</strong></span>";
-    infoBar += "</div>";
-  }
-
-  var metaExtra = "";
-  if (pd.kundenname) metaExtra += pd.kundenname + (pd.firma ? " — " + pd.firma : "") + "<br>";
-  if (pd.strasse)    metaExtra += pd.strasse + (pd.ort ? ", " + pd.ort : "") + "<br>";
-  metaExtra += "Erstellt: " + heute + scaleInfo;
-
-  var css = "*{box-sizing:border-box;margin:0;padding:0}"
-    + "body{font-family:Arial,sans-serif;font-size:11px;color:#222;background:#fff}"
-    + ".page{padding:12mm 10mm;min-height:100vh}"
-    + ".header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #f5a623;padding-bottom:8px;margin-bottom:10px}"
-    + ".logo{font-size:16px;font-weight:700;color:#f5a623}"
-    + ".meta{text-align:right;font-size:9px;color:#555;line-height:1.6}"
-    + ".meta strong{color:#222}"
-    + ".info-bar{display:flex;flex-wrap:wrap;gap:12px;font-size:9px;color:#555;margin-bottom:8px;background:#fafafa;border:1px solid #e0e0e0;border-radius:3px;padding:6px 10px}"
-    + ".info-bar span{display:flex;gap:4px}"
-    + ".info-bar strong{color:#222}"
-    + ".plan-wrap{border:1px solid #ccc;border-radius:3px;overflow:hidden;margin-bottom:10px;background:#fff}"
-    + ".plan-wrap img{width:100%;display:block}"
-    + ".legende{margin-top:8px}"
-    + ".legende h3{font-size:10px;font-weight:700;color:#f5a623;text-transform:uppercase;margin-bottom:5px;border-bottom:2px solid #f5a623;padding-bottom:3px}"
-    + "table{width:220px;border-collapse:collapse;font-size:9px}"
-    + "th{background:#f5a623;color:#fff;padding:3px 7px;text-align:left}"
-    + "td{border:1px solid #e0e0e0;padding:2px 7px}"
-    + "tr:nth-child(even) td{background:#fafafa}"
-    + ".footer{border-top:1px solid #ddd;margin-top:10px;padding-top:5px;font-size:8px;color:#999;display:flex;justify-content:space-between}"
-    + "@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{padding:6mm}}";
-
-  var html = "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'>"
-    + "<title>" + planName + "</title>"
-    + "<style>" + css + "</style>"
-    + "</head><body>"
-    + "<div class='page'>"
-    + "<div class='header'>"
-    + "<div class='logo'>&#9889; Elektro&#8209;Grundriss</div>"
-    + "<div class='meta'><strong>" + planName + "</strong><br>" + metaExtra + "</div>"
-    + "</div>"
-    + infoBar
-    + "<div class='plan-wrap'><img src='" + imgData + "'></div>"
-    + legendeHTML
-    + "<div class='footer'>"
-    + "<span>&#9889; Elektro-Grundriss Planer &#8212; Anvolt GmbH</span>"
-    + "<span>" + planName + "</span>"
-    + "<span>Erstellt: " + heute + "</span>"
-    + "</div></div>"
-    + "<script>window.onload=function(){window.print();}<\/script>"
-    + "</body></html>";
-
-  var w = window.open("", "_blank");
-  if (!w) { alert("Popup-Fenster wurde blockiert. Bitte Popup fuer diese Seite erlauben."); return; }
-  w.document.write(html);
-  w.document.close();
 }
 
 // ═══════════════════════════════════════════════════
