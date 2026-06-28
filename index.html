@@ -605,7 +605,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         <input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="loadFloorplan(event)">
       </label>
       <div class="vs"></div>
-      <button class="btn" style="background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.5);font-size:11px;font-weight:600" onclick="openGrundrissdruckDialog()" title="Grundriss drucken / PDF">🖨 Grundriss PDF</button>
+      <button class="btn" style="background:rgba(155,89,182,.2);color:#9b59b6;border:1px solid rgba(155,89,182,.4);font-size:11px;font-weight:600" onclick="open3DView()" title="3D-Ansicht der Kabelverlegung">🧊 3D-Ansicht</button>
       <button class="btn" style="background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.4);font-size:11px" onclick="openDINModal()" title="DIN 18015-2 Ausstattungsstufen">📋 DIN 18015</button>
       <button class="btn" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);font-size:11px" onclick="openRaumPanel()" title="Raum definieren">⬜ Raum</button>
       <button class="btn" style="background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.4);font-size:11px" onclick="openKTPanel()" title="Kabeltrasse zeichnen">🔲 Kabeltrasse</button>
@@ -7056,513 +7056,489 @@ function exportFloorplanPDF() {
 
 
 // ═══════════════════════════════════════════════════
-//  GRUNDRISS DRUCKEN — Layer + Bereichsauswahl
+//  3D-ANSICHT — Three.js Kabelverlegung
 // ═══════════════════════════════════════════════════
-var _gz_print = { cropRect: null, active: false };
+function open3DView() {
+  var sc = state.scale || 100; // px pro Meter
+  var defRH = (state.raumhoehe || 250) / 100; // Raumhöhe in Metern
 
-// ── Pointer-basierte Bereichsauswahl (Maus + Touch) ──
-function gz_startCropSelect() {
-  // Laufende Auswahl abbrechen falls aktiv
-  gz_stopCropSelect();
-  _gz_print.active   = true;
-  _gz_print.cropRect = null;
-  var start = null, cur = null;
+  // Daten sammeln
+  var raeume  = state.raeume  || [];
+  var wires   = state.wires   || [];
+  var symbols = state.symbols || [];
 
-  canvas.style.cursor = 'crosshair';
-  setStatus('📐 Bereich auswählen — Klicken/Tippen und ziehen, dann loslassen');
-
-  function getPos(e) {
-    var r = canvas.getBoundingClientRect();
-    var src = e.touches ? e.touches[0] : e;
-    var cx = (src.clientX - r.left) * (canvas.width  / r.width);
-    var cy = (src.clientY - r.top)  * (canvas.height / r.height);
-    return { x: (cx - state.pan.x) / state.zoom,
-             y: (cy - state.pan.y) / state.zoom };
-  }
-
-  function onDown(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    start = getPos(e);
-    cur   = start;
-    gz_drawCropOverlay(start, cur);
-  }
-  function onMove(e) {
-    if (!start) return;
-    e.preventDefault();
-    e.stopPropagation();
-    cur = getPos(e);
-    gz_drawCropOverlay(start, cur);
-  }
-  function onUp(e) {
-    if (!start) return;
-    e.preventDefault();
-    e.stopPropagation();
-    var end = getPos(e.changedTouches ? e : e);
-    if (e.changedTouches) end = { x: (( (e.changedTouches[0].clientX - canvas.getBoundingClientRect().left) * canvas.width / canvas.getBoundingClientRect().width) - state.pan.x) / state.zoom,
-                                   y: (( (e.changedTouches[0].clientY - canvas.getBoundingClientRect().top)  * canvas.height/ canvas.getBoundingClientRect().height)- state.pan.y) / state.zoom };
-    var x1 = Math.min(start.x, end.x), y1 = Math.min(start.y, end.y);
-    var x2 = Math.max(start.x, end.x), y2 = Math.max(start.y, end.y);
-    if (x2-x1 > 5 && y2-y1 > 5) {
-      _gz_print.cropRect = { x:x1, y:y1, w:x2-x1, h:y2-y1 };
-    }
-    gz_stopCropSelect();
-    gz_drawCropOverlay(start, end); // zeige finalen Bereich
-    setStatus(_gz_print.cropRect ? '✅ Bereich ausgewählt — jetzt PDF öffnen' : '⚠ Kein Bereich — nochmal versuchen');
-    // Status im offenen Dialog aktualisieren
-    var el = document.getElementById('gz-crop-status');
-    if (el) {
-      el.textContent = _gz_print.cropRect
-        ? '✅ Bereich gewählt (' + Math.round(_gz_print.cropRect.w) + '×' + Math.round(_gz_print.cropRect.h) + ' px)'
-        : '⚠ Zu klein — nochmal versuchen';
-      el.style.color = _gz_print.cropRect ? '#27ae60' : '#e74c3c';
-    }
-    start = null;
-  }
-
-  // Pointer Events — unified für Maus + Touch
-  canvas.addEventListener('pointerdown',  onDown, {passive:false});
-  canvas.addEventListener('pointermove',  onMove, {passive:false});
-  canvas.addEventListener('pointerup',    onUp,   {passive:false});
-  canvas.addEventListener('pointercancel',function(){ gz_stopCropSelect(); render(); }, {passive:false});
-  canvas._gz_handlers = { down:onDown, move:onMove, up:onUp };
-}
-
-function gz_stopCropSelect() {
-  _gz_print.active = false;
-  canvas.style.cursor = '';
-  if (canvas._gz_handlers) {
-    canvas.removeEventListener('pointerdown',  canvas._gz_handlers.down);
-    canvas.removeEventListener('pointermove',  canvas._gz_handlers.move);
-    canvas.removeEventListener('pointerup',    canvas._gz_handlers.up);
-    canvas._gz_handlers = null;
-  }
-}
-
-function gz_drawCropOverlay(s, e2) {
-  render();
-  if (!s || !e2) return;
-  var x1w=Math.min(s.x,e2.x), y1w=Math.min(s.y,e2.y);
-  var x2w=Math.max(s.x,e2.x), y2w=Math.max(s.y,e2.y);
-  var x1=x1w*state.zoom+state.pan.x, y1=y1w*state.zoom+state.pan.y;
-  var x2=x2w*state.zoom+state.pan.x, y2=y2w*state.zoom+state.pan.y;
-  ctx.save();
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle='rgba(0,0,0,0.38)';
-  ctx.fillRect(0,0,canvas.width,y1);
-  ctx.fillRect(0,y2,canvas.width,canvas.height-y2);
-  ctx.fillRect(0,y1,x1,y2-y1);
-  ctx.fillRect(x2,y1,canvas.width-x2,y2-y1);
-  ctx.strokeStyle='#f5a623'; ctx.lineWidth=2; ctx.setLineDash([6,3]);
-  ctx.strokeRect(x1,y1,x2-x1,y2-y1); ctx.setLineDash([]);
-  [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(function(p){
-    ctx.fillStyle='#f5a623'; ctx.fillRect(p[0]-5,p[1]-5,10,10);
+  // Welt-Bounding-Box bestimmen (für Kamera-Zentrierung)
+  var allX = [], allZ = [];
+  raeume.forEach(function(r) {
+    if (r.pts) r.pts.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); });
   });
-  // Maße anzeigen
-  var wm = ((x2w-x1w)/( state.scale||100)).toFixed(1);
-  var hm = ((y2w-y1w)/(state.scale||100)).toFixed(1);
-  ctx.fillStyle='rgba(0,0,0,.7)'; ctx.fillRect(x1+4,y1+4,80,18);
-  ctx.fillStyle='#f5a623'; ctx.font='bold 11px monospace';
-  ctx.fillText(wm+'m × '+hm+'m', x1+8, y1+16);
-  ctx.restore();
-}
+  symbols.forEach(function(s){ allX.push(s.x/sc); allZ.push(s.y/sc); });
+  wires.forEach(function(w){ if(w.points) w.points.forEach(function(p){ allX.push(p.x/sc); allZ.push(p.y/sc); }); });
 
-// ── Druckdialog ──
-function openGrundrissdruckDialog() {
-  var orient = canvas.width > canvas.height ? 'landscape' : 'portrait';
-  var cropActive = !!_gz_print.cropRect;
-  var dlg = document.getElementById('gz-druck-dlg');
-  if (dlg) dlg.remove();
+  var minX = allX.length ? Math.min.apply(null,allX) : 0;
+  var maxX = allX.length ? Math.max.apply(null,allX) : 10;
+  var minZ = allZ.length ? Math.min.apply(null,allZ) : 0;
+  var maxZ = allZ.length ? Math.max.apply(null,allZ) : 10;
+  var cx = (minX+maxX)/2, cz = (minZ+maxZ)/2;
+  var span = Math.max(maxX-minX, maxZ-minZ, 5);
 
-  function row(id, label, checked) {
-    return '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;padding:6px 9px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;user-select:none">'
-      +'<input type="checkbox" id="'+id+'" '+(checked?'checked':'')
-      +' style="accent-color:#f5a623;width:14px;height:14px;cursor:pointer"> '+label+'</label>';
-  }
-  function radio(name, val, label, checked) {
-    return '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin-bottom:5px;user-select:none">'
-      +'<input type="radio" name="'+name+'" value="'+val+'" '+(checked?'checked':'')
-      +' style="accent-color:#f5a623;cursor:pointer"> '+label+'</label>';
-  }
-
-  var html = '<div id="gz-druck-dlg" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;touch-action:none">'
-  +'<div style="background:var(--bg);border:1px solid var(--bd2);border-radius:12px;padding:22px 24px;width:540px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
-
-  // Titel
-  +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
-  +'<h2 style="font-size:14px;font-weight:700;color:var(--tx);margin:0">🖨 Grundriss drucken / PDF</h2>'
-  +'<button onclick="gz_stopCropSelect();render();document.getElementById(\'gz-druck-dlg\').remove()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>'
-  +'</div>'
-
-  // ── Bereichsauswahl ──
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">📐 Druckbereich</div>'
-  +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
-  +'<button onclick="document.getElementById(\'gz-druck-dlg\').style.display=\'none\';gz_startCropSelect()" '
-  +'style="padding:8px 14px;border:1.5px solid #f5a623;border-radius:6px;background:rgba(245,166,35,.12);color:#f5a623;cursor:pointer;font-size:11px;font-weight:700;touch-action:manipulation">✂ Bereich wählen</button>'
-  +'<button onclick="_gz_print.cropRect=null;render();var s=document.getElementById(\'gz-crop-status\');if(s){s.textContent=\'Ganzer Grundriss\';s.style.color=\'var(--tx3)\';}" '
-  +'style="padding:8px 14px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx2);cursor:pointer;font-size:11px;touch-action:manipulation">✕ Zurücksetzen</button>'
-  +'</div>'
-  +'<div style="margin-top:7px;font-size:9px;color:var(--tx3)">👆 Auf Mobilgeräten: Finger auf den Grundriss halten und ziehen</div>'
-  +'<div id="gz-crop-status" style="margin-top:5px;font-size:11px;font-weight:600;color:'+(cropActive?'#27ae60':'var(--tx3)')+';">'
-  +(cropActive ? '✅ Bereich gewählt ('+Math.round(_gz_print.cropRect.w)+'×'+Math.round(_gz_print.cropRect.h)+' px)' : 'Ganzer Grundriss')
-  +'</div></div>'
-
-  // ── Layer ──
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:14px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">🗂 Ebenen</div>'
-  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-  +row('gz-l-floorplan','🗺 Grundrissbild',true)
-  +row('gz-l-raeume',   '⬜ Räume/Flächen',true)
-  +row('gz-l-symbols',  '⚡ Elektrosymbole',true)
-  +row('gz-l-labels',   '🔤 Sym.-Beschrift.',true)
-  +row('gz-l-wires',    '〰 Kabellinien',true)
-  +row('gz-l-circuit',  '🔢 Stromkr.-Badge',true)
-  +row('gz-l-wirelabel','📏 Kabel-Längen',true)
-  +row('gz-l-montage',  '📐 Montagehöhen',false)
-  +row('gz-l-trassen',  '📦 Kabeltrassen',true)
-  +row('gz-l-grid',     '⊞ Raster',false)
-  +'</div>'
-  +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'
-  +'<button onclick="gz_setAllLayers(true)"  style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer;touch-action:manipulation">Alle ein</button>'
-  +'<button onclick="gz_setAllLayers(false)" style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer;touch-action:manipulation">Alle aus</button>'
-  +'<button onclick="gz_presetGrundriss()"   style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer;touch-action:manipulation">Nur Grundriss</button>'
-  +'<button onclick="gz_presetElektro()"     style="font-size:10px;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer;touch-action:manipulation">Nur Elektro</button>'
-  +'</div></div>'
-
-  // ── Format + Skalierung ──
-  +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">'
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Format</div>'
-  +radio('gz-orient','portrait', '📄 Hochformat A4', orient==='portrait')
-  +radio('gz-orient','landscape','📄 Querformat A4', orient==='landscape')
-  +'</div>'
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Skalierung</div>'
-  +radio('gz-scale','fit','Seite füllen',true)
-  +radio('gz-scale','75','75%',false)
-  +radio('gz-scale','50','50%',false)
-  +'</div>'
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 13px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Rand</div>'
-  +radio('gz-margin','5', 'Schmal 5mm',false)
-  +radio('gz-margin','10','Normal 10mm',true)
-  +radio('gz-margin','20','Breit 20mm',false)
-  +'</div></div>'
-
-  // ── Optionen ──
-  +'<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:11px 14px;margin-bottom:18px">'
-  +'<div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Optionen</div>'
-  +'<div style="display:flex;gap:14px;flex-wrap:wrap">'
-  +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;user-select:none"><input type="checkbox" id="gz-opt-kopf"    checked style="accent-color:#f5a623;width:14px;height:14px"> Kopfzeile</label>'
-  +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;user-select:none"><input type="checkbox" id="gz-opt-legende" checked style="accent-color:#f5a623;width:14px;height:14px"> Legende</label>'
-  +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;user-select:none"><input type="checkbox" id="gz-opt-fuss"    checked style="accent-color:#f5a623;width:14px;height:14px"> Fußzeile</label>'
-  +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;user-select:none"><input type="checkbox" id="gz-opt-rahmen" checked style="accent-color:#f5a623;width:14px;height:14px"> Rahmen</label>'
-  +'</div></div>'
-
-  // ── Buttons ──
-  +'<div style="display:flex;gap:10px">'
-  +'<button onclick="gz_stopCropSelect();render();document.getElementById(\'gz-druck-dlg\').remove()" style="flex:1;padding:12px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer;font-size:12px;touch-action:manipulation">Abbrechen</button>'
-  +'<button onclick="druckGrundrissNurPDF()" style="flex:2;padding:12px;border:none;border-radius:6px;background:#f5a623;color:#fff;cursor:pointer;font-size:12px;font-weight:700;touch-action:manipulation">🖨 Drucken / Als PDF speichern</button>'
-  +'</div>'
-  +'</div></div>';
-
-  document.body.insertAdjacentHTML('beforeend', html);
-
-  // Dialog wieder einblenden wenn Bereichsauswahl fertig
-  canvas.addEventListener('pointerup', function onAfterCrop() {
-    var d = document.getElementById('gz-druck-dlg');
-    if (d && d.style.display === 'none') {
-      setTimeout(function(){ d.style.display = 'flex'; }, 300);
-    }
-    canvas.removeEventListener('pointerup', onAfterCrop);
-  });
-}
-
-function gz_setAllLayers(v) {
-  ['gz-l-floorplan','gz-l-raeume','gz-l-symbols','gz-l-labels','gz-l-wires',
-   'gz-l-circuit','gz-l-wirelabel','gz-l-montage','gz-l-trassen','gz-l-grid']
-  .forEach(function(id){ var e=document.getElementById(id); if(e) e.checked=v; });
-}
-function gz_presetGrundriss() {
-  gz_setAllLayers(false);
-  ['gz-l-floorplan','gz-l-raeume'].forEach(function(id){ var e=document.getElementById(id);if(e)e.checked=true; });
-}
-function gz_presetElektro() {
-  gz_setAllLayers(false);
-  ['gz-l-symbols','gz-l-labels','gz-l-wires','gz-l-circuit','gz-l-wirelabel','gz-l-trassen']
-  .forEach(function(id){ var e=document.getElementById(id);if(e)e.checked=true; });
-}
-
-// ── Drucken ──
-function druckGrundrissNurPDF() {
-  var orient   = document.querySelector('input[name="gz-orient"]:checked').value;
-  var scaleOpt = document.querySelector('input[name="gz-scale"]:checked').value;
-  var margin   = parseInt(document.querySelector('input[name="gz-margin"]:checked').value);
-  var showKopf    = document.getElementById('gz-opt-kopf').checked;
-  var showLegende = document.getElementById('gz-opt-legende').checked;
-  var showFuss    = document.getElementById('gz-opt-fuss').checked;
-  var showRahmen  = document.getElementById('gz-opt-rahmen').checked;
-  var layers = {
-    floorplan : document.getElementById('gz-l-floorplan').checked,
-    raeume    : document.getElementById('gz-l-raeume').checked,
-    symbols   : document.getElementById('gz-l-symbols').checked,
-    labels    : document.getElementById('gz-l-labels').checked,
-    wires     : document.getElementById('gz-l-wires').checked,
-    circuit   : document.getElementById('gz-l-circuit').checked,
-    wirelabel : document.getElementById('gz-l-wirelabel').checked,
-    montage   : document.getElementById('gz-l-montage').checked,
-    trassen   : document.getElementById('gz-l-trassen').checked,
-    grid      : document.getElementById('gz-l-grid').checked,
+  // JSON-Daten für das 3D-Fenster serialisieren
+  var data3d = {
+    raeume:  raeume,
+    wires:   wires.map(function(w){
+      var src = symbols.find(function(s){return s.id===w.srcId;});
+      var dst = symbols.find(function(s){return s.id===w.dstId;});
+      return {
+        points:     w.points,
+        verlegeart: w.verlegeart || 'UP',
+        trasseHoehe:w.trasseHoehe || 20,
+        color:      gz3d_wireColor(w),
+        label:      w.kabel || w.wireType || 'Leitung',
+        circuit:    w.circuit || '',
+        laenge_m:   w.laenge_m || '',
+        srcHoehe:   src ? (src.hoehe != null ? src.hoehe : 40) : 40,
+        dstHoehe:   dst ? (dst.hoehe != null ? dst.hoehe : 40) : 40,
+        srcRH:      src ? (src.raumhoehe || defRH*100) : defRH*100,
+        dstRH:      dst ? (dst.raumhoehe || defRH*100) : defRH*100,
+      };
+    }),
+    symbols: symbols.map(function(s){
+      var def = SYMBOLS[s.type] || {};
+      return {
+        x: s.x, y: s.y,
+        hoehe:    s.hoehe     != null ? s.hoehe     : 40,
+        raumhoehe:s.raumhoehe != null ? s.raumhoehe : defRH*100,
+        label:    s.label || def.name || s.type,
+        type:     s.type,
+        montage:  s.montage || 'UP',
+      };
+    }),
+    scale: sc,
+    raumhoehe: defRH,
+    cx: cx, cz: cz, span: span,
+    projName: document.getElementById('projName').value || 'Grundriss',
   };
 
-  document.getElementById('gz-druck-dlg').remove();
-  gz_stopCropSelect();
+  var jsonStr = JSON.stringify(data3d).replace(/</g,'\\u003c').replace(/>/g,'\\u003e');
 
-  var imgData = gz_renderPrintCanvas(layers, _gz_print.cropRect);
-  render(); // Canvas zurücksetzen
-
-  var pn = document.getElementById('projName').value || 'Grundriss';
-  var pd = projData || {};
-  var heute = new Date().toLocaleDateString('de-DE');
-  var planName = pn;
-  if (state.activeFloorplanId && state.floorplans) {
-    var fp = state.floorplans.find(function(f){ return f.id === state.activeFloorplanId; });
-    if (fp && fp.name) planName = pn + ' \u2014 ' + fp.name;
-  }
-
-  // Kopfzeile
-  var kopfHTML = '';
-  if (showKopf) {
-    var meta = [];
-    if (pd.kundenname) meta.push(pd.kundenname + (pd.firma ? ' \u2014 '+pd.firma : ''));
-    if (pd.strasse)    meta.push(pd.strasse + (pd.ort ? ', '+pd.ort : ''));
-    meta.push(heute);
-    if (_gz_print.cropRect) meta.push('Ausschnitt');
-    kopfHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-end;'
-      +'border-bottom:2.5px solid #f5a623;padding-bottom:5px;margin-bottom:8px">'
-      +'<div style="font-size:13px;font-weight:700;color:#f5a623">&#9889; '+planName+'</div>'
-      +'<div style="font-size:8px;color:#666;text-align:right">'+meta.join(' | ')+'</div>'
-      +'</div>';
-  }
-
-  // Legende
-  var legendeHTML = '';
-  if (showLegende && layers.symbols) {
-    var sc2 = {};
-    state.symbols.forEach(function(s){
-      var nm = (SYMBOLS[s.type]&&SYMBOLS[s.type].name)||s.type;
-      sc2[nm] = (sc2[nm]||0) + (s.count||1);
-    });
-    var keys = Object.keys(sc2);
-    if (keys.length) {
-      var rows = keys.map(function(k){
-        return '<tr><td style="padding:2px 5px;font-size:8px;border:1px solid #e0e0e0">'+k+'</td>'
-          +'<td style="padding:2px 5px;font-size:8px;font-weight:700;text-align:right;border:1px solid #e0e0e0">'+sc2[k]+'</td></tr>';
-      }).join('');
-      var total2 = state.wires.reduce(function(a,w){return a+parseFloat(w.laenge_m||0);},0);
-      legendeHTML = '<div style="width:130px;flex-shrink:0;padding-left:8px">'
-        +'<div style="font-size:7px;font-weight:700;color:#f5a623;text-transform:uppercase;border-bottom:1.5px solid #f5a623;padding-bottom:2px;margin-bottom:4px">Legende</div>'
-        +'<table style="border-collapse:collapse;width:100%"><thead>'
-        +'<tr><th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px;text-align:left;border:1px solid #f5a623">Symbol</th>'
-        +'<th style="background:#f5a623;color:#fff;padding:2px 5px;font-size:7px;border:1px solid #f5a623">Anz.</th></tr></thead>'
-        +'<tbody>'+rows+'</tbody></table>'
-        +(layers.wires && state.wires.length
-          ? '<div style="margin-top:5px;font-size:7px;color:#555;border-top:1px solid #ddd;padding-top:3px">'
-            +'Leitungen: <b>'+state.wires.length+'</b><br>Gesamt: <b>'+total2.toFixed(1)+' m</b></div>' : '')
-        +'</div>';
-    }
-  }
-
-  // Fußzeile
-  var fussHTML = showFuss
-    ? '<div style="border-top:1px solid #ddd;margin-top:8px;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#aaa">'
-      +'<span>&#9889; Elektro-Grundriss \u2014 Anvolt GmbH</span><span>'+planName+'</span><span>'+heute+'</span></div>'
-    : '';
-
-  var imgStyle = (showRahmen?'border:1px solid #bbb;':'')+'display:block;'
-    +(scaleOpt==='fit' ? 'width:100%;height:auto;' : 'max-width:'+scaleOpt+'%;height:auto;');
-
-  var css = '@page{size:A4 '+orient+';margin:'+margin+'mm}'
-    +'*{box-sizing:border-box;margin:0;padding:0}'
-    +'body{font-family:Arial,sans-serif;color:#222;background:#fff}'
-    +'.row{display:flex;align-items:flex-start;width:100%}'
-    +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  // Symbol-Farben je Typ
+  var symColorMap = {
+    'steckdose':'#e74c3c','schalter':'#3498db','taster':'#2ecc71',
+    'leuchte':'#f1c40f','strahler':'#f39c12','lampe':'#f1c40f',
+    'verteiler':'#9b59b6','sicherung':'#e67e22','default':'#95a5a6'
+  };
 
   var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
-    +'<title>'+planName+'</title><style>'+css+'</style></head><body>'
-    +kopfHTML
-    +'<div class="row"><div style="flex:1;min-width:0"><img id="pimg" src="'+imgData+'" style="'+imgStyle+'"></div>'
-    +legendeHTML+'</div>'
-    +fussHTML
-    +'<script>var img=document.getElementById("pimg");'
-    +'function doPrint(){setTimeout(function(){window.print();},250);}'
-    +'if(img.complete)doPrint();else img.onload=doPrint;<\/script>'
+    +'<title>3D-Ansicht — '+data3d.projName+'</title>'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box}'
+    +'body{background:#0a0a14;color:#eee;font-family:Arial,sans-serif;overflow:hidden}'
+    +'#c3d{display:block;width:100vw;height:100vh}'
+    +'#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px}'
+    +'.ui-panel{background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.4);border-radius:8px;padding:10px 14px;backdrop-filter:blur(8px)}'
+    +'.ui-title{font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px}'
+    +'.ui-btn{display:block;width:100%;padding:6px 10px;margin-bottom:5px;border:1px solid rgba(155,89,182,.5);border-radius:5px;background:rgba(155,89,182,.15);color:#ccc;cursor:pointer;font-size:11px;text-align:left;transition:background .2s}'
+    +'.ui-btn:hover{background:rgba(155,89,182,.35)}'
+    +'.ui-btn.act{background:rgba(155,89,182,.4);color:#fff;border-color:#9b59b6}'
+    +'.ui-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 0}'
+    +'.cb-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#ccc;margin-bottom:5px;cursor:pointer}'
+    +'.cb-row input{accent-color:#9b59b6;cursor:pointer}'
+    +'#tooltip{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid #9b59b6;border-radius:6px;padding:7px 14px;font-size:11px;color:#eee;pointer-events:none;display:none;white-space:nowrap}'
+    +'#info{position:fixed;top:12px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;color:#aaa;max-width:200px;line-height:1.6;backdrop-filter:blur(8px)}'
+    +'#legend{position:fixed;bottom:20px;right:12px;background:rgba(10,10,20,.85);border:1px solid rgba(155,89,182,.3);border-radius:8px;padding:10px 14px;font-size:10px;backdrop-filter:blur(8px);max-height:60vh;overflow-y:auto}'
+    +'.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;color:#ccc}'
+    +'.leg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}'
+    +'</style></head><body>'
+    +'<canvas id="c3d"></canvas>'
+
+    +'<div id="ui">'
+    +'<div class="ui-panel">'
+    +'<div class="ui-title">🧊 3D-Kabelverlegung</div>'
+    +'<div style="font-size:10px;color:#888;margin-bottom:8px">'+data3d.projName+'</div>'
+    +'<button class="ui-btn" onclick="setCam(\'persp\')">👁 Perspektive</button>'
+    +'<button class="ui-btn" onclick="setCam(\'top\')">⬆ Draufsicht</button>'
+    +'<button class="ui-btn" onclick="setCam(\'front\')">⬛ Vorderansicht</button>'
+    +'<button class="ui-btn" onclick="setCam(\'iso\')">🔷 Isometrisch</button>'
+    +'<div class="ui-sep"></div>'
+    +'<button class="ui-btn" onclick="resetCam()">🎯 Zurücksetzen</button>'
+    +'</div>'
+    +'<div class="ui-panel">'
+    +'<div class="ui-title">Ebenen</div>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-walls" checked onchange="toggleLayer(\'walls\',this.checked)"> Wände/Räume</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-floor" checked onchange="toggleLayer(\'floor\',this.checked)"> Boden</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-wires" checked onchange="toggleLayer(\'wires\',this.checked)"> Kabellinien</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-symbols" checked onchange="toggleLayer(\'symbols\',this.checked)"> Elektrogeräte</label>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-labels" checked onchange="toggleLayer(\'labels\',this.checked)"> Beschriftungen</label>'
+    +'<div class="ui-sep"></div>'
+    +'<label class="cb-row"><input type="checkbox" id="cb-roof" onchange="toggleLayer(\'roof\',this.checked)"> Decke (transparent)</label>'
+    +'</div>'
+    +'</div>'
+
+    +'<div id="info">'
+    +'<div style="color:#9b59b6;font-weight:700;margin-bottom:5px">Steuerung</div>'
+    +'🖱 Linke Taste: Drehen<br>'
+    +'🖱 Rechte Taste: Verschieben<br>'
+    +'🖱 Scrollrad: Zoom<br>'
+    +'👆 Touch: 1 Finger = Drehen<br>'
+    +'👆 Touch: 2 Finger = Zoom'
+    +'</div>'
+
+    +'<div id="tooltip"></div>'
+    +'<div id="legend"><div style="color:#9b59b6;font-weight:700;font-size:11px;margin-bottom:7px">Kabeltypen</div><div id="leg-items"></div></div>'
+
+    +'<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>'
+    +'<script>'
+    +'var D = '+jsonStr+';'
+    +'var SC = D.scale; var layers3d = { walls:true, floor:true, wires:true, symbols:true, labels:true, roof:false };'
+    +'var layerObjs = { walls:[], floor:[], wires:[], symbols:[], labels:[], roof:[] };'
+
+    // Scene setup
+    +'var renderer = new THREE.WebGLRenderer({canvas:document.getElementById("c3d"),antialias:true});'
+    +'renderer.setPixelRatio(window.devicePixelRatio||1);'
+    +'renderer.setSize(window.innerWidth,window.innerHeight);'
+    +'renderer.shadowMap.enabled=true;'
+    +'renderer.setClearColor(0x0a0a14);'
+
+    +'var scene = new THREE.Scene();'
+    +'scene.fog = new THREE.FogExp2(0x0a0a14, 0.015);'
+
+    // Camera
+    +'var W=window.innerWidth,H=window.innerHeight;'
+    +'var camera = new THREE.PerspectiveCamera(55,W/H,0.1,500);'
+    +'var camDist = D.span * 1.2;'
+    +'camera.position.set(D.cx, camDist*0.7, D.cz + camDist);'
+    +'camera.lookAt(D.cx, 0, D.cz);'
+
+    // Lighting
+    +'scene.add(new THREE.AmbientLight(0xffffff,0.55));'
+    +'var dirL = new THREE.DirectionalLight(0xffffff,0.8);'
+    +'dirL.position.set(D.cx+20,30,D.cz+20); dirL.castShadow=true; scene.add(dirL);'
+    +'var fillL = new THREE.DirectionalLight(0x8888ff,0.3);'
+    +'fillL.position.set(D.cx-10,10,D.cz-10); scene.add(fillL);'
+    +'scene.add(new THREE.PointLight(0xf5a623,0.4,50));'
+
+    // Grid
+    +'var grid = new THREE.GridHelper(Math.max(D.span*3,30),30,0x223,0x112);'
+    +'grid.position.set(D.cx,0,D.cz); scene.add(grid);'
+
+    // Helper: px → world-m (centered)
+    +'function px(x){return x/SC;}'
+    +'function pz(y){return y/SC;}'
+
+    // ── BODEN ──
+    +'(function buildFloor(){'
+    +'  var geo = new THREE.PlaneGeometry(D.span*3,D.span*3);'
+    +'  var mat = new THREE.MeshLambertMaterial({color:0x1a1a2a,side:THREE.DoubleSide});'
+    +'  var mesh = new THREE.Mesh(geo,mat);'
+    +'  mesh.rotation.x=-Math.PI/2; mesh.position.set(D.cx,0,D.cz);'
+    +'  mesh.receiveShadow=true; scene.add(mesh); layerObjs.floor.push(mesh);'
+    +'})();'
+
+    // ── RÄUME → Wände ──
+    +'(function buildRooms(){'
+    +'  D.raeume.forEach(function(r){'
+    +'    if(!r.pts||!r.pts.length) return;'
+    +'    var rh = (r.hoehe||D.raumhoehe*100)/100;'
+    +'    var pts2d;'
+    +'    if(r.type==="rect"&&r.pts.length===2){'
+    +'      var x1=Math.min(r.pts[0].x,r.pts[1].x)/SC, z1=Math.min(r.pts[0].y,r.pts[1].y)/SC;'
+    +'      var x2=Math.max(r.pts[0].x,r.pts[1].x)/SC, z2=Math.max(r.pts[0].y,r.pts[1].y)/SC;'
+    +'      pts2d=[[x1,z1],[x2,z1],[x2,z2],[x1,z2]];'
+    +'    } else {'
+    +'      pts2d=r.pts.map(function(p){return[p.x/SC,p.y/SC];});'
+    +'    }'
+    // Boden des Raums
+    +'    var shape = new THREE.Shape();'
+    +'    shape.moveTo(pts2d[0][0],pts2d[0][1]);'
+    +'    for(var i=1;i<pts2d.length;i++) shape.lineTo(pts2d[i][0],pts2d[i][1]);'
+    +'    shape.closePath();'
+    +'    var floorGeo = new THREE.ShapeGeometry(shape);'
+    +'    var colHex = r.color ? parseInt(r.color.replace("#","0x"))||0x1e3a2e : 0x1e3a2e;'
+    +'    var floorMat = new THREE.MeshLambertMaterial({color:colHex,transparent:true,opacity:0.35,side:THREE.DoubleSide});'
+    +'    var floorMesh = new THREE.Mesh(floorGeo,floorMat);'
+    +'    floorMesh.rotation.x=-Math.PI/2; floorMesh.position.y=0.01; scene.add(floorMesh);'
+    +'    layerObjs.walls.push(floorMesh);'
+    // Wände als dünne Boxen entlang der Kanten
+    +'    var wallMat = new THREE.MeshLambertMaterial({color:0x2a3a4a,transparent:true,opacity:0.55});'
+    +'    var wallW = 0.12;'
+    +'    for(var wi=0;wi<pts2d.length;wi++){'
+    +'      var p1=pts2d[wi], p2=pts2d[(wi+1)%pts2d.length];'
+    +'      var dx=p2[0]-p1[0], dz=p2[1]-p1[1];'
+    +'      var len=Math.sqrt(dx*dx+dz*dz);'
+    +'      if(len<0.01) continue;'
+    +'      var wGeo = new THREE.BoxGeometry(len,rh,wallW);'
+    +'      var wMesh = new THREE.Mesh(wGeo,wallMat);'
+    +'      wMesh.position.set(p1[0]+dx/2, rh/2, p1[1]+dz/2);'
+    +'      wMesh.rotation.y = -Math.atan2(dz,dx);'
+    +'      wMesh.castShadow=true; wMesh.receiveShadow=true;'
+    +'      scene.add(wMesh); layerObjs.walls.push(wMesh);'
+    +'    }'
+    // Decke (optional)
+    +'    var roofMat = new THREE.MeshLambertMaterial({color:0x1a2a3a,transparent:true,opacity:0.15,side:THREE.DoubleSide});'
+    +'    var roofMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape),roofMat);'
+    +'    roofMesh.rotation.x=-Math.PI/2; roofMesh.position.y=rh; roofMesh.visible=false;'
+    +'    scene.add(roofMesh); layerObjs.roof.push(roofMesh);'
+    // Raumname
+    +'    if(r.name){'
+    +'      var cx3=pts2d.reduce(function(a,p){return a+p[0];},0)/pts2d.length;'
+    +'      var cz3=pts2d.reduce(function(a,p){return a+p[1];},0)/pts2d.length;'
+    +'      makeLabel(r.name, cx3, 0.05, cz3, "#3fb950", 0.35);'
+    +'    }'
+    +'  });'
+    +'})();'
+
+    // ── KABEL ──
+    +'var wireLegend = {};'
+    +'(function buildWires(){'
+    +'  D.wires.forEach(function(wire,wi){'
+    +'    if(!wire.points||wire.points.length<2) return;'
+    +'    var vl = wire.verlegeart||"UP";'
+    +'    var col = new THREE.Color(wire.color||"#e74c3c");'
+    +'    var rh = (wire.srcRH||250)/100;'
+    +'    var hSrc = (wire.srcHoehe||40)/100;'
+    +'    var hDst = (wire.dstHoehe||40)/100;'
+    +'    var th  = (wire.trasseHoehe||20)/100;'
+    +'    if(!wireLegend[wire.label]) wireLegend[wire.label]=wire.color||"#e74c3c";'
+    // 3D-Punkte für Kabelweg berechnen
+    +'    var pts3 = [];'
+    +'    var n = wire.points.length;'
+    +'    wire.points.forEach(function(p,i){'
+    +'      var x3=p.x/SC, z3=p.y/SC;'
+    +'      var y3;'
+    +'      if(vl==="UP"||vl==="HR"||vl==="EZ"||vl==="HW"){'
+    // Unterputz: Start- und Endpunkt auf Gerätehöhe, Mitte unter der Decke
+    +'        if(i===0) y3=hSrc;'
+    +'        else if(i===n-1) y3=hDst;'
+    +'        else y3=rh-0.05;' // unter der Decke
+    +'      } else if(vl==="AP"){'
+    // Aufputz/Kabelkanal: direkt auf Höhe (linear interpoliert)
+    +'        var t=i/(n-1);'
+    +'        y3=hSrc+(hDst-hSrc)*t;'
+    +'      } else if(vl==="HD"){'
+    // Hohldecke: alles auf Deckenhöhe
+    +'        y3=rh;'
+    +'      } else if(vl==="FU"){'
+    // Fußboden: 3cm unter Boden
+    +'        y3=-0.03;'
+    +'      } else if(vl==="ER"){'
+    // Erdkabel: 60cm unter Boden
+    +'        y3=-0.6;'
+    +'      } else {'
+    +'        var t2=i/(n-1);'
+    +'        y3=rh-0.05;'
+    +'      }'
+    +'      pts3.push(new THREE.Vector3(x3,y3,z3));'
+    +'    });'
+    // Bei UP: Senkrechte Einführung am Start und Ende ergänzen
+    +'    if((vl==="UP"||vl==="HR"||vl==="HW")&&n>=2){'
+    +'      var p0=pts3[0].clone(); var pLast=pts3[pts3.length-1].clone();'
+    +'      pts3.unshift(new THREE.Vector3(p0.x,rh-0.05,p0.z));'
+    +'      pts3.push(new THREE.Vector3(pLast.x,rh-0.05,pLast.z));'
+    +'      pts3[1].y=hSrc; pts3[pts3.length-2].y=hDst;'
+    +'    }'
+    // TubeGeometry aus CatmullRomCurve
+    +'    var curve = new THREE.CatmullRomCurve3(pts3);'
+    +'    var tubeGeo = new THREE.TubeGeometry(curve, Math.max(pts3.length*4,8), 0.025, 6, false);'
+    +'    var tubeMat = new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:0.2});'
+    +'    var tube = new THREE.Mesh(tubeGeo,tubeMat);'
+    +'    tube.userData = { type:"wire", label:wire.label, circuit:wire.circuit, laenge:wire.laenge_m, verlegeart:vl };'
+    +'    tube.castShadow=true; scene.add(tube); layerObjs.wires.push(tube);'
+    // Stromkreis-Label in der Mitte
+    +'    if(wire.circuit){'
+    +'      var mid=pts3[Math.floor(pts3.length/2)];'
+    +'      makeLabel(wire.circuit, mid.x, mid.y+0.15, mid.z, wire.color||"#e74c3c", 0.2);'
+    +'    }'
+    +'  });'
+    // Legende aufbauen
+    +'  var legEl=document.getElementById("leg-items");'
+    +'  Object.keys(wireLegend).forEach(function(k){'
+    +'    legEl.innerHTML+=\'<div class="leg-row"><div class="leg-dot" style="background:\'+wireLegend[k]+\'"></div><span>\'+k+\'</span></div>\';'
+    +'  });'
+    +'})();'
+
+    // ── SYMBOLE (Elektrogeräte) ──
+    +'(function buildSymbols(){'
+    +'  var symColors={"steckdose":"#e74c3c","schalter":"#3498db","taster":"#2ecc71","leuchte":"#f1c40f","strahler":"#f39c12","lampe":"#f1c40f","verteiler":"#9b59b6","sicherung":"#e67e22","default":"#95a5a6"};'
+    +'  D.symbols.forEach(function(s){'
+    +'    var x3=s.x/SC, z3=s.y/SC;'
+    +'    var h=(s.hoehe||40)/100;'
+    +'    var colKey=Object.keys(symColors).find(function(k){return s.type&&s.type.toLowerCase().indexOf(k)>=0;});'
+    +'    var col=symColors[colKey||"default"];'
+    // Kleiner Würfel an der Wand-Position
+    +'    var geo = new THREE.BoxGeometry(0.12,0.12,0.08);'
+    +'    var mat = new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.4});'
+    +'    var mesh = new THREE.Mesh(geo,mat);'
+    +'    mesh.position.set(x3,h,z3);'
+    +'    mesh.userData={type:"symbol",label:s.label,hoehe:s.hoehe,montage:s.montage};'
+    +'    scene.add(mesh); layerObjs.symbols.push(mesh);'
+    // Vertikale Verbindungslinie (Installationspfad)
+    +'    var vGeo=new THREE.BufferGeometry().setFromPoints(['
+    +'      new THREE.Vector3(x3,0.01,z3),'
+    +'      new THREE.Vector3(x3,h,z3)'
+    +'    ]);'
+    +'    var vLine=new THREE.Line(vGeo,new THREE.LineBasicMaterial({color:0x444444,opacity:0.5,transparent:true}));'
+    +'    scene.add(vLine); layerObjs.symbols.push(vLine);'
+    // Glüh-Kugel am Symbol
+    +'    var sphereGeo=new THREE.SphereGeometry(0.07,8,8);'
+    +'    var sphereMat=new THREE.MeshLambertMaterial({color:new THREE.Color(col),emissive:new THREE.Color(col),emissiveIntensity:0.6,transparent:true,opacity:0.8});'
+    +'    var sphere=new THREE.Mesh(sphereGeo,sphereMat);'
+    +'    sphere.position.set(x3,h+0.12,z3);'
+    +'    scene.add(sphere); layerObjs.symbols.push(sphere);'
+    +'    if(s.label) makeLabel(s.label,x3,h+0.28,z3,"#ffffff",0.18);'
+    +'  });'
+    +'})();'
+
+    // ── SPRITE-LABELS ──
+    +'var labelSprites=[];'
+    +'function makeLabel(text,x,y,z,color,size){'
+    +'  var c2=document.createElement("canvas"); c2.width=256; c2.height=64;'
+    +'  var cx2=c2.getContext("2d");'
+    +'  cx2.clearRect(0,0,256,64);'
+    +'  cx2.fillStyle="rgba(0,0,0,.6)"; cx2.beginPath();'
+    +'  cx2.roundRect(2,2,252,60,8); cx2.fill();'
+    +'  cx2.fillStyle=color||"#fff"; cx2.font="bold 22px Arial";'
+    +'  cx2.textAlign="center"; cx2.textBaseline="middle";'
+    +'  cx2.fillText(text.substring(0,24),128,32);'
+    +'  var tex=new THREE.CanvasTexture(c2);'
+    +'  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));'
+    +'  sp.position.set(x,y,z); sp.scale.set(size*4,size,1);'
+    +'  scene.add(sp); layerObjs.labels.push(sp); labelSprites.push(sp);'
+    +'}'
+
+    // ── KAMERA-STEUERUNG ──
+    +'var isDragging=false, isRightDrag=false;'
+    +'var lastMouse={x:0,y:0};'
+    +'var camTheta=0, camPhi=Math.PI/4;'
+    +'var camTarget=new THREE.Vector3(D.cx,0,D.cz);'
+    +'var camR=camDist;'
+
+    +'function updateCameraPos(){'
+    +'  camera.position.x=camTarget.x+camR*Math.sin(camPhi)*Math.sin(camTheta);'
+    +'  camera.position.y=camTarget.y+camR*Math.cos(camPhi);'
+    +'  camera.position.z=camTarget.z+camR*Math.sin(camPhi)*Math.cos(camTheta);'
+    +'  camera.lookAt(camTarget);'
+    +'}'
+
+    // Mouse
+    +'document.addEventListener("mousedown",function(e){'
+    +'  isDragging=true; isRightDrag=(e.button===2);'
+    +'  lastMouse={x:e.clientX,y:e.clientY};'
+    +'});'
+    +'document.addEventListener("mousemove",function(e){'
+    +'  if(!isDragging) return;'
+    +'  var dx=(e.clientX-lastMouse.x)*0.005, dy=(e.clientY-lastMouse.y)*0.005;'
+    +'  lastMouse={x:e.clientX,y:e.clientY};'
+    +'  if(isRightDrag){'
+    +'    var right=new THREE.Vector3(); camera.getWorldDirection(right);'
+    +'    var up2=new THREE.Vector3(0,1,0);'
+    +'    right.cross(up2).normalize();'
+    +'    camTarget.addScaledVector(right,-dx*camR*0.5);'
+    +'    camTarget.y+=dy*camR*0.5;'
+    +'  } else {'
+    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
+    +'  }'
+    +'  updateCameraPos();'
+    +'});'
+    +'document.addEventListener("mouseup",function(){isDragging=false;});'
+    +'document.addEventListener("wheel",function(e){'
+    +'  camR=Math.max(1,Math.min(100,camR*(1+e.deltaY*0.001)));'
+    +'  updateCameraPos();'
+    +'},{passive:true});'
+    +'document.addEventListener("contextmenu",function(e){e.preventDefault();});'
+
+    // Touch
+    +'var touches={};'
+    +'var lastPinchDist=null;'
+    +'document.addEventListener("touchstart",function(e){'
+    +'  e.preventDefault();'
+    +'  Array.from(e.changedTouches).forEach(function(t){touches[t.identifier]={x:t.clientX,y:t.clientY};});'
+    +'},{passive:false});'
+    +'document.addEventListener("touchmove",function(e){'
+    +'  e.preventDefault();'
+    +'  var ids=Object.keys(touches);'
+    +'  if(ids.length===1&&e.touches.length===1){'
+    +'    var t=e.touches[0];'
+    +'    var dx=(t.clientX-touches[ids[0]].x)*0.006, dy=(t.clientY-touches[ids[0]].y)*0.006;'
+    +'    camTheta-=dx; camPhi=Math.max(0.05,Math.min(Math.PI-0.05,camPhi+dy));'
+    +'    touches[ids[0]]={x:t.clientX,y:t.clientY};'
+    +'    updateCameraPos();'
+    +'  } else if(e.touches.length===2){'
+    +'    var t0=e.touches[0],t1=e.touches[1];'
+    +'    var dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);'
+    +'    if(lastPinchDist){camR=Math.max(1,Math.min(100,camR*(lastPinchDist/dist)));updateCameraPos();}'
+    +'    lastPinchDist=dist;'
+    +'    touches[t0.identifier]={x:t0.clientX,y:t0.clientY};'
+    +'    touches[t1.identifier]={x:t1.clientX,y:t1.clientY};'
+    +'  }'
+    +'},{passive:false});'
+    +'document.addEventListener("touchend",function(e){'
+    +'  Array.from(e.changedTouches).forEach(function(t){delete touches[t.identifier];});'
+    +'  if(Object.keys(touches).length<2) lastPinchDist=null;'
+    +'},{passive:false});'
+
+    // Kamera-Presets
+    +'function setCam(mode){'
+    +'  if(mode==="top"){camPhi=0.01;camR=D.span*2;}'
+    +'  else if(mode==="front"){camPhi=Math.PI/2;camTheta=0;camR=D.span*1.5;}'
+    +'  else if(mode==="iso"){camPhi=Math.PI/4;camTheta=Math.PI/4;camR=D.span*1.5;}'
+    +'  else{camPhi=Math.PI/3.5;camTheta=Math.PI/6;camR=D.span*1.2;}'
+    +'  updateCameraPos();'
+    +'}'
+    +'function resetCam(){camTarget.set(D.cx,0,D.cz);camR=camDist;camPhi=Math.PI/4;camTheta=0;updateCameraPos();}'
+
+    // Layer toggle
+    +'function toggleLayer(name,val){'
+    +'  layers3d[name]=val;'
+    +'  (layerObjs[name]||[]).forEach(function(o){o.visible=val;});'
+    +'}'
+
+    // Raycasting für Tooltip
+    +'var raycaster=new THREE.Raycaster();'
+    +'var mouse2=new THREE.Vector2();'
+    +'var tooltip=document.getElementById("tooltip");'
+    +'document.addEventListener("mousemove",function(e){'
+    +'  mouse2.x=(e.clientX/window.innerWidth)*2-1;'
+    +'  mouse2.y=-(e.clientY/window.innerHeight)*2+1;'
+    +'  raycaster.setFromCamera(mouse2,camera);'
+    +'  var allMeshes=[];'
+    +'  ["wires","symbols"].forEach(function(k){layerObjs[k].forEach(function(o){if(o.isMesh)allMeshes.push(o);});});'
+    +'  var hits=raycaster.intersectObjects(allMeshes);'
+    +'  if(hits.length&&hits[0].object.userData.label){'
+    +'    var d=hits[0].object.userData;'
+    +'    var txt=d.label;'
+    +'    if(d.circuit) txt+=" · SK "+d.circuit;'
+    +'    if(d.laenge)  txt+=" · "+d.laenge+"m";'
+    +'    if(d.verlegeart) txt+=" · "+d.verlegeart;'
+    +'    if(d.hoehe)   txt+=" · "+d.hoehe+"cm";'
+    +'    tooltip.textContent=txt; tooltip.style.display="block";'
+    +'  } else { tooltip.style.display="none"; }'
+    +'});'
+
+    // Resize
+    +'window.addEventListener("resize",function(){'
+    +'  camera.aspect=window.innerWidth/window.innerHeight;'
+    +'  camera.updateProjectionMatrix();'
+    +'  renderer.setSize(window.innerWidth,window.innerHeight);'
+    +'});'
+
+    // Animate
+    +'updateCameraPos();'
+    +'(function animate(){'
+    +'  requestAnimationFrame(animate);'
+    +'  renderer.render(scene,camera);'
+    +'})();'
+    +'<\/script>'
     +'</body></html>';
 
-  var w = window.open('','_blank');
-  if (!w){ alert('Popup blockiert \u2014 bitte erlauben'); return; }
-  w.document.write(html); w.document.close();
+  var w3 = window.open('', '_blank', 'width=1200,height=800');
+  if (!w3) { alert('Popup blockiert \u2014 bitte erlauben'); return; }
+  w3.document.write(html);
+  w3.document.close();
 }
 
-// ── Layer-selektiver Canvas-Render ──
-function gz_renderPrintCanvas(layers, cropRect) {
-  var worldX, worldY, worldW, worldH;
-  if (cropRect) {
-    worldX=cropRect.x; worldY=cropRect.y; worldW=cropRect.w; worldH=cropRect.h;
-  } else {
-    worldX=-state.pan.x/state.zoom; worldY=-state.pan.y/state.zoom;
-    worldW=canvas.width/state.zoom;  worldH=canvas.height/state.zoom;
-  }
-
-  var DPR=2, MAX=6000;
-  var EW=Math.round(worldW*state.zoom*DPR), EH=Math.round(worldH*state.zoom*DPR);
-  if(EW>MAX||EH>MAX){ var sc=MAX/Math.max(EW,EH); EW=Math.round(EW*sc); EH=Math.round(EH*sc); DPR*=sc; }
-
-  var ec=document.createElement('canvas'); ec.width=EW; ec.height=EH;
-  var ex=ec.getContext('2d');
-  ex.fillStyle='#ffffff'; ex.fillRect(0,0,EW,EH);
-
-  var scl=state.zoom*DPR;
-  ex.save();
-  ex.setTransform(scl,0,0,scl,-worldX*scl,-worldY*scl);
-
-  // Raster
-  if(layers.grid){
-    var gs=state.gridSize||50;
-    ex.save(); ex.strokeStyle='rgba(180,180,200,.25)'; ex.lineWidth=0.5/state.zoom;
-    for(var gx=Math.floor(worldX/gs)*gs;gx<worldX+worldW+gs;gx+=gs){ex.beginPath();ex.moveTo(gx,worldY);ex.lineTo(gx,worldY+worldH);ex.stroke();}
-    for(var gy=Math.floor(worldY/gs)*gs;gy<worldY+worldH+gs;gy+=gs){ex.beginPath();ex.moveTo(worldX,gy);ex.lineTo(worldX+worldW,gy);ex.stroke();}
-    ex.restore();
-  }
-
-  // Räume
-  if(layers.raeume && state.raeume && state.raeume.length){
-    state.raeume.forEach(function(r){
-      if(!r.pts||!r.pts.length) return;
-      ex.save();
-      ex.strokeStyle='rgba(63,185,80,.5)'; ex.lineWidth=1.5/state.zoom;
-      ex.setLineDash([4/state.zoom,3/state.zoom]); ex.fillStyle=r.color||'rgba(63,185,80,.08)';
-      if(r.type==='rect'&&r.pts.length===2){
-        var rx=Math.min(r.pts[0].x,r.pts[1].x),ry=Math.min(r.pts[0].y,r.pts[1].y);
-        var rw=Math.abs(r.pts[1].x-r.pts[0].x),rh=Math.abs(r.pts[1].y-r.pts[0].y);
-        ex.beginPath();ex.rect(rx,ry,rw,rh);ex.fill();ex.stroke();
-        ex.setLineDash([]);ex.fillStyle='rgba(63,185,80,.8)';
-        ex.font='bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';ex.textAlign='center';
-        ex.fillText(r.name+(r.flaeche?' ('+r.flaeche+'m²)':''),rx+rw/2,ry+rh/2);
-      } else {
-        ex.beginPath();ex.moveTo(r.pts[0].x,r.pts[0].y);
-        r.pts.forEach(function(p){ex.lineTo(p.x,p.y);});ex.closePath();ex.fill();ex.stroke();
-        var cx=r.pts.reduce(function(a,p){return a+p.x;},0)/r.pts.length;
-        var cy=r.pts.reduce(function(a,p){return a+p.y;},0)/r.pts.length;
-        ex.setLineDash([]);ex.fillStyle='rgba(63,185,80,.8)';
-        ex.font='bold '+(10/state.zoom)+'px IBM Plex Mono,monospace';ex.textAlign='center';
-        ex.fillText(r.name,cx,cy);
-      }
-      ex.textAlign='left';ex.restore();
-    });
-  }
-
-  // Grundrissbild
-  if(layers.floorplan && state.floorplan){
-    ex.drawImage(state.floorplan.img,0,0,state.floorplan.w,state.floorplan.h);
-  }
-
-  // Trassen
-  if(layers.trassen && state.trassen && state.trassen.length){
-    state.trassen.forEach(function(kt){
-      ex.save();
-      var col=kt.color||'#888';
-      ex.fillStyle=col+'33'; ex.strokeStyle=col; ex.lineWidth=1.5/state.zoom;
-      var hw=(kt.breite||60)/2;
-      var len=kt.laenge_m?kt.laenge_m*(state.scale||100):100;
-      ex.translate(kt.x,kt.y); ex.rotate((kt.rotation||0)*Math.PI/180);
-      ex.beginPath();ex.rect(-len/2,-hw,len,hw*2);ex.fill();ex.stroke();
-      ex.restore();
-    });
-  }
-
-  // Leitungen
-  if(layers.wires && state.wires.length){
-    state.wires.forEach(function(wire){
-      if(!wire.points||wire.points.length<2) return;
-      ex.save();
-      ex.strokeStyle=getWireColor(wire); ex.lineWidth=getWireWidth(wire)/state.zoom;
-      ex.setLineDash(getWireDash(wire)); ex.lineCap='round'; ex.lineJoin='round';
-      ex.beginPath(); ex.moveTo(wire.points[0].x,wire.points[0].y);
-      wire.points.forEach(function(p,i){if(i)ex.lineTo(p.x,p.y);}); ex.stroke();
-      ex.setLineDash([]);
-      // Länge
-      if(layers.wirelabel && wire.laenge_m && state.scale){
-        var mp=wire.points[Math.floor(wire.points.length/2)]||wire.points[0];
-        ex.font=(7/state.zoom)+'px IBM Plex Mono,monospace'; ex.fillStyle='#27ae60'; ex.textAlign='center';
-        ex.fillText(wire.laenge_m+'m',mp.x,mp.y-5/state.zoom); ex.textAlign='left';
-      }
-      // Stromkreis-Badge
-      if(layers.circuit && wire.circuit){
-        var mp2=wire.points[Math.floor(wire.points.length/2)]||wire.points[0];
-        var bc=PHASE_COLORS[wire.phase||'L1']||PHASE_COLORS.default;
-        ex.font='bold '+(7/state.zoom)+'px IBM Plex Mono,monospace';
-        var tw=ex.measureText(wire.circuit).width+8/state.zoom;
-        ex.fillStyle=bc;
-        ex.beginPath(); if(ex.roundRect)ex.roundRect(mp2.x-tw/2,mp2.y-5.5/state.zoom,tw,11/state.zoom,3/state.zoom);
-        else ex.rect(mp2.x-tw/2,mp2.y-5.5/state.zoom,tw,11/state.zoom); ex.fill();
-        ex.fillStyle='#fff'; ex.textAlign='center';
-        ex.fillText(wire.circuit,mp2.x,mp2.y+4/state.zoom); ex.textAlign='left';
-      }
-      ex.restore();
-    });
-  }
-
-  // Symbole
-  if(layers.symbols){
-    var SZ_BASE=36;
-    state.symbols.forEach(function(sym){
-      var def=SYMBOLS[sym.type]; if(!def) return;
-      var SZ=SZ_BASE*(sym.size||1);
-      ex.save(); ex.translate(sym.x,sym.y);
-      if(sym.rotation) ex.rotate(sym.rotation*Math.PI/180);
-      ex.shadowColor='rgba(0,0,0,.3)'; ex.shadowBlur=4/state.zoom;
-      var offsc=getSymbolCanvas(sym.type,def,SZ);
-      ex.drawImage(offsc,-SZ/2,-SZ/2,SZ,SZ); ex.shadowBlur=0;
-      if(layers.labels){
-        ex.font='bold '+(9/state.zoom)+'px IBM Plex Sans,sans-serif'; ex.fillStyle='#1a1a2e'; ex.textAlign='center';
-        ex.fillText((sym.label||def.name).substring(0,16),0,SZ/2+10/state.zoom);
-      }
-      if(layers.montage && (sym.montage||sym.hoehe!=null)){
-        ex.font=(7/state.zoom)+'px IBM Plex Mono,monospace'; ex.fillStyle='#0077cc'; ex.textAlign='center';
-        ex.fillText((sym.montage||'')+(sym.hoehe!=null?' '+sym.hoehe+'cm':''),0,SZ/2+20/state.zoom);
-      }
-      if(layers.circuit && sym.circuit && def.circuits){
-        var ph3=sym.phase||'L1', bc3=PHASE_COLORS[ph3]||PHASE_COLORS.default;
-        var bw3=(sym.circuit.length+2)*5.5/state.zoom;
-        ex.fillStyle=bc3; ex.beginPath();
-        if(ex.roundRect)ex.roundRect(-bw3/2,SZ/2+13/state.zoom,bw3,12/state.zoom,3/state.zoom);
-        else ex.rect(-bw3/2,SZ/2+13/state.zoom,bw3,12/state.zoom); ex.fill();
-        ex.fillStyle='#fff'; ex.font='bold '+(8/state.zoom)+'px IBM Plex Mono,monospace'; ex.textAlign='center';
-        ex.fillText(sym.circuit,0,SZ/2+21/state.zoom);
-      } else if(layers.circuit && sym.circuit && sym.circuit!=='SK1'){
-        ex.font=(7/state.zoom)+'px IBM Plex Mono,monospace'; ex.fillStyle='#e67e22'; ex.textAlign='center';
-        ex.fillText(sym.circuit,0,SZ/2+29/state.zoom);
-      }
-      if(layers.wirelabel && sym.kabelPosition){
-        var dirs={unten:{dx:0,dy:1},oben:{dx:0,dy:-1},links:{dx:-1,dy:0},rechts:{dx:1,dy:0}};
-        var d=dirs[sym.kabelPosition]||dirs.unten, al=18/state.zoom;
-        ex.strokeStyle='#0077cc'; ex.lineWidth=1.8/state.zoom; ex.setLineDash([3/state.zoom,2/state.zoom]);
-        ex.beginPath(); ex.moveTo(d.dx*(SZ/2+6/state.zoom),d.dy*(SZ/2+6/state.zoom));
-        ex.lineTo(d.dx*(SZ/2+6/state.zoom+al),d.dy*(SZ/2+6/state.zoom+al)); ex.stroke(); ex.setLineDash([]);
-        if(sym.kabelLaenge){
-          ex.font=(7/state.zoom)+'px IBM Plex Mono,monospace'; ex.fillStyle='#27ae60';
-          ex.textAlign=d.dx<0?'right':'left';
-          ex.fillText(sym.kabelLaenge+'m',d.dx*(SZ/2+6/state.zoom+al/2),d.dy*(SZ/2+6/state.zoom+al/2)+8/state.zoom);
-        }
-      }
-      ex.textAlign='left'; ex.restore();
-    });
-  }
-
-  ex.restore();
-  return ec.toDataURL('image/png');
+function gz3d_wireColor(wire) {
+  if (wire.wireType && WIRE_TYPES[wire.wireType]) return WIRE_TYPES[wire.wireType].color;
+  return PHASE_COLORS[wire.phase] || '#e74c3c';
 }
 
 // ═══════════════════════════════════════════════════
