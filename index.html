@@ -3025,6 +3025,12 @@ function initFirebase() {
     fbAuth = firebase.auth();
 
     fbAuth.onAuthStateChanged(user => {
+      if (!user || (currentUser && currentUser.uid !== user.uid)) {
+        if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+        currentProjectId = null;
+        googleDriveAccessToken = null;
+        currentGoogleDriveFileId = null;
+      }
       currentUser = user;
       updateLoginUI(user);
       if (user) {
@@ -3041,18 +3047,34 @@ function initFirebase() {
 }
 
 // ── Auth ──
+function describeCloudError(err) {
+  const code = err && err.code || 'unbekannt';
+  const hints = {
+    'auth/unauthorized-domain': 'Diese Webseite ist für Google Login nicht freigegeben. Der Betreiber muss die Domain in Firebase Authentication prüfen.',
+    'auth/popup-blocked': 'Das Anmeldefenster wurde blockiert. Öffne die App direkt in Chrome oder Safari und erlaube das Anmeldefenster.',
+    'auth/popup-closed-by-user': 'Die Anmeldung wurde vor dem Abschluss geschlossen. Bitte erneut anmelden.',
+    'auth/operation-not-allowed': 'Google Login ist im Firebase-Projekt nicht aktiviert.',
+    'auth/network-request-failed': 'Die Verbindung zum Anmeldedienst ist fehlgeschlagen. Internetverbindung und Browser prüfen.',
+    'permission-denied': 'Der Cloud-Zugriff wurde verweigert. Der Betreiber muss die Firestore-Berechtigungen prüfen.',
+    'failed-precondition': 'Die Cloud-Abfrage kann nicht ausgeführt werden. Der Betreiber muss die Datenbankkonfiguration prüfen.'
+  };
+  return (hints[code] || 'Cloud-Vorgang fehlgeschlagen. Bitte den Fehlercode an den Betreiber weitergeben.') + ' (' + code + ')';
+}
 function googleLogin() {
-  if (!fbAuth) return;
+  if (!fbAuth) { alert('Google Login ist nicht geladen. Bitte die Seite neu laden.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('https://www.googleapis.com/auth/drive.file');
-  provider.setCustomParameters({ prompt: 'select_account consent' });
+  // Drive-Zugriff wird erst beim expliziten Drive-Speichern angefordert.
+  provider.setCustomParameters({ prompt: 'select_account' });
   fbAuth.signInWithPopup(provider).then(result => {
     const cred = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
     googleDriveAccessToken = cred && cred.accessToken ? cred.accessToken : googleDriveAccessToken;
     setStatus(googleDriveAccessToken ? 'Google Login verbunden - Google Drive bereit' : 'Google Login verbunden');
   }).catch(err => {
     console.warn('Login Fehler:', err);
-    setStatus('Login fehlgeschlagen: ' + err.message);
+    const message = describeCloudError(err);
+    setFbStatus('offline', 'Anmeldung fehlgeschlagen');
+    setStatus(message);
+    alert(message);
   });
 }
 function googleLogout() {
@@ -3097,7 +3119,6 @@ async function loadProjectList() {
   try {
     const snap = await fbDb.collection(GRUNDRISS_COLLECTION)
       .where('uid', '==', currentUser.uid)
-      .orderBy('updatedAt', 'desc')
       .get();
 
     const list = document.getElementById('projList');
@@ -3109,7 +3130,8 @@ async function loadProjectList() {
     }
 
     list.innerHTML = '';
-    snap.forEach(doc => {
+    const timestamp = doc => { const t = doc.data().updatedAt; return t && typeof t.toMillis === 'function' ? t.toMillis() : 0; };
+    [...snap.docs].sort((a, b) => timestamp(b) - timestamp(a)).forEach(doc => {
       const d = doc.data();
       const div = document.createElement('div');
       div.className = 'proj-list-item';
@@ -3128,7 +3150,10 @@ async function loadProjectList() {
     setFbStatus('online', snap.size + ' Projekte');
   } catch(e) {
     console.warn('[Firebase] loadProjectList:', e);
-    setFbStatus('offline', 'Ladefehler');
+    setFbStatus('offline', 'Projektliste nicht geladen');
+    setStatus(describeCloudError(e));
+    const list = document.getElementById('projList');
+    if (list) { list.textContent = describeCloudError(e); }
   }
 }
 
@@ -3259,7 +3284,7 @@ async function saveToCloud() {
 
 // ── Auto-save every 60 seconds if project open ──
 setInterval(() => {
-  if (currentProjectId && currentUser && state.symbols.length > 0) {
+  if (currentProjectId && currentUser && projectHasWork()) {
     saveToCloud();
   }
 }, 60000);
