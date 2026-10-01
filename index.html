@@ -1440,7 +1440,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
     <!-- Mode Tabs -->
     <div style="display:flex;gap:4px;margin-bottom:10px;background:var(--bg);border-radius:6px;padding:3px">
-      <button id="ai-tab-claude" onclick="setAIMode('claude')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🧠 Claude KI (eingebaut)</button>
+      <button id="ai-tab-claude" onclick="setAIMode('claude')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🧠 Claude KI</button>
       <button id="ai-tab-openrouter" onclick="setAIMode('openrouter')" class="btn bg" style="flex:1;font-size:11px;padding:6px">🌐 OpenRouter (gratis)</button>
       <button id="ai-tab-offline" onclick="setAIMode('offline')" class="btn bg" style="flex:1;font-size:11px;padding:6px">📖 Wissensbasis (offline)</button>
     </div>
@@ -1448,10 +1448,15 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <!-- Mode: Claude (built-in via Anthropic API) -->
     <div id="ai-cfg-claude" style="background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="color:var(--gr);font-weight:600">✅ Direkt einsatzbereit — kein Setup, kein Key nötig!</span>
+        <span style="color:var(--gr);font-weight:600">Claude benötigt eine eingerichtete Serververbindung.</span>
       </div>
       <div style="color:var(--tx3);font-size:10px;margin-top:4px">
-        Nutzt Claude Sonnet direkt in dieser App. Beantwortet alle Elektrofragen auf Deutsch — Normen, Schaltpläne, Kabelberechnung, KNX, DIN 18015.
+        Der API-Schlüssel bleibt auf dem Server. Serveradresse und Zugangscode erhältst du vom Betreiber.<br>
+        <label for="claudeEndpoint">Serveradresse (HTTPS)</label>
+        <input class="rp-input" id="claudeEndpoint" type="url" placeholder="https://dein-server.example/api/claude" style="width:100%;margin-top:4px">
+        <label for="claudeAccessToken">Zugangscode</label>
+        <input class="rp-input" id="claudeAccessToken" type="password" autocomplete="off" placeholder="Zugangscode des Servers" style="width:100%;margin-top:4px">
+        <div style="margin-top:6px">Die Frage wird an den angegebenen Server und Anthropic gesendet. Zugangscode und Serveradresse werden nicht gespeichert.</div>
       </div>
     </div>
 
@@ -1494,7 +1499,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px;min-height:220px;max-height:340px;display:flex;flex-direction:column;gap:8px">
       <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx2)">
         <strong style="color:var(--pu)">🤖 KI-Assistent</strong> — 3 Modi:<br>
-        <span style="color:var(--gr)">🧠 Claude KI</span> = eingebaut, sofort nutzbar &nbsp;|&nbsp;
+        <span style="color:var(--gr)">🧠 Claude KI</span> = mit Serververbindung &nbsp;|&nbsp;
         <span style="color:var(--bl)">🌐 OpenRouter</span> = kostenlose Cloud-Modelle &nbsp;|&nbsp;
         <span style="color:var(--ac)">📖 Wissensbasis</span> = offline, kein Internet
       </div>
@@ -1507,7 +1512,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     </div>
     <div style="display:flex;justify-content:space-between;margin-top:6px">
       <button class="btn bg" onclick="document.getElementById('aiChat').innerHTML=''" style="font-size:10px">🗑 Chat leeren</button>
-      <span style="font-size:9px;color:var(--tx3);align-self:center" id="aiStatus">Modus: Ollama (lokal)</span>
+      <span style="font-size:9px;color:var(--tx3);align-self:center" id="aiStatus">Modus: Claude KI — Serververbindung erforderlich</span>
     </div>
   </div>
 </div>
@@ -6464,7 +6469,8 @@ function applyFloorplanSheet(sheet) {
     img.src = sheet.floorplanData;
   } else {
     state.floorplan = null;
-    if (uz) uz.style.display = state.symbols.length ? 'none' : 'flex';
+    if (uz) uz.style.display = 'none';
+    const zl = document.getElementById('zlbl'); if (zl) zl.textContent = Math.round(state.zoom * 100) + '%';
     render(); renderProps(null);
   }
   updateFloorplanTabs();
@@ -8254,6 +8260,7 @@ function exportXML() {
 let aiMode = 'claude';
 
 function showAI() {
+  setAIMode(aiMode);
   document.getElementById('aiModal').classList.remove('hid');
 }
 
@@ -8265,7 +8272,7 @@ function setAIMode(mode) {
     if (btn) { btn.className = m === mode ? 'btn ba' : 'btn bg'; btn.style.flex='1'; btn.style.fontSize='11px'; btn.style.padding='6px'; }
     if (cfg) cfg.style.display = m === mode ? 'block' : 'none';
   });
-  const labels = { claude:'Modus: Claude KI (eingebaut)', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
+  const labels = { claude:'Modus: Claude KI — Serververbindung erforderlich', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
   const statusEl = document.getElementById('aiStatus');
   if (statusEl) statusEl.textContent = labels[mode] || '';
 }
@@ -8306,34 +8313,51 @@ function aiAddLoading(label) {
   return div;
 }
 
-// Claude eingebaut (Anthropic API)
+// Claude über authentifizierten Server-Proxy; API-Key nur auf dem Server.
+let claudePending = false;
 async function sendClaude(msg) {
+  if (claudePending) { document.getElementById('aiInput').value = msg; return; }
+  const endpoint = document.getElementById('claudeEndpoint').value.trim();
+  const accessToken = document.getElementById('claudeAccessToken').value.trim();
+  let url;
+  try {
+    url = new URL(endpoint);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.hostname === 'api.anthropic.com') throw new Error();
+  } catch (_) {
+    document.getElementById('aiInput').value = msg;
+    aiAddMsg('assistant', 'Bitte eine gültige HTTPS-Adresse deines Claude-Servers eingeben. Die direkte Anthropic-API funktioniert hier nicht.', 'var(--yl)');
+    return;
+  }
+  if (!accessToken) {
+    document.getElementById('aiInput').value = msg;
+    aiAddMsg('assistant', 'Bitte den Zugangscode deines Claude-Servers eingeben. Die Frage wurde nicht gesendet.', 'var(--yl)');
+    return;
+  }
+  claudePending = true;
   aiAddMsg('user', msg, 'var(--ac)');
   const loader = aiAddLoading('Claude denkt nach...');
-  const projCtx = 'Projekt: "' + document.getElementById('projName').value + '", ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen.';
-  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur und DIN-18015-Experte. Du hilfst bei Elektroinstallationsplanung: Schaltplaene, Kabelquerschnitte, Normen, KNX, Verlegung. ' + projCtx + ' Antworte auf Deutsch, praxisbezogen, max 200 Woerter.';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(url.href, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: msg }]
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+      body: JSON.stringify({ message: msg }),
+      signal: controller.signal
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error((data.error && data.error.message) || 'HTTP ' + response.status);
+    const answer = (data.content || []).filter(c => c.type === 'text' && typeof c.text === 'string').map(c => c.text).join('\n');
+    if (!answer) throw new Error('Der Server hat keine Textantwort geliefert.');
+    aiAddMsg('assistant', answer, 'var(--pu)');
+  } catch (e) {
+    const detail = e.name === 'AbortError' ? 'Zeitüberschreitung nach 45 Sekunden.' : e.message;
+    aiAddMsg('assistant', 'Claude-Verbindung fehlgeschlagen: ' + detail + '\nServeradresse, Zugangscode und Serverfreigabe prüfen.', 'var(--rd)');
+    document.getElementById('aiInput').value = msg;
+  } finally {
+    clearTimeout(timer);
     loader.remove();
-    if (data.content && data.content[0]) {
-      aiAddMsg('assistant', data.content[0].text, 'var(--pu)');
-    } else {
-      const errMsg = data.error ? data.error.message : 'Unbekannter Fehler';
-      aiAddMsg('assistant', 'Fehler: ' + errMsg + '\n\nTipp: Wissensbasis (offline) Modus nutzen!', 'var(--rd)');
-    }
-  } catch(e) {
-    loader.remove();
-    aiAddMsg('assistant', 'Verbindungsfehler: ' + e.message + '\n\nTipp: Wissensbasis (offline) Modus waehlen!', 'var(--rd)');
+    claudePending = false;
   }
 }
 
