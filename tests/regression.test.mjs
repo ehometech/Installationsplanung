@@ -133,3 +133,33 @@ test('storage failure gives a visible warning without discarding in-memory symbo
   assert.match(warning, /Symbol-Backup/);
   assert.equal(context.customSymbols.own.name, 'Keep');
 });
+
+test('cloud autosave includes a floorplan without symbols and requires a cloud project', () => {
+  const start = html.indexOf('// ── Auto-save every 60 seconds');
+  const source = html.slice(start, html.indexOf('// ── Show project manager', start));
+  let callback, calls = 0;
+  const context = { currentProjectId: 'cloud-test', currentUser: { uid: 'user' }, projectHasWork: () => true, saveToCloud(){ calls++; }, setInterval(fn){ callback = fn; } };
+  vm.createContext(context); vm.runInContext(source, context);
+  callback(); assert.equal(calls, 1);
+  context.currentProjectId = null; callback(); assert.equal(calls, 1);
+  context.currentProjectId = 'cloud-test'; context.currentUser = null; callback(); assert.equal(calls, 1);
+});
+test('login errors explain blocked popups and unauthorized domains', () => {
+  const source = html.slice(html.indexOf('function describeCloudError('), html.indexOf('function googleLogin('));
+  const context = {}; vm.createContext(context); vm.runInContext(source, context);
+  assert.match(context.describeCloudError({ code: 'auth/unauthorized-domain' }), /Firebase Authentication/);
+  assert.match(context.describeCloudError({ code: 'auth/popup-blocked' }), /Chrome oder Safari/);
+  assert.match(context.describeCloudError({ code: 'permission-denied' }), /Firestore-Berechtigungen/);
+});
+test('ordinary Google login does not request Drive permissions', async () => {
+  const source = html.slice(html.indexOf('function describeCloudError('), html.indexOf('function googleLogout('));
+  let scopeRequested = false, signedIn = false;
+  const context = {
+    firebase: { auth: { GoogleAuthProvider: class { addScope(){ scopeRequested = true; } setCustomParameters(){} } } },
+    fbAuth: { signInWithPopup(){ signedIn = true; return Promise.reject({ code: 'auth/popup-blocked' }); } },
+    console: { warn(){} }, setStatus(){}, setFbStatus(){}, alert(){}
+  };
+  vm.createContext(context); vm.runInContext(source, context);
+  context.googleLogin(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(signedIn, true); assert.equal(scopeRequested, false);
+});
