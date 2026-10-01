@@ -2413,7 +2413,38 @@ function saveCustomSymbols() {
     localStorage.setItem(LS_CUSTOM, JSON.stringify(customSymbols));
     localStorage.setItem(LS_DELETED, JSON.stringify([...deletedStdSymbols]));
     localStorage.setItem(LS_OVERRIDES, JSON.stringify(overriddenStdSymbols));
-  } catch(e) { console.warn('saveCustomSymbols:', e); }
+    return true;
+  } catch(e) {
+    console.warn('saveCustomSymbols:', e);
+    alert('Deine Symbole konnten nicht dauerhaft im Browser gespeichert werden. Der Speicher ist voll oder nicht verfügbar. Bitte jetzt unter „Symbole verwalten“ ein Symbol-Backup exportieren. Die Symbole bleiben bis zum Schließen dieser Seite verfügbar.');
+    return false;
+  }
+}
+
+// Projekte ergänzen die persönliche Sammlung, auch wenn ältere Projekte keine Symbole enthalten.
+function restoreProjectSymbolConfig(data) {
+  if (!data || typeof data !== 'object') return;
+  if (data.customSymbols && typeof data.customSymbols === 'object' && !Array.isArray(data.customSymbols)) {
+    customSymbols = { ...customSymbols, ...data.customSymbols };
+  }
+  if (data.overriddenStdSymbols && typeof data.overriddenStdSymbols === 'object' && !Array.isArray(data.overriddenStdSymbols)) {
+    overriddenStdSymbols = { ...overriddenStdSymbols, ...data.overriddenStdSymbols };
+  }
+  if (Array.isArray(data.deletedStdSymbols)) {
+    for (const key of data.deletedStdSymbols) deletedStdSymbols.add(key);
+  }
+  // Explizit gespeicherte Symbole haben Vorrang vor älteren Löschmarkierungen.
+  for (const key of [...Object.keys(customSymbols), ...Object.keys(overriddenStdSymbols)]) deletedStdSymbols.delete(key);
+  for (const key of deletedStdSymbols) { delete SYMBOLS[key]; delete symCache[key]; }
+  for (const [key, cs] of Object.entries(overriddenStdSymbols)) {
+    SYMBOLS[key] = {
+      ...SYMBOLS[key], ...cs, isOverride: true,
+      svg: cs.imgData ? `<image href="${cs.imgData}" width="40" height="40"/>` : SYMBOLS[key]?.svg
+    };
+    delete symCache[key];
+  }
+  mergeCustomSymbols();
+  saveCustomSymbols();
 }
 
 function mergeCustomSymbols() {
@@ -3183,7 +3214,7 @@ function listenToProject(id) {
       if (d.raeume && JSON.stringify(d.raeume) !== JSON.stringify(state.raeume||[])) { state.raeume = d.raeume; changed = true; }
       if (d.scale !== undefined && d.scale !== state.scale) { state.scale = d.scale; changed = true; }
       if (d.raumhoehe) state.raumhoehe = d.raumhoehe;
-      if (d.customSymbols && Object.keys(d.customSymbols).length) { customSymbols = d.customSymbols; mergeCustomSymbols(); }
+      if (d.customSymbols || d.overriddenStdSymbols || d.deletedStdSymbols) restoreProjectSymbolConfig(d);
       if (d.name) document.getElementById('projName').value = d.name;
       if (changed) { render(); buildPalette(); captureActiveFloorplan(); renderProjectPage(); }
       setFbStatus('online', 'Synchronisiert OK');
@@ -6519,7 +6550,8 @@ function serializeProjectData() {
     floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
     symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
     pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
-    floorplanData: currentFloorplanData(), customSymbols: customSymbols||{},
+    floorplanData: currentFloorplanData(), customSymbols: simpleClone(customSymbols)||{},
+    overriddenStdSymbols: simpleClone(overriddenStdSymbols)||{}, deletedStdSymbols: [...deletedStdSymbols],
     updatedAt: new Date().toISOString(), _v:2, _saved: new Date().toISOString()
   };
 }
@@ -6539,7 +6571,7 @@ function loadProjectData(d) {
     state.pan=d.pan||{x:0,y:0}; state.zoom=d.zoom||1; state.raumhoehe=d.raumhoehe||250;
     if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { state.floorplan=null; captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
   }
-  if (d.customSymbols) { customSymbols = d.customSymbols; mergeCustomSymbols(); buildPalette(); }
+  restoreProjectSymbolConfig(d);
   renderProjectPage();
 }
 function resetWorkspaceForNewProject(name) {
