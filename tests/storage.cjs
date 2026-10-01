@@ -21,7 +21,7 @@ const http=require('http'),fs=require('fs'),assert=require('assert');
  console.log('PASS: 12 MB symbols + project survive reload without localStorage');
  const result=await page.evaluate(async()=>{
    const db=new Map();let writes=0,failAt=Infinity,maxBytes=0;
-   function ref(id){return {id,async set(d){writes++;if(writes===failAt)throw Error('simulated disconnect');maxBytes=Math.max(maxBytes,new TextEncoder().encode(JSON.stringify(d)).length);db.set(id,structuredClone(d));},async get(){const d=db.get(id);return {exists:!!d,data:()=>d}},async delete(){db.delete(id)}}}
+   function ref(id){return {id,async set(d){writes++;if(writes===failAt)throw Error('simulated disconnect');maxBytes=Math.max(maxBytes,new TextEncoder().encode(JSON.stringify(d)).length);db.set(id,structuredClone(d));},async get(){const d=db.get(id);if(!d)throw Error('Missing or insufficient permissions');return {exists:!!d,data:()=>d}},async delete(){db.delete(id)}}}
    currentUser={uid:'test-user'};
    fbDb={collection:()=>({doc:ref}),runTransaction:async fn=>{const queued=[];await fn({get:r=>r.get(),set:(r,d)=>queued.push([r,d])});for(const [r,d] of queued)await r.set(d)}};
    window.firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}};
