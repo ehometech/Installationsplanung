@@ -3121,8 +3121,10 @@ function splitCloudPayload(text) {
   return chunks;
 }
 async function writeCloudProject(ref, data, expectedVersion) {
-  const initial = await ref.get({source:'server'});
-  if ((initial.exists ? cloudVersion(initial.data()) : null) !== expectedVersion)
+  // Owner-only rules cannot read a document that does not exist yet.
+  // New projects use a fresh Firestore auto-ID and are published after all chunks.
+  const initial = expectedVersion === null ? null : await ref.get({source:'server'});
+  if (expectedVersion !== null && (!initial.exists || cloudVersion(initial.data()) !== expectedVersion))
     throw new Error('Das Cloud-Projekt wurde auf einem anderen Gerät geändert. Lokale Änderungen exportieren und Cloud-Projekt neu öffnen.');
   const uid = currentUser.uid;
   const revision = crypto.randomUUID();
@@ -3146,6 +3148,9 @@ async function writeCloudProject(ref, data, expectedVersion) {
     symbolCount:(data.floorplans||[]).reduce((n,f)=>n+(f.symbols||[]).length,0),
     floorplanCount:(data.floorplans||[]).length,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
   let obsolete = null;
+  if (expectedVersion === null) {
+    await ref.set({...manifest, previousRevision:null, createdAt:manifest.updatedAt});
+  } else {
   await fbDb.runTransaction(async tx => {
     const previous = await tx.get(ref);
     if ((previous.exists ? cloudVersion(previous.data()) : null) !== expectedVersion)
@@ -3156,6 +3161,7 @@ async function writeCloudProject(ref, data, expectedVersion) {
     // Publish only after ALL chunks succeeded. Old revision stays readable on failure.
     tx.set(ref, {...manifest,createdAt:previous.exists ? (previous.data().createdAt || manifest.updatedAt) : manifest.updatedAt});
   });
+  }
   // Keep one previous complete revision; older blocks no longer accumulate.
   if (obsolete) for (let i=0;i<obsolete.chunkCount;i++) {
     try { await fbDb.collection(GRUNDRISS_COLLECTION).doc('chunk_'+ref.id+'_'+obsolete.revision+'_'+i).delete(); } catch(e) { console.warn('Alte Cloud-Version konnte nicht bereinigt werden',e); break; }
