@@ -3195,7 +3195,7 @@ async function createNewProject() {
     listenToProject(ref.id);
     setFbStatus('online','Cloud gespeichert');
     setStatus('Projekt vollständig in Cloud gespeichert');
-  } catch(e) { setFbStatus('offline','Nicht gespeichert'); setStatus(e.message); alert('Cloud-Speichern fehlgeschlagen: '+e.message); }
+  } catch(e) { const detail = (e.code ? '['+e.code+'] ' : '') + (e.message || String(e)); console.error('[Cloud-Speichern / Neues Projekt]', detail); setFbStatus('offline','Nicht gespeichert'); setStatus(detail); alert('Cloud-Speichern fehlgeschlagen:\n'+detail); }
   finally { _cloudBusy = false; }
 }
 async function openProject(id) {
@@ -3239,7 +3239,7 @@ function listenToProject(id) {
     // Never replace the user's working canvas in a background listener.
   },e => { setFbStatus('offline','Synchronisierung fehlgeschlagen'); console.warn(e); });
 }
-async function saveToCloud() {
+async function saveToCloud(silent=false) {
   if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
   if (!currentProjectId) return createNewProject();
   if (_cloudBusy) return;
@@ -3252,7 +3252,7 @@ async function saveToCloud() {
     const revision = await writeCloudProject(fbDb.collection(GRUNDRISS_COLLECTION).doc(id),data,_cloudVersion);
     if (currentProjectId===id) { _cloudVersion=revision; _cloudSignature=signature; }
     setFbStatus('online','Cloud gespeichert '+new Date().toLocaleTimeString('de-DE'));
-  } catch(e) { setFbStatus('offline','Cloud NICHT gespeichert'); setStatus(e.message); }
+  } catch(e) { const detail = (e.code ? '['+e.code+'] ' : '') + (e.message || String(e)); console.error('[Cloud-Speichern]', detail); setFbStatus('offline','Cloud NICHT gespeichert'); setStatus(detail); if (!silent) alert('Cloud-Speichern fehlgeschlagen:\n'+detail); }
   finally { _cloudBusy=false; }
 }
 
@@ -3261,7 +3261,7 @@ async function saveToCloud() {
 // ── Auto-save every 60 seconds if project open ──
 setInterval(() => {
   if (currentProjectId && currentUser && projectHasWork()) {
-    saveToCloud();
+    saveToCloud(true);
   }
 }, 60000);
 
