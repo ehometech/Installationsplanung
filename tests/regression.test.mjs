@@ -83,3 +83,53 @@ test('proxy masks upstream errors', async () => {
     assert.equal(r.status, 502); assert.ok(!(await r.text()).includes('private upstream details'));
   });
 });
+
+test('loading an older project preserves uploaded symbols and persists restored overrides', () => {
+  const source = html.slice(html.indexOf('function restoreProjectSymbolConfig('), html.indexOf('function mergeCustomSymbols('));
+  let saved = 0;
+  const context = {
+    customSymbols: { own: { name: 'Mein Symbol', imgData: 'data:image/png;base64,test' } },
+    overriddenStdSymbols: {}, deletedStdSymbols: new Set(), SYMBOLS: { ST: { svg: '<circle/>' } }, symCache: { ST: 'old' },
+    mergeCustomSymbols(){}, saveCustomSymbols(){ saved++; }
+  };
+  vm.createContext(context); vm.runInContext(source, context);
+  context.restoreProjectSymbolConfig({ customSymbols: {} });
+  assert.equal(context.customSymbols.own.name, 'Mein Symbol');
+  context.restoreProjectSymbolConfig({ customSymbols: { second: { name: 'Zweites' } }, overriddenStdSymbols: { ST: { imgData: 'data:image/png;base64,replacement', name: 'Eigene Steckdose' } } });
+  assert.equal(context.customSymbols.own.name, 'Mein Symbol');
+  assert.equal(context.customSymbols.second.name, 'Zweites');
+  assert.equal(context.SYMBOLS.ST.name, 'Eigene Steckdose');
+  assert.match(context.SYMBOLS.ST.svg, /replacement/);
+  assert.equal(context.symCache.ST, undefined);
+  assert.equal(saved, 2);
+});
+test('project export includes custom symbols, overrides and deletion markers', () => {
+  const source = html.slice(html.indexOf('function serializeProjectData('), html.indexOf('function loadProjectData('));
+  const context = {
+    captureActiveFloorplan(){}, currentLocalProjectId: 'project-test',
+    document: { getElementById: () => ({ value: 'Test' }) }, simpleClone: v => JSON.parse(JSON.stringify(v || null)),
+    state: { floorplans: [], symbols: [], wires: [] }, currentFloorplanData: () => null,
+    customSymbols: { own: { imgData: 'own-data' } }, overriddenStdSymbols: { ST: { imgData: 'override-data' } }, deletedStdSymbols: new Set(['TV'])
+  };
+  vm.createContext(context); vm.runInContext(source, context);
+  const data = context.serializeProjectData();
+  assert.equal(data.customSymbols.own.imgData, 'own-data');
+  assert.equal(data.overriddenStdSymbols.ST.imgData, 'override-data');
+  assert.equal(data.deletedStdSymbols[0], 'TV');
+  context.customSymbols.own.imgData = 'changed';
+  assert.equal(data.customSymbols.own.imgData, 'own-data');
+});
+test('storage failure gives a visible warning without discarding in-memory symbols', () => {
+  const source = html.slice(html.indexOf('function saveCustomSymbols('), html.indexOf('// Projekte ergänzen'));
+  let warning = '';
+  const context = {
+    customSymbols: { own: { name: 'Keep' } }, deletedStdSymbols: new Set(), overriddenStdSymbols: {},
+    localStorage: { setItem(){ throw new Error('QuotaExceededError'); } },
+    LS_CUSTOM: 'custom', LS_DELETED: 'deleted', LS_OVERRIDES: 'overrides',
+    console: { warn(){} }, alert: text => { warning = text; }
+  };
+  vm.createContext(context); vm.runInContext(source, context);
+  assert.equal(context.saveCustomSymbols(), false);
+  assert.match(warning, /Symbol-Backup/);
+  assert.equal(context.customSymbols.own.name, 'Keep');
+});
