@@ -2368,14 +2368,14 @@ const LS_CUSTOM    = 'grundriss_custom_symbols';
 const LS_DELETED   = 'grundriss_deleted_std';
 const LS_OVERRIDES = 'grundriss_overrides';
 
-function loadCustomSymbols() {
+async function loadCustomSymbols() {
   try {
-    // 1. Custom Symbole
-    const saved = localStorage.getItem(LS_CUSTOM);
+    const stored = await idbGetBackup('symbols');
+    const saved = stored ? JSON.stringify(stored.customSymbols) : localStorage.getItem(LS_CUSTOM);
     if (saved) { customSymbols = JSON.parse(saved); }
 
     // 2. Gelöschte Standard-Symbole
-    const del = localStorage.getItem(LS_DELETED);
+    const del = stored ? JSON.stringify(stored.deletedStdSymbols) : localStorage.getItem(LS_DELETED);
     if (del) {
       const keys = JSON.parse(del);
       deletedStdSymbols = new Set(keys);
@@ -2383,7 +2383,7 @@ function loadCustomSymbols() {
     }
 
     // 3. Überschriebene Standard-Symbole (eigenes Bild statt Standard-SVG)
-    const ov = localStorage.getItem(LS_OVERRIDES);
+    const ov = stored ? JSON.stringify(stored.overriddenStdSymbols) : localStorage.getItem(LS_OVERRIDES);
     if (ov) {
       overriddenStdSymbols = JSON.parse(ov);
       for (const [k, cs] of Object.entries(overriddenStdSymbols)) {
@@ -2400,16 +2400,17 @@ function loadCustomSymbols() {
 
     // 4. Custom Symbole einbinden
     mergeCustomSymbols();
-  } catch(e) { console.warn('loadCustomSymbols:', e); }
+    if (!stored) await persistSymbols();
+  } catch(e) { storageFailure(e); }
 }
 
-function saveCustomSymbols() {
-  try {
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(customSymbols));
-    localStorage.setItem(LS_DELETED, JSON.stringify([...deletedStdSymbols]));
-    localStorage.setItem(LS_OVERRIDES, JSON.stringify(overriddenStdSymbols));
-  } catch(e) { console.warn('saveCustomSymbols:', e); }
+async function persistSymbols() {
+  const snapshot = simpleClone({customSymbols, deletedStdSymbols:[...deletedStdSymbols], overriddenStdSymbols});
+  await idbPutBackup(snapshot, 'symbols');
+  // Remove legacy copies only after the complete transaction committed.
+  [LS_CUSTOM,LS_DELETED,LS_OVERRIDES].forEach(k => localStorage.removeItem(k));
 }
+function saveCustomSymbols() { return persistSymbols().catch(e => { storageFailure(e); throw e; }); }
 
 function mergeCustomSymbols() {
   for (const [key, cs] of Object.entries(customSymbols)) {
@@ -2514,7 +2515,7 @@ function showSymbolEditForm(upload, progressLabel, onNext) {
   }
 }
 
-function saveNewSymbol() {
+async function saveNewSymbol() {
   if (!pendingUpload) return;
   const name = document.getElementById('seBezeichnung').value.trim();
   const abbr = document.getElementById('seAbbr').value.trim().toUpperCase();
@@ -2531,7 +2532,7 @@ function saveNewSymbol() {
     imgType: isSVG ? 'svg' : 'img',
     color: '#555'
   };
-  saveCustomSymbols();
+  await saveCustomSymbols();
   mergeCustomSymbols();
   buildPalette();
   setStatus('✅ Symbol "' + name + '" gespeichert!');
@@ -2629,7 +2630,7 @@ function replaceSymbolImage(event) {
   event.target.value = '';
 }
 
-function saveEditedSymbol() {
+async function saveEditedSymbol() {
   if (!editingSymKey) return;
   const name      = document.getElementById('seModalName').value.trim();
   const abbr      = document.getElementById('seModalAbbr').value.trim().toUpperCase();
@@ -2658,7 +2659,7 @@ function saveEditedSymbol() {
     // Direkt in SYMBOLS übernehmen
     SYMBOLS[editingSymKey] = { ...SYMBOLS[editingSymKey], name, abbr, cat, phase, nennstrom, kabel, isOverride: true };
   }
-  saveCustomSymbols();
+  await saveCustomSymbols();
   mergeCustomSymbols();
   renderSymbolManager();
   document.getElementById('symEditModal').classList.add('hid');
@@ -2666,7 +2667,7 @@ function saveEditedSymbol() {
   setStatus('✅ Symbol aktualisiert');
 }
 
-function deleteSymbol() {
+async function deleteSymbol() {
   if (!editingSymKey) return;
   const name = (customSymbols[editingSymKey]||overriddenStdSymbols[editingSymKey]||SYMBOLS[editingSymKey])?.name || editingSymKey;
   if (!confirm('Symbol "'+name+'" aus Palette entfernen?')) return;
@@ -2676,7 +2677,7 @@ function deleteSymbol() {
   delete customSymbols[editingSymKey];
   delete SYMBOLS[editingSymKey];
   if (typeof symCache !== 'undefined') delete symCache[editingSymKey];
-  saveCustomSymbols();
+  await saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   document.getElementById('symEditModal').classList.add('hid');
@@ -2783,7 +2784,7 @@ function renderSymbolManager() {
   body.innerHTML = html;
 }
 
-function restoreStdSymbol(key) {
+async function restoreStdSymbol(key) {
   ensureSymbolsBackup();
   if (!window._SYMBOLS_ORIG || !window._SYMBOLS_ORIG[key]) {
     setStatus('Original-Daten nicht verfügbar — Seite neu laden'); return;
@@ -2791,13 +2792,13 @@ function restoreStdSymbol(key) {
   deletedStdSymbols.delete(key);
   SYMBOLS[key] = { ...window._SYMBOLS_ORIG[key] };
   if (typeof symCache !== 'undefined') delete symCache[key];
-  saveCustomSymbols();
+  await saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   setStatus('↺ Symbol "' + SYMBOLS[key].name + '" wiederhergestellt');
 }
 
-function restoreAllStdSymbols() {
+async function restoreAllStdSymbols() {
   if (!confirm('Alle entfernten Standard-Symbole wiederherstellen?')) return;
   ensureSymbolsBackup();
   for (const key of [...deletedStdSymbols]) {
@@ -2807,7 +2808,7 @@ function restoreAllStdSymbols() {
     }
   }
   deletedStdSymbols.clear();
-  saveCustomSymbols();
+  await saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   setStatus('↺ Alle Standard-Symbole wiederhergestellt');
@@ -2837,7 +2838,7 @@ function symMgrAddToCat(catEncoded) {
 }
 let _pendingUploadCat = null;
 
-function confirmDeleteSymbol(key) {
+async function confirmDeleteSymbol(key) {
   const name = (customSymbols[key]||overriddenStdSymbols[key]||SYMBOLS[key])?.name || key;
   const isStd = !customSymbols[key] && !overriddenStdSymbols[key];
   const msg = isStd
@@ -2857,13 +2858,13 @@ Es kann über "↺ Wiederherstellen" zurückgeholt werden.`
   delete customSymbols[key];
   delete SYMBOLS[key];
   if (typeof symCache !== 'undefined') delete symCache[key];
-  saveCustomSymbols();
+  await saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   setStatus('🗑 "' + name + '" aus Palette entfernt — über "Gelöschte anzeigen" wiederherstellbar');
 }
 
-function resetStdSymbol(key) {
+async function resetStdSymbol(key) {
   // Override entfernen → Standard wiederherstellen
   if (!confirm('Original-Symbol wiederherstellen?')) return;
   delete overriddenStdSymbols[key];
@@ -2873,7 +2874,7 @@ function resetStdSymbol(key) {
   if (window._SYMBOLS_ORIG && window._SYMBOLS_ORIG[key]) {
     SYMBOLS[key] = { ...window._SYMBOLS_ORIG[key] };
   }
-  saveCustomSymbols();
+  await saveCustomSymbols();
   mergeCustomSymbols();
   renderSymbolManager();
   buildPalette();
@@ -2915,18 +2916,18 @@ function exportSymbolConfig() {
   setStatus('Symbol-Backup exportiert');
 }
 
-function importSymbolConfig(event) {
+async function importSymbolConfig(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
       const importedSymbols = data.symbols || data.customSymbols || {};
       customSymbols = { ...(customSymbols||{}), ...importedSymbols };
       if (Array.isArray(data.deletedStdSymbols)) deletedStdSymbols = new Set(data.deletedStdSymbols);
       if (data.overriddenStdSymbols) overriddenStdSymbols = data.overriddenStdSymbols;
-      saveCustomSymbols();
+      await saveCustomSymbols();
       mergeCustomSymbols();
       buildPalette();
       renderSymbolManager();
@@ -2938,7 +2939,7 @@ function importSymbolConfig(event) {
   event.target.value = '';
 }
 
-function resetToBuiltin() {
+async function resetToBuiltin() {
   if (!confirm('Alle eigenen Symbole löschen und Standard wiederherstellen?')) return;
   // Remove custom entries from SYMBOLS
   for (const key of Object.keys(customSymbols)) {
@@ -2946,7 +2947,7 @@ function resetToBuiltin() {
     delete symCache[key];
   }
   customSymbols = {};
-  localStorage.removeItem('grundriss_custom_symbols');
+  await saveCustomSymbols();
   renderSymbolManager();
   buildPalette();
   setStatus('↺ Standard-Symbole wiederhergestellt');
@@ -3022,7 +3023,8 @@ function googleLogin() {
 function googleLogout() {
   if (!fbAuth) return;
   fbAuth.signOut().then(() => {
-    currentUser = null; currentProjectId = null; googleDriveAccessToken = null; currentGoogleDriveFileId = null;
+    disconnectCloudProject();
+    currentUser = null; googleDriveAccessToken = null; currentGoogleDriveFileId = null;
     setFbStatus('offline', 'Abgemeldet');
     setStatus('Abgemeldet');
   });
@@ -3075,6 +3077,7 @@ async function loadProjectList() {
     list.innerHTML = '';
     snap.forEach(doc => {
       const d = doc.data();
+      if (d.kind === 'project-chunk') return;
       const div = document.createElement('div');
       div.className = 'proj-list-item';
       const dt = d.updatedAt?.toDate ? d.updatedAt.toDate().toLocaleDateString('de-DE') : '—';
@@ -3096,55 +3099,122 @@ async function loadProjectList() {
   }
 }
 
-async function createNewProject() {
-  if (!fbAuth) { alert('Firebase Auth nicht geladen - Seite neu laden!'); return; }
-  if (!currentUser) { alert('Bitte zuerst mit Google anmelden!'); return; }
-  if (!fbDb) { alert('Firestore nicht verfügbar - Seite neu laden!'); return; }
-  const nameEl = document.getElementById('newProjName');
-  const name = (nameEl?.value||'').trim() || document.getElementById('projName')?.value || 'Projekt ' + new Date().toLocaleDateString('de-DE');
-  try {
-    setFbStatus('syncing', 'Erstelle...');
-    const projectData = serializeProjectData();
-    projectData.name = name;
-    const newDoc = {
-      ...projectData,
-      uid: currentUser.uid,
-      symbolCount: (projectData.floorplans||[]).reduce((a,f)=>a+(f.symbols||[]).length,0),
-      floorplanCount: (projectData.floorplans||[]).length,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    const ref = await fbDb.collection(GRUNDRISS_COLLECTION).add(newDoc);
-    currentProjectId = ref.id;
-    if (nameEl) nameEl.value = '';
-    document.getElementById('projName').value = name;
-    const pm = document.getElementById('projMgrModal'); if (pm) pm.classList.add('hid');
-    listenToProject(ref.id);
-    render(); renderProps(null); renderProjectPage();
-    setFbStatus('online', 'Projekt erstellt & gespeichert');
-    setStatus('Projekt "' + name + '" in Cloud erstellt');
-  } catch(e) {
-    console.error('[Firebase] createProject:', e);
-    setFbStatus('offline', 'Fehler');
-    alert('Projekt erstellen fehlgeschlagen: ' + (e.message || String(e)));
+let _cloudBusy = false;
+let _cloudVersion = null;
+let _cloudSignature = '';
+function disconnectCloudProject() {
+  if (fbUnsubscribe) fbUnsubscribe();
+  fbUnsubscribe = null; currentProjectId = null; _cloudVersion = null; _cloudSignature = '';
+}
+function cloudVersion(data) { return data?.revision || JSON.stringify(data?.updatedAt || null); }
+function cloudSignature(data) {
+  return JSON.stringify(data, (key,value) => ['updatedAt','_saved','savedAt'].includes(key) ? undefined : value);
+}
+function splitCloudPayload(text) {
+  const chunks = [];
+  for (let i=0;i<text.length;) {
+    let end = Math.min(i+120000,text.length);
+    // Do not split a UTF-16 surrogate pair.
+    if (end<text.length && /[\uD800-\uDBFF]/.test(text[end-1])) end--;
+    chunks.push(text.slice(i,end)); i=end;
   }
+  return chunks;
 }
-
-
-
-
-async function openProject(id, data) {
-  currentProjectId = id;
-  loadProjectData(data);
-  document.getElementById('projMgrModal').classList.add('hid');
-  listenToProject(id);
-  render(); renderProps(null); buildPalette(); updateFloorplanTabs(); renderProjectPage();
-  setFbStatus('online', 'Projekt geladen');
-  setStatus('Projekt "' + (data.name||'Projekt') + '" geladen');
+async function writeCloudProject(ref, data, expectedVersion) {
+  const initial = await ref.get({source:'server'});
+  if ((initial.exists ? cloudVersion(initial.data()) : null) !== expectedVersion)
+    throw new Error('Das Cloud-Projekt wurde auf einem anderen Gerät geändert. Lokale Änderungen exportieren und Cloud-Projekt neu öffnen.');
+  const uid = currentUser.uid;
+  const revision = crypto.randomUUID();
+  const json = JSON.stringify(data);
+  const chunks = splitCloudPayload(json);
+  const refs = chunks.map((_,i) => fbDb.collection(GRUNDRISS_COLLECTION).doc('chunk_'+ref.id+'_'+revision+'_'+i));
+  // Each individual write stays well below the document and request limits.
+  let uploaded = 0;
+  try {
+  for (let i=0;i<chunks.length;i++) {
+    await refs[i].set({uid,kind:'project-chunk',projectId:ref.id,revision,index:i,payload:chunks[i]});
+    uploaded = i+1;
+    setFbStatus('syncing','Speichert '+(i+1)+'/'+chunks.length+' …');
+  }
+  } catch(e) {
+    for (const part of refs.slice(0,uploaded)) { try { await part.delete(); } catch(_) {} }
+    throw e;
+  }
+  const manifest = {uid,kind:'project',storageFormat:3,revision,chunkCount:chunks.length,
+    payloadLength:json.length,name:data.name,id:data.id,
+    symbolCount:(data.floorplans||[]).reduce((n,f)=>n+(f.symbols||[]).length,0),
+    floorplanCount:(data.floorplans||[]).length,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  let obsolete = null;
+  await fbDb.runTransaction(async tx => {
+    const previous = await tx.get(ref);
+    if ((previous.exists ? cloudVersion(previous.data()) : null) !== expectedVersion)
+      throw new Error('Das Cloud-Projekt wurde auf einem anderen Gerät geändert. Lokale Änderungen als JSON sichern und Cloud-Projekt neu öffnen.');
+    obsolete = previous.exists ? previous.data().previousRevision : null;
+    const prior = previous.exists && previous.data().storageFormat===3 ? {revision:previous.data().revision,chunkCount:previous.data().chunkCount} : null;
+    manifest.previousRevision = prior;
+    // Publish only after ALL chunks succeeded. Old revision stays readable on failure.
+    tx.set(ref, {...manifest,createdAt:previous.exists ? (previous.data().createdAt || manifest.updatedAt) : manifest.updatedAt});
+  });
+  // Keep one previous complete revision; older blocks no longer accumulate.
+  if (obsolete) for (let i=0;i<obsolete.chunkCount;i++) {
+    try { await fbDb.collection(GRUNDRISS_COLLECTION).doc('chunk_'+ref.id+'_'+obsolete.revision+'_'+i).delete(); } catch(e) { console.warn('Alte Cloud-Version konnte nicht bereinigt werden',e); break; }
+  }
+  return revision;
 }
-
-
-
+async function readCloudProject(id, manifest) {
+  if (manifest.storageFormat !== 3) return manifest;
+  if (!Number.isInteger(manifest.chunkCount) || manifest.chunkCount<1 || manifest.chunkCount>10000)
+    throw new Error('Ungültiges Cloud-Projektformat');
+  const parts = [];
+  for(let i=0;i<manifest.chunkCount;i++) {
+    const snap = await fbDb.collection(GRUNDRISS_COLLECTION).doc('chunk_'+id+'_'+manifest.revision+'_'+i).get({source:'server'});
+    const d = snap.data();
+    if (!snap.exists || d.uid!==currentUser.uid || d.revision!==manifest.revision || d.index!==i || typeof d.payload!=='string')
+      throw new Error('Cloud-Projekt unvollständig. Der offene lokale Stand bleibt erhalten.');
+    parts.push(d.payload);
+  }
+  const json = parts.join('');
+  if(json.length!==manifest.payloadLength) throw new Error('Cloud-Daten unvollständig');
+  return JSON.parse(json);
+}
+async function createNewProject() {
+  if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
+  if (_cloudBusy) return;
+  const nameEl = document.getElementById('newProjName');
+  const name = nameEl?.value.trim() || document.getElementById('projName').value || 'Projekt';
+  _cloudBusy = true;
+  try {
+    const data = simpleClone(serializeProjectData()); data.name = name;
+    const ref = fbDb.collection(GRUNDRISS_COLLECTION).doc();
+    const revision = await writeCloudProject(ref,data,null);
+    currentProjectId = ref.id; _cloudVersion = revision; _cloudSignature = cloudSignature(data);
+    document.getElementById('projName').value = name;
+    if(nameEl) nameEl.value='';
+    document.getElementById('projMgrModal')?.classList.add('hid');
+    listenToProject(ref.id);
+    setFbStatus('online','Cloud gespeichert');
+    setStatus('Projekt vollständig in Cloud gespeichert');
+  } catch(e) { setFbStatus('offline','Nicht gespeichert'); setStatus(e.message); alert('Cloud-Speichern fehlgeschlagen: '+e.message); }
+  finally { _cloudBusy = false; }
+}
+async function openProject(id) {
+  if (_cloudBusy) { setStatus('Bitte laufendes Cloud-Speichern abwarten.'); return; }
+  try {
+    if (projectHasWork()) await saveProjectToLibrary(true);
+    const snapshot = await fbDb.collection(GRUNDRISS_COLLECTION).doc(id).get({source:'server'});
+    if (!snapshot.exists) throw new Error('Projekt nicht vorhanden');
+    const manifest = snapshot.data();
+    const data = await readCloudProject(id,manifest);
+    disconnectCloudProject();
+    loadProjectData(data);
+    currentProjectId = id; _cloudVersion = cloudVersion(manifest); _cloudSignature = cloudSignature(data);
+    document.getElementById('projMgrModal').classList.add('hid');
+    listenToProject(id);
+    render(); renderProps(null); buildPalette(); updateFloorplanTabs(); renderProjectPage();
+    setFbStatus('online','Cloud-Projekt geladen');
+  } catch(e) { setFbStatus('offline','Ladefehler'); alert(e.message); }
+}
 
 async function deleteProject(id, e) {
   e.stopPropagation();
@@ -3159,71 +3229,38 @@ async function deleteProject(id, e) {
 
 // ── Realtime Listener ──
 function listenToProject(id) {
-  if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+  if (fbUnsubscribe) fbUnsubscribe();
   if (!fbDb) return;
-  fbUnsubscribe = fbDb.collection(GRUNDRISS_COLLECTION).doc(id)
-    .onSnapshot(snap => {
-      if (Date.now() < cloudSaveLock) return;
-      if (!snap.exists) return;
-      const d = snap.data();
-      if (d.floorplans && JSON.stringify(d.floorplans) !== JSON.stringify(state.floorplans||[])) {
-        loadProjectData(d);
-        setFbStatus('online', 'Synchronisiert OK');
-        return;
-      }
-      let changed = false;
-      if (d.symbols && JSON.stringify(d.symbols) !== JSON.stringify(state.symbols)) { state.symbols = d.symbols; changed = true; }
-      if (d.wires && JSON.stringify(d.wires) !== JSON.stringify(state.wires)) { state.wires = d.wires; changed = true; }
-      if (d.trassen && JSON.stringify(d.trassen) !== JSON.stringify(state.trassen||[])) { state.trassen = d.trassen; changed = true; }
-      if (d.raeume && JSON.stringify(d.raeume) !== JSON.stringify(state.raeume||[])) { state.raeume = d.raeume; changed = true; }
-      if (d.scale !== undefined && d.scale !== state.scale) { state.scale = d.scale; changed = true; }
-      if (d.raumhoehe) state.raumhoehe = d.raumhoehe;
-      if (d.customSymbols && Object.keys(d.customSymbols).length) { customSymbols = d.customSymbols; mergeCustomSymbols(); }
-      if (d.name) document.getElementById('projName').value = d.name;
-      if (changed) { render(); buildPalette(); captureActiveFloorplan(); renderProjectPage(); }
-      setFbStatus('online', 'Synchronisiert OK');
-    }, err => {
-      console.warn('[Firebase] listener:', err);
-      setFbStatus('offline', 'Sync-Fehler');
-    });
+  fbUnsubscribe = fbDb.collection(GRUNDRISS_COLLECTION).doc(id).onSnapshot(snap => {
+    if (snap.metadata.hasPendingWrites || _cloudBusy || currentProjectId!==id) return;
+    if (!snap.exists) { setFbStatus('offline','Cloud-Projekt gelöscht – lokalen Stand exportieren'); return; }
+    if (cloudVersion(snap.data()) !== _cloudVersion)
+      setFbStatus('offline','Anderer Cloud-Stand – vor Speichern Projekt neu öffnen');
+    // Never replace the user's working canvas in a background listener.
+  },e => { setFbStatus('offline','Synchronisierung fehlgeschlagen'); console.warn(e); });
 }
-
-
-
-
-// ── Save to Cloud ──
 async function saveToCloud() {
   if (!currentUser || !fbDb) { alert('Bitte zuerst mit Google anmelden!'); return; }
-  if (!currentProjectId) {
-    await createNewProject();
-    return;
-  }
-  setFbStatus('syncing', 'Speichert...');
-  cloudSaveLock = Date.now() + 30000;
+  if (!currentProjectId) return createNewProject();
+  if (_cloudBusy) return;
+  const data = simpleClone(serializeProjectData());
+  const signature = cloudSignature(data);
+  if (signature === _cloudSignature) return;
+  const id = currentProjectId;
+  _cloudBusy = true;
   try {
-    const projectData = serializeProjectData();
-    const updateData = {
-      ...projectData,
-      symbolCount: (projectData.floorplans||[]).reduce((a,f)=>a+(f.symbols||[]).length,0),
-      floorplanCount: (projectData.floorplans||[]).length,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    await fbDb.collection(GRUNDRISS_COLLECTION).doc(currentProjectId).update(updateData);
-    setFbStatus('online', 'Gespeichert OK ' + new Date().toLocaleTimeString('de-DE'));
-    setStatus('In Cloud gespeichert - inklusive aller Grundrisse');
-  } catch(e) {
-    console.warn('[Firebase] save:', e);
-    setFbStatus('offline', 'Speicherfehler');
-    setStatus('Cloud-Speichern fehlgeschlagen: ' + e.message);
-  }
+    const revision = await writeCloudProject(fbDb.collection(GRUNDRISS_COLLECTION).doc(id),data,_cloudVersion);
+    if (currentProjectId===id) { _cloudVersion=revision; _cloudSignature=signature; }
+    setFbStatus('online','Cloud gespeichert '+new Date().toLocaleTimeString('de-DE'));
+  } catch(e) { setFbStatus('offline','Cloud NICHT gespeichert'); setStatus(e.message); }
+  finally { _cloudBusy=false; }
 }
-
 
 
 
 // ── Auto-save every 60 seconds if project open ──
 setInterval(() => {
-  if (currentProjectId && currentUser && state.symbols.length > 0) {
+  if (currentProjectId && currentUser && projectHasWork()) {
     saveToCloud();
   }
 }, 60000);
@@ -3586,7 +3623,7 @@ function renderSmartWirePreview(pt, target, wireSnap) {
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   canvas = document.getElementById('main-canvas');
   ctx = canvas.getContext('2d');
   overlay = document.getElementById('overlay-canvas');
@@ -3594,22 +3631,24 @@ window.addEventListener('load', () => {
   wrap = document.getElementById('canvas-wrap');
   resizeCanvas();
   ensureSymbolsBackup();
-  loadCustomSymbols();
+  await initLocalStorage();
+  await loadCustomSymbols();
   loadCustomWireTypes();
   buildPalette();
   initFirebase();
   setupEvents();
   initSymUploadZone();
   // ── Backup wiederherstellen (IndexedDB voll + localStorage leicht) ──
-  localStateRestore().then(() => {
-    render();
-    restoreActiveViewAfterRefresh();
-  });
+  await localStateRestore();
+  render();
+  restoreActiveViewAfterRefresh();
+  _storageReady = true;
+  navigator.storage?.persist?.().catch(() => {});
   window.addEventListener('resize', resizeCanvas);
   // ── Voll-Backup (inkl. Grundriss-Bilder) alle 20s nach IndexedDB ──
-  setInterval(localStateSaveFull, 20000);
+  setInterval(localStateSaveFull, 3000);
   // ── Leichtes Backup (ohne Bilder) alle 10s nach localStorage ──
-  setInterval(localStateSave, 10000);
+  // Full backups replace the former localStorage interval;
   // ── Beim Verlassen/Reload: synchrones leichtes Backup + Warnung ──
   window.addEventListener('beforeunload', (e) => {
     const warn = projectHasWork() && _hasUnsavedChanges();  // VOR dem Speichern prüfen
@@ -3631,20 +3670,18 @@ window.addEventListener('load', () => {
 const LS_KEY  = 'anvolt_grundriss_v2';        // leichtes Backup (ohne Bilder)
 const IDB_NAME = 'anvolt_grundriss_backup';   // Voll-Backup inkl. Grundriss-Bilder
 const IDB_STORE = 'backup';
-const BACKUP_MAX_AGE = 86400000;              // 24h
+const BACKUP_MAX_AGE = Infinity;              // 24h
 
 // Signatur des zuletzt gespeicherten Standes -> "gibt es ungespeicherte Änderungen?"
 let _lastBackupSig = '';
 function _workSignature() {
-  try {
-    return JSON.stringify({
-      s: state.symbols, w: state.wires, t: state.trassen, r: state.raeume,
-      fp: (state.floorplans||[]).map(f => ({ id:f.id, n:(f.symbols||[]).length, w:(f.wires||[]).length })),
-      sc: state.scale, af: state.activeFloorplanId
-    });
-  } catch(e) { return String(Date.now()); }
+  return JSON.stringify({name:document.getElementById('projName')?.value, projData,
+    s:state.symbols,w:state.wires,t:state.trassen,r:state.raeume, fp:state.floorplans,
+    sc:state.scale,af:state.activeFloorplanId,cs:customSymbols,ov:overriddenStdSymbols,del:[...deletedStdSymbols]},
+    (key,value) => key === 'updatedAt' ? undefined : value);
 }
-function _hasUnsavedChanges() { return _workSignature() !== _lastBackupSig; }
+
+function _hasUnsavedChanges() { return _localSaveFailed || _localSavePending || _workSignature() !== _lastBackupSig; }
 
 // ── Bilder aus dem Backup entfernen (für kompaktes localStorage-Backup) ──
 function stripImages(backup) {
@@ -3666,50 +3703,56 @@ function _idbOpen() {
     req.onerror = () => reject(req.error);
   });
 }
-function idbPutBackup(obj) {
+function idbPutBackup(obj, key='current') {
   return _idbOpen().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).put(obj, 'current');
+    tx.objectStore(IDB_STORE).put(obj, key);
     tx.oncomplete = () => { db.close(); resolve(true); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('Speicherung abgebrochen')); };
   }));
 }
-function idbGetBackup() {
+function idbGetBackup(key='current') {
   return _idbOpen().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readonly');
-    const rq = tx.objectStore(IDB_STORE).get('current');
+    const rq = tx.objectStore(IDB_STORE).get(key);
     rq.onsuccess = () => { db.close(); resolve(rq.result || null); };
     rq.onerror = () => { db.close(); reject(rq.error); };
   }));
 }
 
 // ── Leichtes Backup nach localStorage (synchron, klein, unload-sicher) ──
-function localStateSave() {
-  try {
-    if (!projectHasWork()) return;
-    const backup = stripImages(serializeProjectData());
-    backup.savedAt = Date.now();
-    localStorage.setItem(LS_KEY, JSON.stringify(backup));
-    _lastBackupSig = _workSignature();
-  } catch(e) {
-    // Bei Quota-Überschreitung altes Backup entfernen und einmal neu versuchen
-    if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
-      try { localStorage.removeItem(LS_KEY); } catch(_) {}
-    }
-    console.warn('localStateSave:', e);
+window.addEventListener('unhandledrejection', event => {
+  if (event.reason?.name === 'QuotaExceededError' || event.reason?.name === 'AbortError') storageFailure(event.reason);
+});
+let _storageReady = false;
+let _localSavePending = false;
+let _localSaveFailed = false;
+function storageFailure(err) {
+  _localSaveFailed = true;
+  console.error('Lokales Speichern:', err);
+  setStatus('NICHT lokal gespeichert: ' + err.message + ' – bitte Projekt als JSON exportieren.');
+  let box = document.getElementById('storageError');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'storageError';
+    box.style.cssText = 'position:fixed;bottom:28px;left:10px;right:10px;z-index:99999;background:#8b2020;color:white;padding:12px';
+    document.body.appendChild(box);
   }
+  box.textContent = 'Lokales Speichern fehlgeschlagen. Projekt geöffnet lassen und über „Speichern“ als JSON sichern. ' + err.message;
 }
-
-// ── Voll-Backup nach IndexedDB (asynchron, inkl. Bilder) ──
-function localStateSaveFull() {
+function localStateSave() { return localStateSaveFull(); }
+async function localStateSaveFull() {
+  if (!_storageReady || _localSavePending || (!projectHasWork() && !currentLocalProjectId)) return;
+  _localSavePending = true;
   try {
-    if (!projectHasWork()) return;
     const backup = serializeProjectData();
+    const sig = _workSignature();
     backup.savedAt = Date.now();
-    idbPutBackup(backup)
-      .then(() => { _lastBackupSig = _workSignature(); })
-      .catch(err => console.warn('localStateSaveFull (IDB):', err));
-  } catch(e) { console.warn('localStateSaveFull:', e); }
+    await idbPutBackup(backup);
+    _lastBackupSig = sig;
+    _localSaveFailed = false;
+    document.getElementById('storageError')?.remove();
+  } catch(e) { storageFailure(e); }
+  finally { _localSavePending = false; }
 }
 
 // ── Wiederherstellung: IndexedDB (voll) bevorzugt, localStorage als Fallback ──
@@ -3748,6 +3791,8 @@ async function localStateRestore() {
     }
 
     loadProjectData(chosen);
+    await idbPutBackup({...chosen, savedAt:Date.now()});
+    localStorage.removeItem(LS_KEY);
     _lastBackupSig = _workSignature();
     const t = new Date(chosen.savedAt).toLocaleTimeString('de-DE');
     setStatus('Letzter lokaler Stand wiederhergestellt (' + t + ')' +
@@ -3760,29 +3805,14 @@ async function localStateRestore() {
 
 // Frische Nicht-Bild-Felder aus dem leichten Backup auf das Voll-Backup übertragen
 function _mergeLightOntoFull(light, full) {
-  const out = simpleClone(full);
-  const copyVec = (dst, src) => {
-    if (!dst || !src) return;
-    ['symbols','wires','trassen','raeume','scale','pan','zoom','raumhoehe'].forEach(k => {
-      if (src[k] !== undefined) dst[k] = src[k];
-    });
-  };
-  copyVec(out, light);
-  out.activeFloorplanId = light.activeFloorplanId || out.activeFloorplanId;
-  if (Array.isArray(out.floorplans) && Array.isArray(light.floorplans)) {
-    const byId = {};
-    light.floorplans.forEach(f => { byId[f.id] = f; });
-    out.floorplans = out.floorplans.map(f => {
-      const lf = byId[f.id];
-      if (lf) { const merged = { ...f }; copyVec(merged, lf); merged.floorplanData = f.floorplanData; return merged; }
-      return f;
-    });
-  }
-  out.savedAt = light.savedAt;
+  const out = simpleClone(light);
+  const previous = new Map((full.floorplans || []).map(f => [f.id,f]));
+  out.floorplans = (light.floorplans || []).map(f => ({...f,
+    floorplanData:f.floorplanData || previous.get(f.id)?.floorplanData || null}));
+  if (light.activeFloorplanId === full.activeFloorplanId)
+    out.floorplanData = light.floorplanData || full.floorplanData;
   return out;
 }
-
-
 
 
 function resizeCanvas() {
@@ -6361,8 +6391,28 @@ const LS_PROJECT_LIBRARY = 'anvolt_project_library_v1';
 function simpleClone(v) { return JSON.parse(JSON.stringify(v || null)); }
 function makeId(prefix='id') { return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
 function cleanFileName(name) { return (name || 'Grundriss').replace(/\.[^.]+$/, '').trim() || 'Grundriss'; }
-function readProjectLibrary() { try { return JSON.parse(localStorage.getItem(LS_PROJECT_LIBRARY) || '[]'); } catch(e) { return []; } }
-function writeProjectLibrary(list) { localStorage.setItem(LS_PROJECT_LIBRARY, JSON.stringify(list)); }
+let _projectLibrary = [];
+let _libraryReady = false;
+let _libraryQueue = Promise.resolve();
+async function initLocalStorage() {
+  try {
+    const stored = await idbGetBackup('library');
+    _projectLibrary = stored || JSON.parse(localStorage.getItem(LS_PROJECT_LIBRARY) || '[]');
+    if (!stored) await idbPutBackup(_projectLibrary, 'library');
+    localStorage.removeItem(LS_PROJECT_LIBRARY);
+    _libraryReady = true;
+  } catch(e) { storageFailure(e); }
+}
+function readProjectLibrary() { return simpleClone(_projectLibrary); }
+function writeProjectLibrary(list) {
+  if (!_libraryReady) return Promise.reject(new Error('Projektablage konnte nicht geladen werden. Bitte zuerst JSON exportieren.'));
+  const snapshot = simpleClone(list);
+  _libraryQueue = _libraryQueue.catch(() => {}).then(async () => {
+    await idbPutBackup(snapshot, 'library');
+    _projectLibrary = snapshot;
+  });
+  return _libraryQueue.catch(e => { storageFailure(e); throw e; });
+}
   function exportProjectLocalFile() {
     try {
       const data = serializeProjectData();
@@ -6383,6 +6433,7 @@ function writeProjectLibrary(list) { localStorage.setItem(LS_PROJECT_LIBRARY, JS
   }
   }
 function currentFloorplanData(maxD=1600, quality=.72) {
+  if (_floorplanLoading) return state.floorplans.find(f => f.id === state.activeFloorplanId)?.floorplanData || null;
   if (!state.floorplan || !state.floorplan.img) return null;
   try {
     const fc = document.createElement('canvas');
@@ -6439,6 +6490,7 @@ function updateFloorplanTabs() {
     el.appendChild(b);
   });
 }
+let _floorplanLoading = false;
 function applyFloorplanSheet(sheet) {
   if (!sheet) return;
   state.activeFloorplanId = sheet.id;
@@ -6453,9 +6505,13 @@ function applyFloorplanSheet(sheet) {
   state.selectedId = null;
   state.undoStack = [];
   const uz = document.getElementById('uploadZone');
+  _floorplanLoading = !!sheet.floorplanData;
+  state.floorplan = null;
   if (sheet.floorplanData) {
     const img = new Image();
     img.onload = () => {
+      if (state.activeFloorplanId !== sheet.id) return;
+      _floorplanLoading = false;
       state.floorplan = { img, w: img.width, h: img.height };
       if (uz) uz.style.display = 'none';
       const zl=document.getElementById('zlbl'); if(zl) zl.textContent = Math.round(state.zoom * 100) + '%';
@@ -6507,18 +6563,23 @@ function deleteActiveFloorplan() {
 }
 function serializeProjectData() {
   captureActiveFloorplan();
+  if (!currentLocalProjectId) currentLocalProjectId = makeId('project');
   return {
-    id: currentLocalProjectId || makeId('project'),
+    id: currentLocalProjectId,
+    projData: simpleClone(projData), deletedStdSymbols:[...deletedStdSymbols], overriddenStdSymbols:simpleClone(overriddenStdSymbols),
     name: document.getElementById('projName')?.value || 'Projekt',
     floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
     symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
     pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
-    floorplanData: currentFloorplanData(), customSymbols: customSymbols||{},
+    floorplanData: state.floorplans.length ? null : currentFloorplanData(), customSymbols: customSymbols||{},
     updatedAt: new Date().toISOString(), _v:2, _saved: new Date().toISOString()
   };
 }
 function loadProjectData(d) {
   if (!d) return;
+  projData = d.projData || {};
+  if (d.deletedStdSymbols) { deletedStdSymbols = new Set(d.deletedStdSymbols); for (const key of deletedStdSymbols) delete SYMBOLS[key]; }
+  if (d.overriddenStdSymbols) { overriddenStdSymbols = d.overriddenStdSymbols; for (const [key,cs] of Object.entries(overriddenStdSymbols)) { SYMBOLS[key] = {...SYMBOLS[key],...cs,isOverride:true,svg:cs.imgData ? `<image href="${cs.imgData}" width="40" height="40"/>` : SYMBOLS[key]?.svg}; delete symCache[key]; } }
   currentLocalProjectId = d.id || currentLocalProjectId || makeId('project');
   const pn = document.getElementById('projName'); if (pn) pn.value = d.name || 'Projekt';
   const ppn = document.getElementById('projectPageName'); if (ppn) ppn.value = d.name || 'Projekt';
@@ -6537,7 +6598,8 @@ function loadProjectData(d) {
   renderProjectPage();
 }
 function resetWorkspaceForNewProject(name) {
-  currentProjectId = null;
+  disconnectCloudProject();
+  projData = {};
   currentLocalProjectId = makeId('project');
   document.getElementById('projName').value = name;
   const ppn = document.getElementById('projectPageName'); if (ppn) ppn.value = '';
@@ -6547,38 +6609,39 @@ function resetWorkspaceForNewProject(name) {
   const uz = document.getElementById('uploadZone'); if (uz) uz.style.display = 'flex';
   updateFloorplanTabs(); render(); renderProps(null); renderProjectPage();
 }
-function saveProjectToLibrary(silent=false) {
+async function saveProjectToLibrary(silent=false) {
   if (!projectHasWork() && !document.getElementById('projName')?.value) return null;
   const data = serializeProjectData();
   currentLocalProjectId = data.id;
   const list = readProjectLibrary();
   const idx = list.findIndex(p => p.id === data.id);
   if (idx >= 0) list[idx] = data; else list.unshift(data);
-  writeProjectLibrary(list);
+  await writeProjectLibrary(list);
   renderProjectPage();
   if (!silent) setStatus('Projekt gesichert: ' + data.name);
   return data;
 }
-function createProjectFromPage() {
+async function createProjectFromPage() {
   const inputName = (document.getElementById('projectPageName')?.value || '').trim();
   const name = inputName || ('Projekt ' + (readProjectLibrary().length + 1));
-  if (projectHasWork()) saveProjectToLibrary(true);
+  if (projectHasWork()) await saveProjectToLibrary(true);
   resetWorkspaceForNewProject(name);
-  saveProjectToLibrary(true);
+  await saveProjectToLibrary(true);
   setStatus('Neues Projekt angelegt: ' + name);
 }
-function openSavedProject(id) {
+async function openSavedProject(id) {
   const p = readProjectLibrary().find(p => p.id === id);
   if (!p) return;
-  if (projectHasWork()) saveProjectToLibrary(true);
+  if (projectHasWork()) await saveProjectToLibrary(true);
+  disconnectCloudProject();
   loadProjectData(p);
   switchTab('projekt');
   setStatus('Projekt geöffnet: ' + (p.name || 'Projekt'));
 }
-function deleteSavedProject(id) {
+async function deleteSavedProject(id) {
   const p = readProjectLibrary().find(p => p.id === id);
   if (!p || !confirm('Projekt "' + (p.name||'') + '" wirklich löschen?')) return;
-  writeProjectLibrary(readProjectLibrary().filter(p => p.id !== id));
+  await writeProjectLibrary(readProjectLibrary().filter(p => p.id !== id));
   if (currentLocalProjectId === id) currentLocalProjectId = null;
   renderProjectPage();
   setStatus('Projekt aus Liste gelöscht');
@@ -6591,7 +6654,7 @@ async function uploadProjectFloorplans(event) {
       const dataUrl = await readFloorplanFileAsDataUrl(file);
       addFloorplanFromDataUrl(dataUrl, cleanFileName(file.name), false);
     }
-    saveProjectToLibrary(true);
+    await saveProjectToLibrary(true);
     renderProjectPage();
     setStatus(files.length + ' Grundriss(e) im Projekt hinzugefügt');
   } catch(err) { alert('Grundriss konnte nicht geladen werden: ' + err.message); }
@@ -6603,21 +6666,21 @@ function openProjectFloorplan(id) {
   if (id !== state.activeFloorplanId) { captureActiveFloorplan(); applyFloorplanSheet(sheet); }
   switchTab('plan');
 }
-function renameProjectFloorplan(id) {
+async function renameProjectFloorplan(id) {
   captureActiveFloorplan();
   const sheet = (state.floorplans||[]).find(f => f.id === id);
   if (!sheet) return;
   const name = prompt('Grundriss benennen:', sheet.name || 'Grundriss');
   if (name === null) return;
   sheet.name = name.trim() || sheet.name || 'Grundriss';
-  updateFloorplanTabs(); renderProjectPage(); saveProjectToLibrary(true);
+  updateFloorplanTabs(); renderProjectPage(); await saveProjectToLibrary(true);
 }
-function deleteProjectFloorplan(id) {
+async function deleteProjectFloorplan(id) {
   const sheet = (state.floorplans||[]).find(f => f.id === id);
   if (!sheet || !confirm('Grundriss "' + (sheet.name||'') + '" aus dem Projekt entfernen?')) return;
   if (id === state.activeFloorplanId) deleteActiveFloorplan();
   else state.floorplans = (state.floorplans||[]).filter(f => f.id !== id);
-  updateFloorplanTabs(); renderProjectPage(); saveProjectToLibrary(true);
+  updateFloorplanTabs(); renderProjectPage(); await saveProjectToLibrary(true);
 }
 function renderProjectPage() {
   const nameEl = document.getElementById('projectPageName');
@@ -6675,7 +6738,7 @@ async function saveProjectToFolder(silent=false) {
   }
   try {
     const data = serializeProjectData();
-    saveProjectToLibrary(true);
+    await saveProjectToLibrary(true);
     const fileName = (data.name || 'grundriss-projekt').replace(/[\\/:*?"<>|]+/g,'_') + '.json';
     const fileHandle = await projectDirHandle.getFileHandle(fileName, { create:true });
     const writable = await fileHandle.createWritable();
@@ -6708,7 +6771,7 @@ async function saveProjectToGoogleDrive() {
   }
   try {
     const data = serializeProjectData();
-    saveProjectToLibrary(true);
+    await saveProjectToLibrary(true);
     const json = JSON.stringify(data, null, 2);
     const metadata = { name:(data.name||'grundriss-projekt') + '.json', mimeType:'application/json' };
     const boundary = 'anvolt_' + Date.now();
@@ -7022,7 +7085,7 @@ async function loadFloorplan(e) {
       addFloorplanFromDataUrl(dataUrl, cleanFileName(file.name), first);
       first = false;
     }
-    saveProjectToLibrary(true);
+    await saveProjectToLibrary(true);
     setStatus(files.length + ' Grundriss(e) ins Projekt geladen');
   } catch(err) {
     console.warn('loadFloorplan:', err);
@@ -7112,24 +7175,22 @@ function clearAll() {
 //  SAVE / LOAD / EXPORT
 // ═══════════════════════════════════════════════════
 function saveProject() {
+  exportProjectLocalFile();
+  saveProjectToLibrary(true).catch(storageFailure);
   if (currentProjectId && currentUser) saveToCloud();
-  const data = serializeProjectData();
-  saveProjectToLibrary(true);
-  const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download=(data.name||'grundriss-projekt')+'.json';a.click();
-  setStatus('Projekt lokal exportiert - inklusive aller Grundrisse');
 }
+
 function loadProject() { document.getElementById('fileIn').click(); }
 function loadFromFile(e) {
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onload=async ev=>{
     try{
-      if (projectHasWork()) saveProjectToLibrary(true);
+      if (projectHasWork()) await saveProjectToLibrary(true);
       const d=JSON.parse(ev.target.result);
+      disconnectCloudProject();
       loadProjectData(d);
-      saveProjectToLibrary(true);
+      await saveProjectToLibrary(true);
       setStatus('Projekt geladen: '+(d.name||f.name));
     }catch(err){alert('Fehler: '+err.message);}
   };r.readAsText(f);e.target.value='';
