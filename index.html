@@ -1440,7 +1440,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
 
     <!-- Mode Tabs -->
     <div style="display:flex;gap:4px;margin-bottom:10px;background:var(--bg);border-radius:6px;padding:3px">
-      <button id="ai-tab-claude" onclick="setAIMode('claude')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🧠 Claude KI (eingebaut)</button>
+      <button id="ai-tab-claude" onclick="setAIMode('claude')" class="btn ba" style="flex:1;font-size:11px;padding:6px">🧠 Claude KI</button>
       <button id="ai-tab-openrouter" onclick="setAIMode('openrouter')" class="btn bg" style="flex:1;font-size:11px;padding:6px">🌐 OpenRouter (gratis)</button>
       <button id="ai-tab-offline" onclick="setAIMode('offline')" class="btn bg" style="flex:1;font-size:11px;padding:6px">📖 Wissensbasis (offline)</button>
     </div>
@@ -1448,10 +1448,15 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <!-- Mode: Claude (built-in via Anthropic API) -->
     <div id="ai-cfg-claude" style="background:var(--sf2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="color:var(--gr);font-weight:600">✅ Direkt einsatzbereit — kein Setup, kein Key nötig!</span>
+        <span style="color:var(--gr);font-weight:600">Claude benötigt eine eingerichtete Serververbindung.</span>
       </div>
       <div style="color:var(--tx3);font-size:10px;margin-top:4px">
-        Nutzt Claude Sonnet direkt in dieser App. Beantwortet alle Elektrofragen auf Deutsch — Normen, Schaltpläne, Kabelberechnung, KNX, DIN 18015.
+        Der API-Schlüssel bleibt auf dem Server. Serveradresse und Zugangscode erhältst du vom Betreiber.<br>
+        <label for="claudeEndpoint">Serveradresse (HTTPS)</label>
+        <input class="rp-input" id="claudeEndpoint" type="url" placeholder="https://dein-server.example/api/claude" style="width:100%;margin-top:4px">
+        <label for="claudeAccessToken">Zugangscode</label>
+        <input class="rp-input" id="claudeAccessToken" type="password" autocomplete="off" placeholder="Zugangscode des Servers" style="width:100%;margin-top:4px">
+        <div style="margin-top:6px">Die Frage wird an den angegebenen Server und Anthropic gesendet. Zugangscode und Serveradresse werden nicht gespeichert.</div>
       </div>
     </div>
 
@@ -1494,7 +1499,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     <div id="aiChat" style="flex:1;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px;min-height:220px;max-height:340px;display:flex;flex-direction:column;gap:8px">
       <div style="background:var(--sf2);border-radius:6px;padding:10px;font-size:11px;color:var(--tx2)">
         <strong style="color:var(--pu)">🤖 KI-Assistent</strong> — 3 Modi:<br>
-        <span style="color:var(--gr)">🧠 Claude KI</span> = eingebaut, sofort nutzbar &nbsp;|&nbsp;
+        <span style="color:var(--gr)">🧠 Claude KI</span> = mit Serververbindung &nbsp;|&nbsp;
         <span style="color:var(--bl)">🌐 OpenRouter</span> = kostenlose Cloud-Modelle &nbsp;|&nbsp;
         <span style="color:var(--ac)">📖 Wissensbasis</span> = offline, kein Internet
       </div>
@@ -1507,7 +1512,7 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
     </div>
     <div style="display:flex;justify-content:space-between;margin-top:6px">
       <button class="btn bg" onclick="document.getElementById('aiChat').innerHTML=''" style="font-size:10px">🗑 Chat leeren</button>
-      <span style="font-size:9px;color:var(--tx3);align-self:center" id="aiStatus">Modus: Ollama (lokal)</span>
+      <span style="font-size:9px;color:var(--tx3);align-self:center" id="aiStatus">Modus: Claude KI — Serververbindung erforderlich</span>
     </div>
   </div>
 </div>
@@ -2408,7 +2413,38 @@ function saveCustomSymbols() {
     localStorage.setItem(LS_CUSTOM, JSON.stringify(customSymbols));
     localStorage.setItem(LS_DELETED, JSON.stringify([...deletedStdSymbols]));
     localStorage.setItem(LS_OVERRIDES, JSON.stringify(overriddenStdSymbols));
-  } catch(e) { console.warn('saveCustomSymbols:', e); }
+    return true;
+  } catch(e) {
+    console.warn('saveCustomSymbols:', e);
+    alert('Deine Symbole konnten nicht dauerhaft im Browser gespeichert werden. Der Speicher ist voll oder nicht verfügbar. Bitte jetzt unter „Symbole verwalten“ ein Symbol-Backup exportieren. Die Symbole bleiben bis zum Schließen dieser Seite verfügbar.');
+    return false;
+  }
+}
+
+// Projekte ergänzen die persönliche Sammlung, auch wenn ältere Projekte keine Symbole enthalten.
+function restoreProjectSymbolConfig(data) {
+  if (!data || typeof data !== 'object') return;
+  if (data.customSymbols && typeof data.customSymbols === 'object' && !Array.isArray(data.customSymbols)) {
+    customSymbols = { ...customSymbols, ...data.customSymbols };
+  }
+  if (data.overriddenStdSymbols && typeof data.overriddenStdSymbols === 'object' && !Array.isArray(data.overriddenStdSymbols)) {
+    overriddenStdSymbols = { ...overriddenStdSymbols, ...data.overriddenStdSymbols };
+  }
+  if (Array.isArray(data.deletedStdSymbols)) {
+    for (const key of data.deletedStdSymbols) deletedStdSymbols.add(key);
+  }
+  // Explizit gespeicherte Symbole haben Vorrang vor älteren Löschmarkierungen.
+  for (const key of [...Object.keys(customSymbols), ...Object.keys(overriddenStdSymbols)]) deletedStdSymbols.delete(key);
+  for (const key of deletedStdSymbols) { delete SYMBOLS[key]; delete symCache[key]; }
+  for (const [key, cs] of Object.entries(overriddenStdSymbols)) {
+    SYMBOLS[key] = {
+      ...SYMBOLS[key], ...cs, isOverride: true,
+      svg: cs.imgData ? `<image href="${cs.imgData}" width="40" height="40"/>` : SYMBOLS[key]?.svg
+    };
+    delete symCache[key];
+  }
+  mergeCustomSymbols();
+  saveCustomSymbols();
 }
 
 function mergeCustomSymbols() {
@@ -2989,6 +3025,12 @@ function initFirebase() {
     fbAuth = firebase.auth();
 
     fbAuth.onAuthStateChanged(user => {
+      if (!user || (currentUser && currentUser.uid !== user.uid)) {
+        if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+        currentProjectId = null;
+        googleDriveAccessToken = null;
+        currentGoogleDriveFileId = null;
+      }
       currentUser = user;
       updateLoginUI(user);
       if (user) {
@@ -3005,18 +3047,34 @@ function initFirebase() {
 }
 
 // ── Auth ──
+function describeCloudError(err) {
+  const code = err && err.code || 'unbekannt';
+  const hints = {
+    'auth/unauthorized-domain': 'Diese Webseite ist für Google Login nicht freigegeben. Der Betreiber muss die Domain in Firebase Authentication prüfen.',
+    'auth/popup-blocked': 'Das Anmeldefenster wurde blockiert. Öffne die App direkt in Chrome oder Safari und erlaube das Anmeldefenster.',
+    'auth/popup-closed-by-user': 'Die Anmeldung wurde vor dem Abschluss geschlossen. Bitte erneut anmelden.',
+    'auth/operation-not-allowed': 'Google Login ist im Firebase-Projekt nicht aktiviert.',
+    'auth/network-request-failed': 'Die Verbindung zum Anmeldedienst ist fehlgeschlagen. Internetverbindung und Browser prüfen.',
+    'permission-denied': 'Der Cloud-Zugriff wurde verweigert. Der Betreiber muss die Firestore-Berechtigungen prüfen.',
+    'failed-precondition': 'Die Cloud-Abfrage kann nicht ausgeführt werden. Der Betreiber muss die Datenbankkonfiguration prüfen.'
+  };
+  return (hints[code] || 'Cloud-Vorgang fehlgeschlagen. Bitte den Fehlercode an den Betreiber weitergeben.') + ' (' + code + ')';
+}
 function googleLogin() {
-  if (!fbAuth) return;
+  if (!fbAuth) { alert('Google Login ist nicht geladen. Bitte die Seite neu laden.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.addScope('https://www.googleapis.com/auth/drive.file');
-  provider.setCustomParameters({ prompt: 'select_account consent' });
+  // Drive-Zugriff wird erst beim expliziten Drive-Speichern angefordert.
+  provider.setCustomParameters({ prompt: 'select_account' });
   fbAuth.signInWithPopup(provider).then(result => {
     const cred = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
     googleDriveAccessToken = cred && cred.accessToken ? cred.accessToken : googleDriveAccessToken;
     setStatus(googleDriveAccessToken ? 'Google Login verbunden - Google Drive bereit' : 'Google Login verbunden');
   }).catch(err => {
     console.warn('Login Fehler:', err);
-    setStatus('Login fehlgeschlagen: ' + err.message);
+    const message = describeCloudError(err);
+    setFbStatus('offline', 'Anmeldung fehlgeschlagen');
+    setStatus(message);
+    alert(message);
   });
 }
 function googleLogout() {
@@ -3061,7 +3119,6 @@ async function loadProjectList() {
   try {
     const snap = await fbDb.collection(GRUNDRISS_COLLECTION)
       .where('uid', '==', currentUser.uid)
-      .orderBy('updatedAt', 'desc')
       .get();
 
     const list = document.getElementById('projList');
@@ -3073,7 +3130,8 @@ async function loadProjectList() {
     }
 
     list.innerHTML = '';
-    snap.forEach(doc => {
+    const timestamp = doc => { const t = doc.data().updatedAt; return t && typeof t.toMillis === 'function' ? t.toMillis() : 0; };
+    [...snap.docs].sort((a, b) => timestamp(b) - timestamp(a)).forEach(doc => {
       const d = doc.data();
       const div = document.createElement('div');
       div.className = 'proj-list-item';
@@ -3092,7 +3150,10 @@ async function loadProjectList() {
     setFbStatus('online', snap.size + ' Projekte');
   } catch(e) {
     console.warn('[Firebase] loadProjectList:', e);
-    setFbStatus('offline', 'Ladefehler');
+    setFbStatus('offline', 'Projektliste nicht geladen');
+    setStatus(describeCloudError(e));
+    const list = document.getElementById('projList');
+    if (list) { list.textContent = describeCloudError(e); }
   }
 }
 
@@ -3178,7 +3239,7 @@ function listenToProject(id) {
       if (d.raeume && JSON.stringify(d.raeume) !== JSON.stringify(state.raeume||[])) { state.raeume = d.raeume; changed = true; }
       if (d.scale !== undefined && d.scale !== state.scale) { state.scale = d.scale; changed = true; }
       if (d.raumhoehe) state.raumhoehe = d.raumhoehe;
-      if (d.customSymbols && Object.keys(d.customSymbols).length) { customSymbols = d.customSymbols; mergeCustomSymbols(); }
+      if (d.customSymbols || d.overriddenStdSymbols || d.deletedStdSymbols) restoreProjectSymbolConfig(d);
       if (d.name) document.getElementById('projName').value = d.name;
       if (changed) { render(); buildPalette(); captureActiveFloorplan(); renderProjectPage(); }
       setFbStatus('online', 'Synchronisiert OK');
@@ -3223,7 +3284,7 @@ async function saveToCloud() {
 
 // ── Auto-save every 60 seconds if project open ──
 setInterval(() => {
-  if (currentProjectId && currentUser && state.symbols.length > 0) {
+  if (currentProjectId && currentUser && projectHasWork()) {
     saveToCloud();
   }
 }, 60000);
@@ -6464,7 +6525,8 @@ function applyFloorplanSheet(sheet) {
     img.src = sheet.floorplanData;
   } else {
     state.floorplan = null;
-    if (uz) uz.style.display = state.symbols.length ? 'none' : 'flex';
+    if (uz) uz.style.display = 'none';
+    const zl = document.getElementById('zlbl'); if (zl) zl.textContent = Math.round(state.zoom * 100) + '%';
     render(); renderProps(null);
   }
   updateFloorplanTabs();
@@ -6513,7 +6575,8 @@ function serializeProjectData() {
     floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
     symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
     pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
-    floorplanData: currentFloorplanData(), customSymbols: customSymbols||{},
+    floorplanData: currentFloorplanData(), customSymbols: simpleClone(customSymbols)||{},
+    overriddenStdSymbols: simpleClone(overriddenStdSymbols)||{}, deletedStdSymbols: [...deletedStdSymbols],
     updatedAt: new Date().toISOString(), _v:2, _saved: new Date().toISOString()
   };
 }
@@ -6533,7 +6596,7 @@ function loadProjectData(d) {
     state.pan=d.pan||{x:0,y:0}; state.zoom=d.zoom||1; state.raumhoehe=d.raumhoehe||250;
     if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { state.floorplan=null; captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
   }
-  if (d.customSymbols) { customSymbols = d.customSymbols; mergeCustomSymbols(); buildPalette(); }
+  restoreProjectSymbolConfig(d);
   renderProjectPage();
 }
 function resetWorkspaceForNewProject(name) {
@@ -8254,6 +8317,7 @@ function exportXML() {
 let aiMode = 'claude';
 
 function showAI() {
+  setAIMode(aiMode);
   document.getElementById('aiModal').classList.remove('hid');
 }
 
@@ -8265,7 +8329,7 @@ function setAIMode(mode) {
     if (btn) { btn.className = m === mode ? 'btn ba' : 'btn bg'; btn.style.flex='1'; btn.style.fontSize='11px'; btn.style.padding='6px'; }
     if (cfg) cfg.style.display = m === mode ? 'block' : 'none';
   });
-  const labels = { claude:'Modus: Claude KI (eingebaut)', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
+  const labels = { claude:'Modus: Claude KI — Serververbindung erforderlich', openrouter:'Modus: OpenRouter (Cloud)', offline:'Modus: Wissensbasis (offline)' };
   const statusEl = document.getElementById('aiStatus');
   if (statusEl) statusEl.textContent = labels[mode] || '';
 }
@@ -8306,34 +8370,51 @@ function aiAddLoading(label) {
   return div;
 }
 
-// Claude eingebaut (Anthropic API)
+// Claude über authentifizierten Server-Proxy; API-Key nur auf dem Server.
+let claudePending = false;
 async function sendClaude(msg) {
+  if (claudePending) { document.getElementById('aiInput').value = msg; return; }
+  const endpoint = document.getElementById('claudeEndpoint').value.trim();
+  const accessToken = document.getElementById('claudeAccessToken').value.trim();
+  let url;
+  try {
+    url = new URL(endpoint);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.hostname === 'api.anthropic.com') throw new Error();
+  } catch (_) {
+    document.getElementById('aiInput').value = msg;
+    aiAddMsg('assistant', 'Bitte eine gültige HTTPS-Adresse deines Claude-Servers eingeben. Die direkte Anthropic-API funktioniert hier nicht.', 'var(--yl)');
+    return;
+  }
+  if (!accessToken) {
+    document.getElementById('aiInput').value = msg;
+    aiAddMsg('assistant', 'Bitte den Zugangscode deines Claude-Servers eingeben. Die Frage wurde nicht gesendet.', 'var(--yl)');
+    return;
+  }
+  claudePending = true;
   aiAddMsg('user', msg, 'var(--ac)');
   const loader = aiAddLoading('Claude denkt nach...');
-  const projCtx = 'Projekt: "' + document.getElementById('projName').value + '", ' + state.symbols.length + ' Symbole, ' + state.wires.length + ' Leitungen.';
-  const systemPrompt = 'Du bist ein erfahrener Elektroingenieur und DIN-18015-Experte. Du hilfst bei Elektroinstallationsplanung: Schaltplaene, Kabelquerschnitte, Normen, KNX, Verlegung. ' + projCtx + ' Antworte auf Deutsch, praxisbezogen, max 200 Woerter.';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(url.href, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: msg }]
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+      body: JSON.stringify({ message: msg }),
+      signal: controller.signal
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error((data.error && data.error.message) || 'HTTP ' + response.status);
+    const answer = (data.content || []).filter(c => c.type === 'text' && typeof c.text === 'string').map(c => c.text).join('\n');
+    if (!answer) throw new Error('Der Server hat keine Textantwort geliefert.');
+    aiAddMsg('assistant', answer, 'var(--pu)');
+  } catch (e) {
+    const detail = e.name === 'AbortError' ? 'Zeitüberschreitung nach 45 Sekunden.' : e.message;
+    aiAddMsg('assistant', 'Claude-Verbindung fehlgeschlagen: ' + detail + '\nServeradresse, Zugangscode und Serverfreigabe prüfen.', 'var(--rd)');
+    document.getElementById('aiInput').value = msg;
+  } finally {
+    clearTimeout(timer);
     loader.remove();
-    if (data.content && data.content[0]) {
-      aiAddMsg('assistant', data.content[0].text, 'var(--pu)');
-    } else {
-      const errMsg = data.error ? data.error.message : 'Unbekannter Fehler';
-      aiAddMsg('assistant', 'Fehler: ' + errMsg + '\n\nTipp: Wissensbasis (offline) Modus nutzen!', 'var(--rd)');
-    }
-  } catch(e) {
-    loader.remove();
-    aiAddMsg('assistant', 'Verbindungsfehler: ' + e.message + '\n\nTipp: Wissensbasis (offline) Modus waehlen!', 'var(--rd)');
+    claudePending = false;
   }
 }
 
