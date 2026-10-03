@@ -50,7 +50,7 @@ async function verifyUser(req) {
   if (process.env.REQUIRE_AUTH === 'false') return { uid: 'anonymous', email: '' };
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
   if (!m) throw httpError(401, 'Anmeldung erforderlich');
-  const key = process.env.FIREBASE_WEB_API_KEY;
+  const key = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyDYOzvG_5AppllOgRB9MaeHQceyjeBsQhc';
   if (!key) throw httpError(503, 'Server nicht vollständig konfiguriert');
   let r;
   try {
@@ -147,7 +147,7 @@ function cleanResult(raw, input) {
 async function callOpenAI(input) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw httpError(503, 'KI-Dienst nicht konfiguriert');
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-6.1-sol';
   const schema = buildSchema(input.rooms.map(r => r.roomId), input.allowedSymbolTypes.map(t => t.symbolType));
   const { image, ...data } = input;
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 100000);
