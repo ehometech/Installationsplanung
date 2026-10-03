@@ -1,0 +1,3 @@
+{
+  "functions": { "api/ai/electrical-plan.js": { "maxDuration": 120 } }
+}
