@@ -6632,7 +6632,10 @@ function currentFloorplanData(maxD=1600, quality=.72) {
   } catch(e) { console.warn('floorplan encode:', e); return null; }
 }
 function projectHasWork() {
-  return !!(state.floorplan || state.symbols.length || state.wires.length || (state.trassen&&state.trassen.length) || (state.raeume&&state.raeume.length) || (state.floorplans&&state.floorplans.length));
+  return !!(state.floorplan || state.symbols.length || state.wires.length ||
+    (state.trassen&&state.trassen.length) || (state.raeume&&state.raeume.length) ||
+    (state.rooms&&state.rooms.length) || (state.doors&&state.doors.length) || (state.windows&&state.windows.length) ||
+    (state.aiPlans&&state.aiPlans.length) || (state.floorplans&&state.floorplans.length));
 }
 function makeSheetFromState(name) {
   return {
@@ -6640,13 +6643,16 @@ function makeSheetFromState(name) {
     name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1),
     floorplanData: currentFloorplanData(),
     symbols: simpleClone(state.symbols)||[], wires: simpleClone(state.wires)||[], trassen: simpleClone(state.trassen)||[], raeume: simpleClone(state.raeume)||[],
+    rooms: simpleClone(state.rooms)||[], doors: simpleClone(state.doors)||[], windows: simpleClone(state.windows)||[], aiPlans: simpleClone(state.aiPlans)||[],
     scale: state.scale||null, pan: simpleClone(state.pan)||{x:0,y:0}, zoom: state.zoom||1, raumhoehe: state.raumhoehe||250,
     updatedAt: new Date().toISOString()
   };
 }
 function captureActiveFloorplan() {
   if (!state.floorplans) state.floorplans = [];
-  const hasWork = !!state.floorplan || !!state.symbols.length || !!state.wires.length || !!(state.trassen&&state.trassen.length) || !!(state.raeume&&state.raeume.length);
+  const hasWork = !!state.floorplan || !!state.symbols.length || !!state.wires.length ||
+    !!(state.trassen&&state.trassen.length) || !!(state.raeume&&state.raeume.length) ||
+    !!(state.rooms&&state.rooms.length) || !!(state.doors&&state.doors.length) || !!(state.windows&&state.windows.length) || !!(state.aiPlans&&state.aiPlans.length);
   if (!state.activeFloorplanId) {
     if (!hasWork) { updateFloorplanTabs(); return; }
     const sheet = makeSheetFromState('Grundriss 1');
@@ -6685,6 +6691,11 @@ function applyFloorplanSheet(sheet) {
   state.wires = simpleClone(sheet.wires)||[];
   state.trassen = simpleClone(sheet.trassen)||[];
   state.raeume = simpleClone(sheet.raeume)||[];
+  state.rooms = simpleClone(sheet.rooms)||[];
+  state.doors = simpleClone(sheet.doors)||[];
+  state.windows = simpleClone(sheet.windows)||[];
+  state.aiPlans = simpleClone(sheet.aiPlans)||[];
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   state.scale = sheet.scale||null;
   state.pan = simpleClone(sheet.pan)||{x:0,y:0};
   state.zoom = sheet.zoom||1;
@@ -6715,7 +6726,7 @@ function applyFloorplanSheet(sheet) {
 }
 function addFloorplanFromDataUrl(dataUrl, name, activate=true) {
   captureActiveFloorplan();
-  const sheet = { id: makeId('fp'), name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1), floorplanData: dataUrl, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  const sheet = { id: makeId('fp'), name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1), floorplanData: dataUrl, symbols:[], wires:[], trassen:[], raeume:[], rooms:[], doors:[], windows:[], aiPlans:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
   state.floorplans.push(sheet);
   if (activate) applyFloorplanSheet(sheet); else updateFloorplanTabs();
   renderProjectPage();
@@ -6725,7 +6736,7 @@ function createBlankFloorplan() {
   const name = prompt('Name fuer den neuen Grundriss:', 'Grundriss ' + ((state.floorplans||[]).length + 1));
   if (name === null) return;
   captureActiveFloorplan();
-  const sheet = { id: makeId('fp'), name: name.trim() || 'Grundriss', floorplanData:null, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  const sheet = { id: makeId('fp'), name: name.trim() || 'Grundriss', floorplanData:null, symbols:[], wires:[], trassen:[], raeume:[], rooms:[], doors:[], windows:[], aiPlans:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
   state.floorplans.push(sheet); applyFloorplanSheet(sheet); renderProjectPage(); setStatus('Neuer Grundriss angelegt');
 }
 function renameActiveFloorplan() {
@@ -6745,7 +6756,8 @@ function deleteActiveFloorplan() {
   state.floorplans.splice(idx,1);
   const next = state.floorplans[idx] || state.floorplans[idx-1];
   if (next) applyFloorplanSheet(next);
-  else { state.activeFloorplanId=null; state.floorplan=null; state.symbols=[]; state.wires=[]; state.trassen=[]; state.raeume=[]; state.scale=null; render(); renderProps(null); updateFloorplanTabs(); const uz=document.getElementById('uploadZone'); if(uz)uz.style.display='flex'; }
+  else { state.activeFloorplanId=null; state.floorplan=null; state.symbols=[]; state.wires=[]; state.trassen=[]; state.raeume=[];
+    state.rooms=[]; state.doors=[]; state.windows=[]; state.aiPlans=[]; if (typeof aiClearProposals === 'function') aiClearProposals(); state.scale=null; render(); renderProps(null); updateFloorplanTabs(); const uz=document.getElementById('uploadZone'); if(uz)uz.style.display='flex'; }
   renderProjectPage(); setStatus('Grundriss entfernt');
 }
 function serializeProjectData() {
@@ -6757,6 +6769,7 @@ function serializeProjectData() {
     name: document.getElementById('projName')?.value || 'Projekt',
     floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
     symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
+    rooms: state.rooms||[], doors: state.doors||[], windows: state.windows||[], aiPlans: state.aiPlans||[],
     pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
     floorplanData: state.floorplans.length ? null : currentFloorplanData(), customSymbols: customSymbols||{},
     updatedAt: new Date().toISOString(), _v:2, _saved: new Date().toISOString()
@@ -6778,6 +6791,8 @@ function loadProjectData(d) {
     state.floorplans = [];
     state.activeFloorplanId = null;
     state.symbols=d.symbols||[]; state.wires=d.wires||[]; state.trassen=d.trassen||[]; state.raeume=d.raeume||[]; state.scale=d.scale||null;
+    state.rooms=d.rooms||[]; state.doors=d.doors||[]; state.windows=d.windows||[]; state.aiPlans=d.aiPlans||[];
+    if (typeof aiClearProposals === 'function') aiClearProposals();
     state.pan=d.pan||{x:0,y:0}; state.zoom=d.zoom||1; state.raumhoehe=d.raumhoehe||250;
     if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { state.floorplan=null; captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
   }
@@ -6794,7 +6809,10 @@ function resetWorkspaceForNewProject(name) {
   document.getElementById('projName').value = name;
   const ppn = document.getElementById('projectPageName'); if (ppn) ppn.value = '';
   state.floorplan = null; state.floorplans = []; state.activeFloorplanId = null;
-  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = []; state.scale = null;
+  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = [];
+  state.rooms = []; state.doors = []; state.windows = []; state.aiPlans = [];
+  if (typeof aiClearProposals === 'function') aiClearProposals();
+  state.scale = null;
   state.selectedId = null; state.undoStack = []; state.pan = {x:0,y:0}; state.zoom = 1;
   const uz = document.getElementById('uploadZone'); if (uz) uz.style.display = 'flex';
   updateFloorplanTabs(); render(); renderProps(null); renderProjectPage();
@@ -7343,7 +7361,10 @@ function zFit() {
 //  UNDO
 // ═══════════════════════════════════════════════════
 function saveUndo() {
-  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[] }));
+  state.undoStack.push(JSON.stringify({
+    symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[],
+    rooms: state.rooms||[], doors: state.doors||[], windows: state.windows||[], aiPlans: state.aiPlans||[]
+  }));
   if (state.undoStack.length > 50) state.undoStack.shift();
 }
 function undoAction() {
@@ -7351,7 +7372,9 @@ function undoAction() {
   const s = JSON.parse(state.undoStack.pop());
   state.symbols = s.symbols; state.wires = s.wires;
   state.trassen = s.trassen||[]; state.raeume = s.raeume||[];
+  state.rooms = s.rooms||[]; state.doors = s.doors||[]; state.windows = s.windows||[]; state.aiPlans = s.aiPlans||[];
   state.selectedId = null;
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   render(); renderProps(null); setStatus('Rückgängig');
 }
 
@@ -7361,7 +7384,10 @@ function undoAction() {
 function clearAll() {
   if (!confirm('Alles löschen? (Grundriss bleibt erhalten)')) return;
   saveUndo();
-  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = []; state.selectedId = null;
+  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = [];
+  state.rooms = []; state.doors = []; state.windows = []; state.aiPlans = [];
+  state.selectedId = null;
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   render(); renderProps(null); setStatus('Alle Elemente gelöscht');
 }
 
