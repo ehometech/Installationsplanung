@@ -10518,6 +10518,7 @@ function raumKabelInfo(r) {
 const AI_SCHEMA_VERSION = 1;
 const AI_DISCLAIMER = 'KI-generierter Planungsvorschlag. Elektrische Ausführung und Einhaltung der geltenden Normen müssen durch eine Elektrofachkraft geprüft werden.';
 const AI_SETTINGS_KEY = 'ai_plan_settings_v1';
+const AI_DEFAULT_BACKEND_URL = 'https://installationsplanung-ki-backend.vercel.app/api/ai/electrical-plan';
 const AI_MIN_DIST_PX = 40;            // Mindestabstand zwischen zwei Symbolen (Symbol ≈ 36 px)
 const AI_INSET_PX = 22;               // Abstand Symbolmitte zur Wand
 const AI_MAX_PER_ROOM = 60, AI_MAX_TOTAL = 400;
@@ -10641,7 +10642,7 @@ const AI_ROOM_NOTES = {
 };
 
 // ── Zustand ──
-let aiSettings = { engine:'rules', backendUrl:'', fallbackToRules:true, showRooms:true, standard:'standard',
+let aiSettings = { engine:'ai', backendUrl:AI_DEFAULT_BACKEND_URL, fallbackToRules:true, showRooms:true, standard:'standard',
   opts:{ sockets:true, lights:true, switches:true, network:false, tv:false, smoke:false, existing:true },
   custom:{ s:'', l:'', n:'', t:'' } };
 let aiListOpen = true;    // Vorschlagsliste im Vorschau-Panel ein-/ausgeklappt
@@ -10655,6 +10656,7 @@ const aiRid = () => 'room-' + Date.now().toString(36) + Math.random().toString(3
 function aiLoadSettings() {
   try { const s = JSON.parse(localStorage.getItem(AI_SETTINGS_KEY) || 'null');
     if (s && typeof s === 'object') aiSettings = Object.assign({}, aiSettings, s, { opts: Object.assign({}, aiSettings.opts, s.opts), custom: Object.assign({}, aiSettings.custom, s.custom) }); } catch (e) {}
+  if (!aiSettings.backendUrl) { aiSettings.backendUrl = AI_DEFAULT_BACKEND_URL; aiSettings.engine = 'ai'; }
 }
 function aiSaveSettings() { try { localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings)); } catch (e) {} }   // enthält KEINE Schlüssel
 
