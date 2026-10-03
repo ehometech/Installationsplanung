@@ -4206,6 +4206,7 @@ function clientToCanvas(cx, cy) {
 // Mouse
 function onMouseDown(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
+  if (typeof aiHandleDown === 'function' && aiHandleDown(pt, e)) return;
   if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
     if (lvHandleCanvasClick(pt)) return;
   }
@@ -4301,6 +4302,7 @@ function onMouseDown(e) {
 function onMouseMove(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
   document.getElementById('sCursor').textContent = `x:${Math.round(pt.x)} y:${Math.round(pt.y)}`;
+  if (typeof aiHandleMove === 'function' && aiHandleMove(pt, e)) return;
   if (state.scale) {
     const m = pt.x / state.scale;
     document.getElementById('sDist').textContent = `${m.toFixed(1)}m × ${(pt.y/state.scale).toFixed(1)}m`;
@@ -4382,6 +4384,7 @@ function onMouseMove(e) {
 }
 function onMouseUp(e) {
   cancelLongPress();
+  if (typeof aiHandleUp === 'function' && aiHandleUp()) return;
   if (rotatingId) {
     const sym = state.symbols.find(s => s.id === rotatingId);
     if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
@@ -4458,6 +4461,7 @@ function onTouchStart(e) {
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     const pt = clientToCanvas(t.clientX, t.clientY);
+    if (typeof aiHandleDown === 'function' && aiHandleDown(pt, {button:0,shiftKey:false,pointerType:'touch'})) return;
     // Beleuchtungsverteilung: Touch
     if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
       if (lvHandleCanvasClick(pt)) return;
@@ -4531,6 +4535,7 @@ function onTouchMoveCanvas(e) {
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     const pt = clientToCanvas(t.clientX, t.clientY);
+    if (typeof aiHandleMove === 'function' && aiHandleMove(pt, {shiftKey:false,pointerType:'touch'})) return;
     if (_wireActive) {
       cancelLongPress();
       state.dragging = null;
@@ -4579,6 +4584,7 @@ function onTouchMoveCanvas(e) {
 }
 function onTouchEndCanvas(e) {
   cancelLongPress();
+  if (typeof aiHandleUp === 'function' && aiHandleUp()) return;
   if (rotatingId) {
     const sym = state.symbols.find(s => s.id === rotatingId);
     if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
@@ -4916,11 +4922,13 @@ function render() {
   drawBackground();
   drawRaeume();
   drawFloorplan();
+  if (typeof aiDrawRooms === 'function') aiDrawRooms();
   drawWires();
   drawWireJunctions();
   drawCalPoints();
   drawTrassen();
   drawSymbols();
+  if (typeof aiDrawOverlay === 'function') aiDrawOverlay();
   drawSnapHint();
   if (typeof lvDrawOverlay === 'function') lvDrawOverlay();
   ctx.restore();
@@ -7026,6 +7034,10 @@ function switchTab(tab) {
 //  TOOLS
 // ═══════════════════════════════════════════════════
 function setTool(t) {
+  if (typeof aiTool !== 'undefined' && aiTool) {
+    aiTool = null; aiDraft = null;
+    if (typeof aiUpdateToolButtons === 'function') aiUpdateToolButtons();
+  }
   state.tool = t;
   state.wirePoints = [];
   document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('act'));
