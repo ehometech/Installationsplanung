@@ -2340,6 +2340,10 @@ let state = {
   snapEnabled: true,     // Intelligente Andockhilfe an Wandkanten ein/aus
   floorplans: [],
   activeFloorplanId: null,
+  rooms: [],
+  doors: [],
+  windows: [],
+  aiPlans: [],
 };
 let canvas, ctx, overlay, octx, wrap;
 let nid = 1;
@@ -3813,6 +3817,7 @@ window.addEventListener('load', async () => {
   initSymUploadZone();
   // ── Backup wiederherstellen (IndexedDB voll + localStorage leicht) ──
   await localStateRestore();
+  if (typeof aiInit === 'function') aiInit();
   render();
   restoreActiveViewAfterRefresh();
   _storageReady = true;
@@ -4201,6 +4206,7 @@ function clientToCanvas(cx, cy) {
 // Mouse
 function onMouseDown(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
+  if (typeof aiHandleDown === 'function' && aiHandleDown(pt, e)) return;
   if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
     if (lvHandleCanvasClick(pt)) return;
   }
@@ -4296,6 +4302,7 @@ function onMouseDown(e) {
 function onMouseMove(e) {
   const pt = clientToCanvas(e.clientX, e.clientY);
   document.getElementById('sCursor').textContent = `x:${Math.round(pt.x)} y:${Math.round(pt.y)}`;
+  if (typeof aiHandleMove === 'function' && aiHandleMove(pt, e)) return;
   if (state.scale) {
     const m = pt.x / state.scale;
     document.getElementById('sDist').textContent = `${m.toFixed(1)}m × ${(pt.y/state.scale).toFixed(1)}m`;
@@ -4377,6 +4384,7 @@ function onMouseMove(e) {
 }
 function onMouseUp(e) {
   cancelLongPress();
+  if (typeof aiHandleUp === 'function' && aiHandleUp()) return;
   if (rotatingId) {
     const sym = state.symbols.find(s => s.id === rotatingId);
     if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
@@ -4453,6 +4461,7 @@ function onTouchStart(e) {
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     const pt = clientToCanvas(t.clientX, t.clientY);
+    if (typeof aiHandleDown === 'function' && aiHandleDown(pt, {button:0,shiftKey:false,pointerType:'touch'})) return;
     // Beleuchtungsverteilung: Touch
     if (typeof lvHandleCanvasClick === 'function' && _lv.active) {
       if (lvHandleCanvasClick(pt)) return;
@@ -4526,6 +4535,7 @@ function onTouchMoveCanvas(e) {
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     const pt = clientToCanvas(t.clientX, t.clientY);
+    if (typeof aiHandleMove === 'function' && aiHandleMove(pt, {shiftKey:false,pointerType:'touch'})) return;
     if (_wireActive) {
       cancelLongPress();
       state.dragging = null;
@@ -4574,6 +4584,7 @@ function onTouchMoveCanvas(e) {
 }
 function onTouchEndCanvas(e) {
   cancelLongPress();
+  if (typeof aiHandleUp === 'function' && aiHandleUp()) return;
   if (rotatingId) {
     const sym = state.symbols.find(s => s.id === rotatingId);
     if (sym) sym.rotation = Math.round((sym.rotation||0) * 10) / 10;
@@ -4803,37 +4814,38 @@ function autoKabelConfig(key) {
   return null;
 }
 
-function placeSymbol(key, x, y) {
+function createSymbolObject(key, x, y) {
   const sym = SYMBOLS[key];
-  if (!sym) return;
-  saveUndo();
-
-  // Auto-Kabelkonfiguration
+  if (!sym) return null;
   const autoK = autoKabelConfig(key);
-  const kabel     = autoK?.kabel     || sym.kabel    || 'NYM-J 3×1.5';
+  const kabel = autoK?.kabel || sym.kabel || 'NYM-J 3×1.5';
   const nennstrom = autoK?.nennstrom || sym.nennstrom || 16;
-
-  const s = {
+  return {
     id: gid(), type: key, x, y, rotation: 0,
     label: sym.name, circuit: 'SK1', phase: sym.phase||'L1',
     nennstrom, kabel,
     kabelHinweis: autoK?.kabelHinweis || '',
     lsKurve: autoK?.lsKurve || 'B',
-    // Kabelausführung (Position am Symbol)
-    kabelPosition: 'unten', // oben | unten | links | rechts
-    kabelLaenge: '',        // Zuleitung in m (manuell, wenn kein Maßstab)
+    kabelPosition: 'unten', kabelLaenge: '',
     kommentar: '', count: 1,
     size: _symSizeMemory[key] || 1,
   };
-  state.symbols.push(s);
-  selectSymbol(s.id);
+}
+function placeSymbol(key, x, y) {
+  const sym = SYMBOLS[key];
+  if (!sym) return;
+  saveUndo();
+  const obj = createSymbolObject(key, x, y);
+  if (!obj) return;
+  state.symbols.push(obj);
+  selectSymbol(obj.id);
   if (document.getElementById('uploadZone').style.display !== 'none' || state.symbols.length === 1) {
     document.getElementById('uploadZone').style.display = 'none';
   }
   render();
   setStatus(sym.name + ' platziert — Installationseigenschaften eingeben');
-  setTimeout(() => openInstModal(s.id), 80);
-  return s;
+  setTimeout(() => openInstModal(obj.id), 80);
+  return obj;
 }
 function copySymbol(symId) {
   const orig = state.symbols.find(s => s.id === symId);
@@ -4910,11 +4922,13 @@ function render() {
   drawBackground();
   drawRaeume();
   drawFloorplan();
+  if (typeof aiDrawRooms === 'function') aiDrawRooms();
   drawWires();
   drawWireJunctions();
   drawCalPoints();
   drawTrassen();
   drawSymbols();
+  if (typeof aiDrawOverlay === 'function') aiDrawOverlay();
   drawSnapHint();
   if (typeof lvDrawOverlay === 'function') lvDrawOverlay();
   ctx.restore();
@@ -6618,7 +6632,10 @@ function currentFloorplanData(maxD=1600, quality=.72) {
   } catch(e) { console.warn('floorplan encode:', e); return null; }
 }
 function projectHasWork() {
-  return !!(state.floorplan || state.symbols.length || state.wires.length || (state.trassen&&state.trassen.length) || (state.raeume&&state.raeume.length) || (state.floorplans&&state.floorplans.length));
+  return !!(state.floorplan || state.symbols.length || state.wires.length ||
+    (state.trassen&&state.trassen.length) || (state.raeume&&state.raeume.length) ||
+    (state.rooms&&state.rooms.length) || (state.doors&&state.doors.length) || (state.windows&&state.windows.length) ||
+    (state.aiPlans&&state.aiPlans.length) || (state.floorplans&&state.floorplans.length));
 }
 function makeSheetFromState(name) {
   return {
@@ -6626,13 +6643,16 @@ function makeSheetFromState(name) {
     name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1),
     floorplanData: currentFloorplanData(),
     symbols: simpleClone(state.symbols)||[], wires: simpleClone(state.wires)||[], trassen: simpleClone(state.trassen)||[], raeume: simpleClone(state.raeume)||[],
+    rooms: simpleClone(state.rooms)||[], doors: simpleClone(state.doors)||[], windows: simpleClone(state.windows)||[], aiPlans: simpleClone(state.aiPlans)||[],
     scale: state.scale||null, pan: simpleClone(state.pan)||{x:0,y:0}, zoom: state.zoom||1, raumhoehe: state.raumhoehe||250,
     updatedAt: new Date().toISOString()
   };
 }
 function captureActiveFloorplan() {
   if (!state.floorplans) state.floorplans = [];
-  const hasWork = !!state.floorplan || !!state.symbols.length || !!state.wires.length || !!(state.trassen&&state.trassen.length) || !!(state.raeume&&state.raeume.length);
+  const hasWork = !!state.floorplan || !!state.symbols.length || !!state.wires.length ||
+    !!(state.trassen&&state.trassen.length) || !!(state.raeume&&state.raeume.length) ||
+    !!(state.rooms&&state.rooms.length) || !!(state.doors&&state.doors.length) || !!(state.windows&&state.windows.length) || !!(state.aiPlans&&state.aiPlans.length);
   if (!state.activeFloorplanId) {
     if (!hasWork) { updateFloorplanTabs(); return; }
     const sheet = makeSheetFromState('Grundriss 1');
@@ -6671,6 +6691,11 @@ function applyFloorplanSheet(sheet) {
   state.wires = simpleClone(sheet.wires)||[];
   state.trassen = simpleClone(sheet.trassen)||[];
   state.raeume = simpleClone(sheet.raeume)||[];
+  state.rooms = simpleClone(sheet.rooms)||[];
+  state.doors = simpleClone(sheet.doors)||[];
+  state.windows = simpleClone(sheet.windows)||[];
+  state.aiPlans = simpleClone(sheet.aiPlans)||[];
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   state.scale = sheet.scale||null;
   state.pan = simpleClone(sheet.pan)||{x:0,y:0};
   state.zoom = sheet.zoom||1;
@@ -6701,7 +6726,7 @@ function applyFloorplanSheet(sheet) {
 }
 function addFloorplanFromDataUrl(dataUrl, name, activate=true) {
   captureActiveFloorplan();
-  const sheet = { id: makeId('fp'), name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1), floorplanData: dataUrl, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  const sheet = { id: makeId('fp'), name: name || 'Grundriss ' + ((state.floorplans||[]).length + 1), floorplanData: dataUrl, symbols:[], wires:[], trassen:[], raeume:[], rooms:[], doors:[], windows:[], aiPlans:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
   state.floorplans.push(sheet);
   if (activate) applyFloorplanSheet(sheet); else updateFloorplanTabs();
   renderProjectPage();
@@ -6711,7 +6736,7 @@ function createBlankFloorplan() {
   const name = prompt('Name fuer den neuen Grundriss:', 'Grundriss ' + ((state.floorplans||[]).length + 1));
   if (name === null) return;
   captureActiveFloorplan();
-  const sheet = { id: makeId('fp'), name: name.trim() || 'Grundriss', floorplanData:null, symbols:[], wires:[], trassen:[], raeume:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
+  const sheet = { id: makeId('fp'), name: name.trim() || 'Grundriss', floorplanData:null, symbols:[], wires:[], trassen:[], raeume:[], rooms:[], doors:[], windows:[], aiPlans:[], scale:null, pan:{x:0,y:0}, zoom:1, raumhoehe:state.raumhoehe||250, updatedAt:new Date().toISOString() };
   state.floorplans.push(sheet); applyFloorplanSheet(sheet); renderProjectPage(); setStatus('Neuer Grundriss angelegt');
 }
 function renameActiveFloorplan() {
@@ -6731,7 +6756,8 @@ function deleteActiveFloorplan() {
   state.floorplans.splice(idx,1);
   const next = state.floorplans[idx] || state.floorplans[idx-1];
   if (next) applyFloorplanSheet(next);
-  else { state.activeFloorplanId=null; state.floorplan=null; state.symbols=[]; state.wires=[]; state.trassen=[]; state.raeume=[]; state.scale=null; render(); renderProps(null); updateFloorplanTabs(); const uz=document.getElementById('uploadZone'); if(uz)uz.style.display='flex'; }
+  else { state.activeFloorplanId=null; state.floorplan=null; state.symbols=[]; state.wires=[]; state.trassen=[]; state.raeume=[];
+    state.rooms=[]; state.doors=[]; state.windows=[]; state.aiPlans=[]; if (typeof aiClearProposals === 'function') aiClearProposals(); state.scale=null; render(); renderProps(null); updateFloorplanTabs(); const uz=document.getElementById('uploadZone'); if(uz)uz.style.display='flex'; }
   renderProjectPage(); setStatus('Grundriss entfernt');
 }
 function serializeProjectData() {
@@ -6743,6 +6769,7 @@ function serializeProjectData() {
     name: document.getElementById('projName')?.value || 'Projekt',
     floorplans: simpleClone(state.floorplans)||[], activeFloorplanId: state.activeFloorplanId,
     symbols: state.symbols||[], wires: state.wires||[], trassen: state.trassen||[], raeume: state.raeume||[], scale: state.scale||null,
+    rooms: state.rooms||[], doors: state.doors||[], windows: state.windows||[], aiPlans: state.aiPlans||[],
     pan: state.pan, zoom: state.zoom, raumhoehe: state.raumhoehe||250,
     floorplanData: state.floorplans.length ? null : currentFloorplanData(), customSymbols: customSymbols||{},
     updatedAt: new Date().toISOString(), _v:2, _saved: new Date().toISOString()
@@ -6764,6 +6791,8 @@ function loadProjectData(d) {
     state.floorplans = [];
     state.activeFloorplanId = null;
     state.symbols=d.symbols||[]; state.wires=d.wires||[]; state.trassen=d.trassen||[]; state.raeume=d.raeume||[]; state.scale=d.scale||null;
+    state.rooms=d.rooms||[]; state.doors=d.doors||[]; state.windows=d.windows||[]; state.aiPlans=d.aiPlans||[];
+    if (typeof aiClearProposals === 'function') aiClearProposals();
     state.pan=d.pan||{x:0,y:0}; state.zoom=d.zoom||1; state.raumhoehe=d.raumhoehe||250;
     if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { state.floorplan=null; captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
   }
@@ -6780,7 +6809,10 @@ function resetWorkspaceForNewProject(name) {
   document.getElementById('projName').value = name;
   const ppn = document.getElementById('projectPageName'); if (ppn) ppn.value = '';
   state.floorplan = null; state.floorplans = []; state.activeFloorplanId = null;
-  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = []; state.scale = null;
+  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = [];
+  state.rooms = []; state.doors = []; state.windows = []; state.aiPlans = [];
+  if (typeof aiClearProposals === 'function') aiClearProposals();
+  state.scale = null;
   state.selectedId = null; state.undoStack = []; state.pan = {x:0,y:0}; state.zoom = 1;
   const uz = document.getElementById('uploadZone'); if (uz) uz.style.display = 'flex';
   updateFloorplanTabs(); render(); renderProps(null); renderProjectPage();
@@ -7020,6 +7052,10 @@ function switchTab(tab) {
 //  TOOLS
 // ═══════════════════════════════════════════════════
 function setTool(t) {
+  if (typeof aiTool !== 'undefined' && aiTool) {
+    aiTool = null; aiDraft = null;
+    if (typeof aiUpdateToolButtons === 'function') aiUpdateToolButtons();
+  }
   state.tool = t;
   state.wirePoints = [];
   document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('act'));
@@ -7325,7 +7361,10 @@ function zFit() {
 //  UNDO
 // ═══════════════════════════════════════════════════
 function saveUndo() {
-  state.undoStack.push(JSON.stringify({ symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[] }));
+  state.undoStack.push(JSON.stringify({
+    symbols: state.symbols, wires: state.wires, trassen: state.trassen||[], raeume: state.raeume||[],
+    rooms: state.rooms||[], doors: state.doors||[], windows: state.windows||[], aiPlans: state.aiPlans||[]
+  }));
   if (state.undoStack.length > 50) state.undoStack.shift();
 }
 function undoAction() {
@@ -7333,7 +7372,9 @@ function undoAction() {
   const s = JSON.parse(state.undoStack.pop());
   state.symbols = s.symbols; state.wires = s.wires;
   state.trassen = s.trassen||[]; state.raeume = s.raeume||[];
+  state.rooms = s.rooms||[]; state.doors = s.doors||[]; state.windows = s.windows||[]; state.aiPlans = s.aiPlans||[];
   state.selectedId = null;
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   render(); renderProps(null); setStatus('Rückgängig');
 }
 
@@ -7343,7 +7384,10 @@ function undoAction() {
 function clearAll() {
   if (!confirm('Alles löschen? (Grundriss bleibt erhalten)')) return;
   saveUndo();
-  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = []; state.selectedId = null;
+  state.symbols = []; state.wires = []; state.trassen = []; state.raeume = [];
+  state.rooms = []; state.doors = []; state.windows = []; state.aiPlans = [];
+  state.selectedId = null;
+  if (typeof aiClearProposals === 'function') aiClearProposals();
   render(); renderProps(null); setStatus('Alle Elemente gelöscht');
 }
 
@@ -10458,6 +10502,1042 @@ function raumKabelInfo(r) {
 
 
 
+
+
+
+// ═══════════════════════════════════════════════════
+//  KI-ELEKTROPLANUNG  (Räume · Regelengine · KI-Backend · Vorschau · Rückgängig)
+//  Architektur:
+//   Räume/Türen/Fenster (relativ 0..1)  →  buildPlanData()  →  generateElectricalPlan()
+//        ├─ Engine "rules": lokale Regelengine (ohne KI, läuft komplett im Browser)
+//        └─ Engine "ai"   : POST an eigenes Backend (/api/ai/electrical-plan) → KI-Modell
+//   beide liefern IDENTISCHES JSON  →  normalizeResult() (Validierung, nur vorhandene Symbole)
+//   →  Vorschau (state bleibt unberührt)  →  übernehmen / einzeln prüfen / verwerfen  →  undoAIPlan()
+//  Es werden NIE API-Schlüssel im Frontend gespeichert (nur Backend-URL + Einstellungen).
+// ═══════════════════════════════════════════════════
+const AI_SCHEMA_VERSION = 1;
+const AI_DISCLAIMER = 'KI-generierter Planungsvorschlag. Elektrische Ausführung und Einhaltung der geltenden Normen müssen durch eine Elektrofachkraft geprüft werden.';
+const AI_SETTINGS_KEY = 'ai_plan_settings_v1';
+const AI_MIN_DIST_PX = 40;            // Mindestabstand zwischen zwei Symbolen (Symbol ≈ 36 px)
+const AI_INSET_PX = 22;               // Abstand Symbolmitte zur Wand
+const AI_MAX_PER_ROOM = 60, AI_MAX_TOTAL = 400;
+
+// ── Symbol-Mapping: logische Typen (KI/Regeln) → vorhandene SYMBOLS-Schlüssel ──
+// Die KI darf NUR diese Typen (und eigene Symbole) verwenden. Nichts wird neu gezeichnet.
+const AI_SYMBOL_MAP = {
+  socket_single:     { label:'Steckdose',                 candidates:['steckdose_1'] },
+  socket_double:     { label:'Doppelsteckdose',           candidates:['steckdose_2'] },
+  socket_ip44:       { label:'Steckdose IP44 (Feuchtraum/außen)', candidates:['steckdose_ip44'] },
+  socket_usb:        { label:'USB-Steckdose',             candidates:['usb_steckdose'] },
+  switch_single:     { label:'Ausschalter',               candidates:['ausschalter'] },
+  switch_changeover: { label:'Wechselschalter',           candidates:['wechselschalter'] },
+  switch_cross:      { label:'Kreuzschalter',             candidates:['kreuzschalter'] },
+  switch_series:     { label:'Serienschalter',            candidates:['serienschalter'], nameRx:/serien/i },
+  switch_dimmer:     { label:'Dimmer',                    candidates:['dimmer'] },
+  light_ceiling:     { label:'Deckenleuchte / Lichtauslass', candidates:['deckenleuchte'] },
+  light_wall:        { label:'Wandleuchte',               candidates:['wandleuchte'] },
+  light_spot:        { label:'Einbaustrahler',            candidates:['einbaustrahler'] },
+  network_rj45:      { label:'Netzwerkdose (RJ45)',       candidates:['datensteckdose','netzwerk'] },
+  tv_socket:         { label:'TV-/Antennendose',          candidates:['antennensteckdose'] },
+  smoke_detector:    { label:'Rauchmelder',               candidates:['rauchmelder'] },
+  motion_sensor:     { label:'Bewegungsmelder',           candidates:['bewegungsmelder'] },
+  ventilator:        { label:'Ventilator/Lüfter',         candidates:['ventilator'] }
+};
+const AI_ROLE_KEYS = {
+  socket:  ['steckdose_1','steckdose_2','steckdose_ip44','usb_steckdose'],
+  light:   ['leuchte','deckenleuchte','wandleuchte','einbaustrahler','aussenleuchte'],
+  switch:  ['ausschalter','wechselschalter','kreuzschalter','serienschalter','taster','taster_leuchte','dimmer'],
+  network: ['datensteckdose','netzwerk'],
+  tv:      ['antennensteckdose']
+};
+const AI_CUSTOM_CAT_ROLE = { 'Steckdosen':'socket', 'Beleuchtung':'light', 'Schalter & Taster':'switch' };
+
+function aiResolveSymbol(type) {
+  if (typeof type !== 'string' || !type) return null;
+  const m = AI_SYMBOL_MAP[type];
+  if (m) {
+    for (const k of m.candidates) if (SYMBOLS[k]) return k;
+    if (m.nameRx) {                                         // z. B. eigenes Symbol "Serienschalter"
+      const hit = Object.entries(SYMBOLS).find(([k, s]) => s.isCustom && m.nameRx.test(s.name || ''));
+      if (hit) return hit[0];
+    }
+    return null;
+  }
+  if (SYMBOLS[type] && SYMBOLS[type].isCustom) return type;            // eigenes Symbol per Schlüssel
+  for (const [logical, d] of Object.entries(AI_SYMBOL_MAP))            // reale Schlüssel nur wenn gemappt
+    if (d.candidates.includes(type) && SYMBOLS[type]) return type;
+  return null;
+}
+function aiLogicalOf(key) {
+  for (const [logical, d] of Object.entries(AI_SYMBOL_MAP)) if (d.candidates[0] === key || (d.candidates.includes(key) && !SYMBOLS[d.candidates[0]])) return logical;
+  return key;
+}
+function aiGetAvailableSymbolTypes() {
+  const list = [];
+  for (const [t, d] of Object.entries(AI_SYMBOL_MAP)) {
+    const k = aiResolveSymbol(t);
+    if (k) list.push({ symbolType: t, label: d.label, category: SYMBOLS[k].cat || '', symbolKey: k });
+  }
+  for (const [k, s] of Object.entries(SYMBOLS)) {
+    if (s.isCustom && !list.some(x => x.symbolKey === k))
+      list.push({ symbolType: k, label: s.name, category: s.cat || 'Eigene Symbole', symbolKey: k });
+  }
+  return list;
+}
+function aiRoleOfKey(key) {
+  for (const [r, arr] of Object.entries(AI_ROLE_KEYS)) if (arr.includes(key)) return r;
+  const s = SYMBOLS[key];
+  if (s && s.isCustom) return AI_CUSTOM_CAT_ROLE[s.cat] || null;
+  return null;
+}
+
+// ── Raumtypen ──
+const AI_ROOM_NAMES = ['Wohnzimmer','Küche','Schlafzimmer','Kinderzimmer','Bad','WC','Flur','Abstellraum','Büro','Hauswirtschaftsraum','Garage','Terrasse','Esszimmer','Gäste-WC','Gästezimmer','Keller','Balkon','Diele','Wohnküche'];
+const AI_ROOM_TYPES = {
+  wohnen:'Wohnen/Essen', schlafen:'Schlafen', kind:'Kinder-/Jugendzimmer', kueche:'Küche', bad:'Bad', wc:'WC',
+  flur:'Flur/Diele', abstell:'Abstellraum', buero:'Büro', hwr:'Hauswirtschaft/Technik', garage:'Garage', terrasse:'Terrasse/Balkon', sonstige:'Sonstiges'
+};
+function aiGuessRoomType(name) {
+  const n = String(name || '').toLowerCase();
+  if (/küche|kueche|kitchen/.test(n)) return 'kueche';
+  if (/\bwc\b|toilette|gäste.?wc|gaeste.?wc/.test(n)) return 'wc';
+  if (/bad|dusche|wanne/.test(n)) return 'bad';
+  if (/schlaf|eltern/.test(n)) return 'schlafen';
+  if (/kind|jugend|spiel/.test(n)) return 'kind';
+  if (/büro|buero|arbeits|office/.test(n)) return 'buero';
+  if (/hauswirtschaft|hwr|wasch|technik/.test(n)) return 'hwr';
+  if (/garage|carport|stellplatz/.test(n)) return 'garage';
+  if (/terrasse|balkon|loggia|außen|aussen/.test(n)) return 'terrasse';
+  if (/flur|diele|gang|eingang|treppe|windfang/.test(n)) return 'flur';
+  if (/abstell|speis|vorrat|keller|kammer/.test(n)) return 'abstell';
+  if (/wohn|ess|gast|living/.test(n)) return 'wohnen';
+  return 'sonstige';
+}
+// Richtwerte je Ausstattungsstufe [Basis, Standard, Komfort] — orientiert an üblichen Ausstattungsstufen
+// (z. B. DIN 18015-2 / RAL-RG 678), aber NICHT normativ geprüft. Bewusst als Tabelle, damit leicht anpassbar.
+const AI_RULE_TABLE = {
+  wohnen:   { s:[5,7,10], l:[1,2,3], n:[0,1,2], t:[1,1,2] },
+  schlafen: { s:[4,5,7],  l:[1,1,2], n:[0,0,1], t:[0,1,1] },
+  kind:     { s:[4,5,7],  l:[1,1,2], n:[0,1,1], t:[0,0,1] },
+  kueche:   { s:[5,7,9],  l:[1,2,3], n:[0,0,1], t:[0,0,1], work:[2,3,4] },
+  bad:      { s:[1,2,3],  l:[1,2,3], n:[0,0,0], t:[0,0,0] },
+  wc:       { s:[1,1,1],  l:[1,1,1], n:[0,0,0], t:[0,0,0] },
+  flur:     { s:[1,2,3],  l:[1,2,3], n:[0,0,1], t:[0,0,0] },
+  abstell:  { s:[1,1,2],  l:[1,1,1], n:[0,0,0], t:[0,0,0] },
+  buero:    { s:[4,6,8],  l:[1,2,2], n:[1,2,3], t:[0,0,1] },
+  hwr:      { s:[3,4,5],  l:[1,1,2], n:[0,0,0], t:[0,0,0] },
+  garage:   { s:[1,2,3],  l:[1,2,2], n:[0,0,0], t:[0,0,0] },
+  terrasse: { s:[1,1,2],  l:[1,1,2], n:[0,0,0], t:[0,0,0] },
+  sonstige: { s:[3,4,5],  l:[1,1,2], n:[0,0,0], t:[0,0,0] }
+};
+const AI_TYPICAL_AREA = { wohnen:22, schlafen:14, kind:12, kueche:10, bad:7, wc:2.5, flur:6, abstell:4, buero:12, hwr:7, garage:18, terrasse:15, sonstige:12 };
+const AI_DOUBLE_ROOMS = { wohnen:[.3,.5,.7], schlafen:[.3,.5,.7], kind:[.3,.5,.7], kueche:[.3,.5,.7], buero:[.3,.5,.7], hwr:[0,.3,.5], flur:[0,.2,.3] };
+const AI_ROOM_NOTES = {
+  bad: 'Bad „{n}“: Schutzbereiche (DIN VDE 0100-701) und Zusatzschutz (RCD) beachten — Position der Steckdosen/Leuchten zu Wanne/Dusche prüfen. Nur Vorschläge.',
+  wc: 'WC „{n}“: Feuchtbereich — Schutzart und Abstände prüfen.',
+  terrasse: 'Außenbereich „{n}“: Schutzart (mind. IP44), Zusatzschutz und Zuleitung prüfen.',
+  garage: 'Garage „{n}“: Schutzart und Feuchtbereich beachten; Wallbox/Geräte separat planen.',
+  kueche: 'Küche „{n}“: Geräteanschlüsse (Herd, Geschirrspüler, Kühlschrank …) separat planen; Arbeitsflächen-Steckdosen nach tatsächlicher Küchenzeile positionieren.'
+};
+
+// ── Zustand ──
+let aiSettings = { engine:'rules', backendUrl:'', fallbackToRules:true, showRooms:true, standard:'standard',
+  opts:{ sockets:true, lights:true, switches:true, network:false, tv:false, smoke:false, existing:true },
+  custom:{ s:'', l:'', n:'', t:'' } };
+let aiListOpen = true;    // Vorschlagsliste im Vorschau-Panel ein-/ausgeklappt
+let aiTool = null;        // 'rect' | 'poly' | 'door' | 'window'
+let aiDraft = null;       // { kind, pts:[{x,y}] }  (Weltkoordinaten)
+let aiHoverPt = null;
+let aiPlan = null;        // aktuelle Vorschau { id, createdAt, standard, engine, proposals:[], warnings:[], log:[] }
+let aiSelPid = null, aiReviewMode = false, aiDrag = null, aiBusy = false, _aiPid = 1;
+const aiRid = () => 'room-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+function aiLoadSettings() {
+  try { const s = JSON.parse(localStorage.getItem(AI_SETTINGS_KEY) || 'null');
+    if (s && typeof s === 'object') aiSettings = Object.assign({}, aiSettings, s, { opts: Object.assign({}, aiSettings.opts, s.opts), custom: Object.assign({}, aiSettings.custom, s.custom) }); } catch (e) {}
+}
+function aiSaveSettings() { try { localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings)); } catch (e) {} }   // enthält KEINE Schlüssel
+
+// ── Geometrie (Pixelraum des Grundrisses) ──
+const aiDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function aiPolyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i].x * q.y - q.x * p[i].y; } return a / 2; }
+function aiPointInPoly(pt, poly) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+}
+function aiSegClosest(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+  const q = { x: a.x + dx * t, y: a.y + dy * t };
+  return { pt: q, t, d: aiDist(p, q) };
+}
+function aiBoundaryClosest(p, poly) {
+  let best = null;
+  for (let i = 0; i < poly.length; i++) {
+    const r = aiSegClosest(p, poly[i], poly[(i + 1) % poly.length]);
+    if (!best || r.d < best.d) best = Object.assign(r, { edge: i });
+  }
+  return best;
+}
+function aiCentroid(p) {
+  const A = aiPolyArea(p); if (Math.abs(A) < 1e-6) return { x: p.reduce((s, q) => s + q.x, 0) / p.length, y: p.reduce((s, q) => s + q.y, 0) / p.length };
+  let cx = 0, cy = 0;
+  for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length], f = p[i].x * q.y - q.x * p[i].y; cx += (p[i].x + q.x) * f; cy += (p[i].y + q.y) * f; }
+  return { x: cx / (6 * A), y: cy / (6 * A) };
+}
+function aiEdges(poly) {
+  const sign = aiPolyArea(poly) >= 0 ? 1 : -1, out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length], L = aiDist(a, b);
+    if (L < 1e-6) continue;
+    const dir = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+    const n = sign > 0 ? { x: -dir.y, y: dir.x } : { x: dir.y, y: -dir.x };      // nach innen
+    out.push({ i, a, b, L, dir, n });
+  }
+  return out;
+}
+function aiRotFromNormal(n) { return Math.round((Math.atan2(n.x, -n.y) * 180 / Math.PI + 360) % 360 / 15) * 15 % 360; }
+
+// ── planData aufbauen (einzige Quelle für Regeln UND KI) ──
+function aiBuildPlanData(roomIds, opts) {
+  const fp = state.floorplan;
+  if (!fp) throw new Error('Kein Grundriss geladen');
+  const W = fp.w, H = fp.h;
+  const rooms = state.rooms.filter(r => !roomIds || roomIds.includes(r.roomId));
+  const allRoomPx = rooms.map(r => ({ r, px: r.polygon.map(p => ({ x: p.x * W, y: p.y * H })) }));
+  const roomOf = (x, y) => { const f = allRoomPx.find(o => aiPointInPoly({ x: x * W, y: y * H }, o.px)); return f ? f.r.roomId : null; };
+  const near = (item) => {
+    const p = { x: item.x * W, y: item.y * H }, tol = Math.max(30, 0.4 * (state.scale || 0));
+    return allRoomPx.filter(o => aiBoundaryClosest(p, o.px).d <= tol).map(o => o.r.roomId);
+  };
+  const allowed = aiGetAvailableSymbolTypes().map(a => ({ symbolType: a.symbolType, label: a.label, category: a.category }));
+  const std = aiSettings.standard;
+  return {
+    schemaVersion: AI_SCHEMA_VERSION,
+    task: { mode: 'generate', command: null, scopeRoomIds: rooms.map(r => r.roomId) },   // Platz für spätere Befehle
+    standard: std,
+    options: Object.assign({}, aiSettings.opts, opts || {}),
+    custom: std === 'custom' ? Object.assign({}, aiSettings.custom) : null,
+    floorplan: { width: W, height: H, scalePxPerM: state.scale || null, imageDataUrl: null, imageAnnotated: false },
+    rooms: rooms.map(r => ({ roomId: r.roomId, name: r.name, type: r.type || aiGuessRoomType(r.name), polygon: r.polygon.map(p => ({ x: +p.x.toFixed(5), y: +p.y.toFixed(5) })) })),
+    doors:   (state.doors || []).map(d => ({ id: d.id, x: d.x, y: d.y, roomIds: near(d) })).filter(d => d.roomIds.length),
+    windows: (state.windows || []).map(d => ({ id: d.id, x: d.x, y: d.y, roomIds: near(d) })).filter(d => d.roomIds.length),
+    existingSymbols: state.symbols.map(s => ({ symbolType: aiLogicalOf(s.type), x: +(s.x / W).toFixed(5), y: +(s.y / H).toFixed(5), roomId: roomOf(s.x / W, s.y / H) })),
+    allowedSymbolTypes: allowed,
+    language: 'de'
+  };
+}
+function aiRenderAnnotatedImage(maxEdge) {
+  const fp = state.floorplan; maxEdge = maxEdge || 1600;
+  const r = Math.min(1, maxEdge / Math.max(fp.w, fp.h)), w = Math.round(fp.w * r), h = Math.round(fp.h * r);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(fp.img, 0, 0, w, h);
+  state.rooms.forEach((rm, i) => {
+    x.beginPath(); rm.polygon.forEach((p, k) => k ? x.lineTo(p.x * w, p.y * h) : x.moveTo(p.x * w, p.y * h)); x.closePath();
+    x.fillStyle = `hsla(${(i * 67) % 360},80%,50%,.12)`; x.fill(); x.strokeStyle = `hsl(${(i * 67) % 360},80%,40%)`; x.lineWidth = 3; x.stroke();
+    const c0 = aiCentroid(rm.polygon.map(p => ({ x: p.x * w, y: p.y * h })));
+    x.font = 'bold ' + Math.max(14, w / 70) + 'px sans-serif'; x.fillStyle = '#000'; x.textAlign = 'center'; x.fillText(rm.name, c0.x, c0.y);
+  });
+  const mark = (arr, col, ch) => (arr || []).forEach(d => { x.fillStyle = col; x.fillRect(d.x * w - 8, d.y * h - 8, 16, 16); x.fillStyle = '#fff'; x.font = 'bold 12px sans-serif'; x.textAlign = 'center'; x.fillText(ch, d.x * w, d.y * h + 4); });
+  mark(state.doors, '#d32f2f', 'T'); mark(state.windows, '#1976d2', 'F');
+  return c.toDataURL('image/jpeg', 0.82);
+}
+
+// ═══════════════════════════════════════════════════
+//  LOKALE REGELENGINE  (unabhängig von der KI; reine Funktion auf planData)
+//  Liefert dasselbe JSON wie die KI:  { rooms:[{roomId, objects:[{symbolType,x,y,rotation,reason,…}]}], meta }
+// ═══════════════════════════════════════════════════
+function aiRulesGenerate(pd) {
+  const W = pd.floorplan.width, H = pd.floorplan.height;
+  const warnings = [], log = [];
+  const lvl = ({ basis: 0, standard: 1, komfort: 2, custom: 1 })[pd.standard];
+  const O = pd.options || {}, cu = pd.custom || {};
+  const allowed = new Set((pd.allowedSymbolTypes || []).map(a => a.symbolType));
+  const placedAll = (pd.existingSymbols || []).map(e => ({ x: e.x * W, y: e.y * H }));
+  const outRooms = [];
+  let assumedScale = false;
+
+  for (const room of pd.rooms) {
+    const type = AI_ROOM_TYPES[room.type] ? room.type : aiGuessRoomType(room.name);
+    const T = AI_RULE_TABLE[type] || AI_RULE_TABLE.sonstige;
+    const pts = room.polygon.map(p => ({ x: p.x * W, y: p.y * H }));
+    const areaPx = Math.abs(aiPolyArea(pts));
+    if (areaPx < 400) { log.push(`Raum „${room.name}“ zu klein — übersprungen`); continue; }
+    let ppm = pd.floorplan.scalePxPerM;
+    if (!ppm) { ppm = Math.sqrt(areaPx / (AI_TYPICAL_AREA[type] || 12)); assumedScale = true; }
+    const edges = aiEdges(pts);
+    const margin = Math.max(0.3 * ppm, 24);
+    const cen = aiCentroid(pts);
+    const objs = [], placed = placedAll.slice();
+    const exist = { socket: 0, light: 0, switch: 0, network: 0, tv: 0 };
+    for (const e of (pd.existingSymbols || []))
+      if (e.roomId === room.roomId && O.existing !== false) { const k = aiResolveSymbol(e.symbolType); const r = k && aiRoleOfKey(k); if (r) exist[r]++; }
+
+    // Türen/Fenster als Anker auf Wänden
+    const anchorsOf = list => (list || []).filter(d => (d.roomIds || []).includes(room.roomId)).map(d => {
+      const b = aiBoundaryClosest({ x: d.x * W, y: d.y * H }, pts);
+      const ei = edges.findIndex(e => e.i === b.edge);
+      return ei < 0 ? null : { edge: ei, d: b.t * edges[ei].L, pt: b.pt };
+    }).filter(Boolean);
+    let doors = anchorsOf(pd.doors);
+    const windows = anchorsOf(pd.windows);
+    if (!doors.length) {                                  // keine Tür markiert → Annahme: Wand zum Gebäudeinneren
+      const others = pd.rooms.filter(r2 => r2.roomId !== room.roomId).map(r2 => aiCentroid(r2.polygon.map(p => ({ x: p.x * W, y: p.y * H }))));
+      const target = others.length ? { x: others.reduce((s, q) => s + q.x, 0) / others.length, y: others.reduce((s, q) => s + q.y, 0) / others.length } : cen;
+      let best = null;
+      edges.forEach((e, i) => { const m = { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, dd = aiDist(m, target); if (e.L > 2 * margin && (!best || dd < best.dd)) best = { i, dd }; });
+      if (best) { doors = [{ edge: best.i, d: edges[best.i].L / 2, pt: null, guessed: true }]; warnings.push(`Raum „${room.name}“: keine Tür markiert — Schalterposition angenommen. Bitte Türen markieren.`); }
+    }
+
+    const free = (ei, withWindows) => {
+      const e = edges[ei]; let iv = [[margin, e.L - margin]];
+      const blk = doors.filter(a => a.edge === ei).map(a => [a.d - 0.55 * ppm - 12, a.d + 0.55 * ppm + 12])
+        .concat(withWindows ? windows.filter(a => a.edge === ei).map(a => [a.d - 0.6 * ppm, a.d + 0.6 * ppm]) : []);
+      for (const [s, t] of blk) {
+        const nxt = [];
+        for (const [a, b] of iv) { if (t <= a || s >= b) nxt.push([a, b]); else { if (s > a) nxt.push([a, s]); if (t < b) nxt.push([t, b]); } }
+        iv = nxt;
+      }
+      return iv.filter(([a, b]) => b - a >= 0.25 * ppm);
+    };
+    const collides = (p, extra) => placed.some(q => aiDist(p, q) < AI_MIN_DIST_PX) || (extra || []).some(q => aiDist(p, q) < AI_MIN_DIST_PX);
+    const toRel = p => ({ x: +(p.x / W).toFixed(5), y: +(p.y / H).toFixed(5) });
+    const push = (symbolType, p, rot, reason, extra) => {
+      if (!allowed.has(symbolType)) { log.push(`„${symbolType}“ nicht verfügbar — Vorschlag in „${room.name}“ übersprungen`); return false; }
+      placed.push(p); objs.push(Object.assign({ symbolType, x: toRel(p).x, y: toRel(p).y, rotation: rot, reason }, extra || {})); return true;
+    };
+    const wallPoint = (ei, d) => { const e = edges[ei]; return { x: e.a.x + e.dir.x * d + e.n.x * AI_INSET_PX, y: e.a.y + e.dir.y * d + e.n.y * AI_INSET_PX }; };
+    const addWall = (symbolType, ei, d, reason, extra) => {
+      const e = edges[ei];
+      for (const off of [0, 1, -1, 2, -2, 3, -3]) {
+        const dd = d + off * AI_MIN_DIST_PX;
+        if (dd < margin * 0.8 || dd > e.L - margin * 0.8) continue;
+        const p = wallPoint(ei, dd);
+        if (!aiPointInPoly(p, pts) || collides(p)) continue;
+        return push(symbolType, p, 0, reason, extra);        // Drehung 0: der Renderer dreht Beschriftungen mit — wandbezogene Drehung würde Text auf den Kopf stellen
+      }
+      log.push(`„${room.name}“: kein freier Platz für ${symbolType}`); return false;
+    };
+    const addFree = (symbolType, p0, reason, extra) => {
+      for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1],[2,0],[-2,0],[0,2],[0,-2]]) {
+        const p = { x: p0.x + dx * AI_MIN_DIST_PX, y: p0.y + dy * AI_MIN_DIST_PX };
+        if (!aiPointInPoly(p, pts) || collides(p)) continue;
+        return push(symbolType, p, 0, reason, extra);
+      }
+      log.push(`„${room.name}“: kein freier Platz für ${symbolType}`); return false;
+    };
+    const slots = (iv, n) => {
+      const tot = iv.reduce((s, [a, b]) => s + (b - a), 0), out = [];
+      for (let k = 0; k < n; k++) { let d = (k + 0.5) * tot / n; for (const [a, b] of iv) { if (d <= b - a) { out.push(a + d); break; } d -= b - a; } }
+      return out;
+    };
+    const edgeLen = (ei, w) => free(ei, w).reduce((s, [a, b]) => s + (b - a), 0);
+    const doorEdges = new Set(doors.map(a => a.edge));
+    const wallsByLen = edges.map((e, i) => i).sort((a, b) => edgeLen(b, true) - edgeLen(a, true));
+    const bestMediaWall = () => wallsByLen.find(i => !doorEdges.has(i) && edgeLen(i, true) > 1.4 * ppm) ?? wallsByLen.find(i => edgeLen(i, true) > 1.0 * ppm) ?? wallsByLen[0];
+
+    // Bedarf
+    const pick = (arr, key) => {
+      if (pd.standard === 'custom' && cu[key] !== '' && cu[key] != null && !isNaN(+cu[key])) return Math.max(0, Math.round(+cu[key]));
+      return arr[lvl];
+    };
+    let nS = O.sockets ? pick(T.s, 's') : 0;
+    let nL = O.lights ? pick(T.l, 'l') : 0;
+    let nN = O.network ? pick(T.n, 'n') : 0;
+    let nT = O.tv ? pick(T.t, 't') : 0;
+    const areaM2 = areaPx / (ppm * ppm);
+    if (O.lights && nL && pd.standard !== 'custom' && areaM2 > 24) nL += Math.floor((areaM2 - 24) / 14);
+    if (O.lights && type === 'flur' && pd.standard !== 'custom') {
+      const bb = pts.reduce((a, p) => ({ x0: Math.min(a.x0, p.x), x1: Math.max(a.x1, p.x), y0: Math.min(a.y0, p.y), y1: Math.max(a.y1, p.y) }), { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 });
+      nL = Math.max(nL, Math.ceil(Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0) / ppm / 3.5));
+    }
+    nS = Math.max(0, nS - exist.socket); nL = Math.max(0, nL - exist.light);
+    nN = Math.max(0, nN - exist.network); nT = Math.max(0, nT - exist.tv);
+
+    // 1) Schalter an den Türen
+    if (O.switches && !exist.switch && doors.length) {
+      let use = doors;
+      if (doors.length > 2) {                                                     // die beiden am weitesten entfernten Türen
+        let bp = [doors[0], doors[1]], bd = -1;
+        for (let i = 0; i < doors.length; i++) for (let j = i + 1; j < doors.length; j++) {
+          const pa = wallPoint(doors[i].edge, doors[i].d), pb = wallPoint(doors[j].edge, doors[j].d), dd = aiDist(pa, pb);
+          if (dd > bd) { bd = dd; bp = [doors[i], doors[j]]; }
+        }
+        use = bp; log.push(`„${room.name}“: ${doors.length} Türen — Wechselschalter an den beiden entferntesten Türen, ggf. Kreuzschalter ergänzen`);
+      }
+      const twoCircuits = nL >= 2 && lvl === 2 && allowed.has('switch_series');
+      use.forEach((a, idx) => {
+        const e = edges[a.edge], off = Math.max((0.45 + 0.2) * ppm, 42);
+        const cand = [a.d + off, a.d - off].filter(d => d >= margin * 0.8 && d <= e.L - margin * 0.8);
+        const dd = cand.length ? cand.sort((x, y) => Math.min(y, e.L - y) - Math.min(x, e.L - x))[0] : Math.min(e.L - margin * 0.8, Math.max(margin * 0.8, a.d + off));
+        let st = use.length > 1 ? 'switch_changeover' : (twoCircuits ? 'switch_series' : 'switch_single');
+        const reason = use.length > 1 ? `Wechselschalter an Tür ${idx + 1} (Raum mit mehreren Türen)` : 'Lichtschalter an der Tür';
+        addWall(st, a.edge, dd, reason + (a.guessed ? ' — Türposition angenommen' : ''), { hoehe: 105 });
+      });
+    } else if (O.switches && !exist.switch) log.push(`„${room.name}“: keine Wand für Schalter gefunden`);
+
+    // 2) TV / Netzwerk-Cluster an der Hauptwand
+    let clusterDouble = false;
+    if ((nT > 0 || nN > 0) && edges.length) {
+      const ei = bestMediaWall(), iv = free(ei, true);
+      if (iv.length) {
+        const longest = iv.slice().sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0], mid = (longest[0] + longest[1]) / 2;
+        const sep = Math.max(AI_MIN_DIST_PX + 6, 0.35 * ppm);
+        const items = [];
+        if (O.sockets && nS > 0) items.push(['socket_double', 'Doppelsteckdose im TV-/Medienbereich']);
+        if (nT > 0) items.push(['tv_socket', 'TV-Anschluss an freier Hauptwand']);
+        if (nN > 0) items.push(['network_rj45', 'Netzwerkanschluss neben TV-/Medienbereich']);
+        items.forEach(([t, why], k) => {
+          const ok = addWall(t, ei, mid + (k - (items.length - 1) / 2) * sep, why);
+          if (ok && t === 'socket_double') { clusterDouble = true; nS--; }
+          if (ok && t === 'tv_socket') nT--;
+          if (ok && t === 'network_rj45') nN--;
+        });
+      }
+    }
+    // weitere TV/Netzwerk-Dosen auf den übrigen Wänden
+    for (const [t, cnt, why] of [['tv_socket', nT, 'Weiterer TV-Anschluss'], ['network_rj45', nN, type === 'buero' ? 'Netzwerkanschluss Arbeitsplatz' : 'Zusätzlicher Netzwerkanschluss']]) {
+      for (let k = 0; k < cnt; k++) {
+        const order = wallsByLen.filter(i => edgeLen(i, true) > 0.8 * ppm);
+        if (!order.length) break;
+        const ei = order[k % order.length], iv = free(ei, true), sl = slots(iv, 2);
+        if (sl.length) addWall(t, ei, sl[Math.floor(k / order.length) % sl.length], why);
+      }
+    }
+
+    // 3) Bettbereich (Schlaf-/Kinderzimmer)
+    if (O.sockets && (type === 'schlafen' || type === 'kind') && nS > 0) {
+      const ei = bestMediaWall(), iv = free(ei, false);
+      if (iv.length) {
+        const longest = iv.slice().sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0], mid = (longest[0] + longest[1]) / 2, half = Math.max(0.9 * ppm, 60);
+        const nb = lvl === 0 ? 1 : 2;
+        for (let k = 0; k < nb; k++) if (nS > 0 && addWall('socket_double', ei, mid + (nb === 1 ? 0 : (k ? half : -half)), 'Bettbereich: Doppelsteckdose neben dem Bett (Bettposition prüfen)')) nS--;
+      }
+    }
+
+    // 4) Küche: Arbeitsflächen
+    if (O.sockets && T.work) {
+      const nw = pd.standard === 'custom' ? T.work[1] : T.work[lvl];
+      const ei = wallsByLen.find(i => !doorEdges.has(i) && edgeLen(i, true) > 1.4 * ppm) ?? wallsByLen[0];
+      const iv = free(ei, false);
+      if (iv.length && nw) slots(iv, nw).forEach(d => addWall('socket_double', ei, d, 'Arbeitsfläche: Doppelsteckdose, Höhe ca. 105 cm (Küchenzeile prüfen)', { hoehe: 105 }));
+    }
+
+    // 5) Lichtauslässe (k-Means auf Rasterpunkten im Raum)
+    if (nL > 0) {
+      const bb = pts.reduce((a, p) => ({ x0: Math.min(a.x0, p.x), x1: Math.max(a.x1, p.x), y0: Math.min(a.y0, p.y), y1: Math.max(a.y1, p.y) }), { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 });
+      const step = Math.max(8, Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0) / 45), S = [];
+      for (let x = bb.x0; x <= bb.x1; x += step) for (let y = bb.y0; y <= bb.y1; y += step) {
+        const p = { x, y }; if (aiPointInPoly(p, pts) && aiBoundaryClosest(p, pts).d >= AI_INSET_PX) S.push(p);
+      }
+      if (S.length) {
+        const ed = p => aiBoundaryClosest(p, pts).d;
+        let c = [S.reduce((b, p) => ed(p) > ed(b) ? p : b, S[0])];
+        while (c.length < Math.min(nL, S.length)) c.push(S.reduce((b, p) => Math.min(...c.map(q => aiDist(p, q))) > Math.min(...c.map(q => aiDist(b, q))) ? p : b, S[0]));
+        for (let it = 0; it < 8 && c.length > 1; it++) {
+          const g = c.map(() => []);
+          S.forEach(p => { let bi = 0, bd = 1e18; c.forEach((q, i) => { const dd = aiDist(p, q); if (dd < bd) { bd = dd; bi = i; } }); g[bi].push(p); });
+          c = c.map((q, i) => { if (!g[i].length) return q; const m = { x: g[i].reduce((s, p) => s + p.x, 0) / g[i].length, y: g[i].reduce((s, p) => s + p.y, 0) / g[i].length };
+            return g[i].reduce((b, p) => aiDist(p, m) < aiDist(b, m) ? p : b, g[i][0]); });
+        }
+        c.forEach((p, i) => addFree('light_ceiling', p, nL === 1 ? 'Deckenauslass mittig im Raum' : `Deckenauslass ${i + 1}/${c.length} (gleichmäßige Verteilung)`));
+      }
+    }
+
+    // 6) Allgemeine Steckdosen entlang freier Wände
+    if (O.sockets && nS > 0 && edges.length) {
+      const cap = edges.map((e, i) => { const L = edgeLen(i, false); return L < 0.5 * ppm ? 0 : Math.max(1, Math.floor(L / (AI_MIN_DIST_PX * 1.6))); });
+      const wt = edges.map((e, i) => cap[i] ? edgeLen(i, false) : 0), n = edges.map(() => 0);
+      let rem = nS, guard = 0;
+      while (rem > 0 && guard++ < 50) {
+        const tot = wt.reduce((s, w, i) => s + (n[i] < cap[i] ? w : 0), 0); if (!tot) break;
+        const share = wt.map((w, i) => n[i] < cap[i] ? w / tot * rem : 0);
+        const base = share.map((s, i) => Math.min(cap[i] - n[i], Math.floor(s)));
+        let given = base.reduce((a, b) => a + b, 0);
+        base.forEach((b, i) => n[i] += b); rem -= given;
+        if (rem > 0) {
+          const order = share.map((s, i) => [s - Math.floor(s), i]).filter(([, i]) => n[i] < cap[i]).sort((a, b) => b[0] - a[0]);
+          for (const [, i] of order) { if (rem <= 0) break; n[i]++; rem--; }
+        }
+      }
+      const dr = (AI_DOUBLE_ROOMS[type] || [0, 0, 0])[lvl], ratio = pd.standard === 'custom' ? (AI_DOUBLE_ROOMS[type] || [0, 0, 0])[1] : dr;
+      const sType = type === 'terrasse' ? 'socket_ip44' : 'socket_single';
+      let k = 0;
+      edges.map((e, i) => i).sort((a, b) => edgeLen(b, false) - edgeLen(a, false)).forEach(ei => {
+        if (!n[ei]) return;
+        slots(free(ei, false), n[ei]).forEach(d => {
+          const dbl = Math.floor((k + 1) * ratio) > Math.floor(k * ratio); k++;
+          addWall(dbl ? 'socket_double' : sType, ei, d, dbl ? 'Doppelsteckdose an freier Wand' : (type === 'terrasse' ? 'Steckdose IP44 im Außenbereich' : 'Steckdose an freier Wand'));
+        });
+      });
+    }
+
+    // 7) Rauchmelder (optional)
+    if (O.smoke && ['schlafen', 'kind', 'flur'].includes(type) && allowed.has('smoke_detector'))
+      addFree('smoke_detector', cen, 'Rauchmelder an der Decke (Landesbauordnung prüfen)');
+
+    if (AI_ROOM_NOTES[type] && objs.length) warnings.push(AI_ROOM_NOTES[type].replace('{n}', room.name));
+    if (type === 'bad') objs.forEach(o => { o.note = 'Schutzbereiche prüfen'; });
+    outRooms.push({ roomId: room.roomId, objects: objs });
+  }
+  if (assumedScale) warnings.unshift('Maßstab nicht kalibriert: Wandlängen/Abstände wurden aus typischen Raumgrößen geschätzt. Für genaue Vorschläge zuerst den Maßstab kalibrieren.');
+  return { rooms: outRooms, meta: { engine: 'rules', warnings, log } };
+}
+
+// ═══════════════════════════════════════════════════
+//  VALIDIERUNG DER ERGEBNISSE (gilt für Regeln UND KI)
+// ═══════════════════════════════════════════════════
+function aiNormalizeResult(result, pd) {
+  const W = pd.floorplan.width, H = pd.floorplan.height, log = [], proposals = [];
+  const roomMap = {}; pd.rooms.forEach(r => { roomMap[r.roomId] = { r, px: r.polygon.map(p => ({ x: p.x * W, y: p.y * H })) }; });
+  const tol = 0.03 * Math.max(W, H);
+  const rooms = result && Array.isArray(result.rooms) ? result.rooms : null;
+  if (!rooms) throw new Error('Ungültiges Ergebnis: "rooms" fehlt');
+  let total = 0;
+  for (const ro of rooms) {
+    const R = roomMap[ro && ro.roomId];
+    if (!R) { log.push(`Unbekannte roomId „${ro && ro.roomId}“ ignoriert`); continue; }
+    const objs = Array.isArray(ro.objects) ? ro.objects : [];
+    let nRoom = 0;
+    for (const o of objs) {
+      if (total >= AI_MAX_TOTAL || nRoom >= AI_MAX_PER_ROOM) { log.push(`Limit erreicht (Raum „${R.r.name}“) — weitere Objekte ignoriert`); break; }
+      if (!o || typeof o !== 'object') { log.push('Ungültiges Objekt ignoriert'); continue; }
+      const key = aiResolveSymbol(o.symbolType);
+      if (!key) { log.push(`Unbekannter/nicht verfügbarer Symboltyp „${String(o.symbolType).slice(0, 40)}“ ignoriert (Raum „${R.r.name}“)`); continue; }
+      let x = Number(o.x), y = Number(o.y);
+      if (!isFinite(x) || !isFinite(y)) { log.push(`Ungültige Koordinaten bei „${o.symbolType}“ ignoriert`); continue; }
+      if (x < -0.02 || x > 1.02 || y < -0.02 || y > 1.02) { log.push(`Koordinaten außerhalb 0..1 bei „${o.symbolType}“ ignoriert`); continue; }
+      x = Math.min(1, Math.max(0, x)); y = Math.min(1, Math.max(0, y));
+      let p = { x: x * W, y: y * H };
+      if (!aiPointInPoly(p, R.px)) {
+        const b = aiBoundaryClosest(p, R.px);
+        if (b.d > tol) { log.push(`„${o.symbolType}“ liegt außerhalb von „${R.r.name}“ — ignoriert`); continue; }
+        const e = aiEdges(R.px).find(q => q.i === b.edge);
+        const q = e ? { x: b.pt.x + e.n.x * AI_INSET_PX, y: b.pt.y + e.n.y * AI_INSET_PX } : b.pt;
+        p = aiPointInPoly(q, R.px) ? q : b.pt;
+      }
+      if (proposals.some(q => q.roomId === ro.roomId && q.symbolKey === key && Math.hypot(q.x * W - p.x, q.y * H - p.y) < 10)) { log.push(`Duplikat „${o.symbolType}“ ignoriert`); continue; }
+      let rot = Number(o.rotation); rot = isFinite(rot) ? ((rot % 360) + 360) % 360 : 0;
+      proposals.push({
+        pid: 'p' + (_aiPid++), roomId: ro.roomId, symbolType: String(o.symbolType), symbolKey: key,
+        x: p.x / W, y: p.y / H, rotation: rot,
+        reason: String(o.reason || '').replace(/[\u0000-\u001f<>]/g, ' ').slice(0, 200),
+        hoehe: (o.hoehe != null && isFinite(+o.hoehe)) ? Math.max(0, Math.min(400, +o.hoehe)) : null,
+        note: o.note ? String(o.note).slice(0, 80) : '', source: 'ai'
+      });
+      nRoom++; total++;
+    }
+  }
+  return { proposals, log };
+}
+
+// ═══════════════════════════════════════════════════
+//  KI-API-ABSTRAKTION
+// ═══════════════════════════════════════════════════
+async function aiCallBackend(planData) {
+  const url = String(aiSettings.backendUrl || '').trim();
+  if (!/^https:\/\//i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(url)) throw new Error('Backend-URL fehlt oder ist nicht HTTPS');
+  const headers = { 'Content-Type': 'application/json' };
+  try { if (currentUser && currentUser.getIdToken) headers.Authorization = 'Bearer ' + await currentUser.getIdToken(); } catch (e) { /* ohne Login weiter */ }
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 120000);
+  try {
+    const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(planData), signal: ctl.signal });
+    let data = null; try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok) throw new Error('Backend ' + resp.status + (data && data.error ? ': ' + String(data.error).slice(0, 200) : ''));
+    const rooms = data && (data.rooms || (data.result && data.result.rooms));
+    if (!Array.isArray(rooms)) throw new Error('Ungültige Backend-Antwort (kein rooms-Array)');
+    return { rooms, meta: { engine: 'ai', model: data.model || '', warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [], log: [] } };
+  } catch (e) {
+    throw (e.name === 'AbortError') ? new Error('Zeitüberschreitung beim KI-Backend') : e;
+  } finally { clearTimeout(to); }
+}
+// Zentrale Schnittstelle (spätere Anbindung OpenAI/ChatGPT Vision → Backend POST /api/ai/electrical-plan)
+async function generateElectricalPlan(planData, options) {
+  options = options || {};
+  const engine = options.engine || aiSettings.engine;
+  if (engine === 'ai') {
+    try {
+      if (!planData.floorplan.imageDataUrl) { planData.floorplan.imageDataUrl = aiRenderAnnotatedImage(1600); planData.floorplan.imageAnnotated = true; }
+      return await aiCallBackend(planData);
+    } catch (e) {
+      const fb = options.fallbackToRules != null ? options.fallbackToRules : aiSettings.fallbackToRules;
+      if (!fb) throw e;
+      console.warn('[KI-Planung] Backend fehlgeschlagen, nutze lokale Regeln:', e);
+      const pd2 = Object.assign({}, planData, { floorplan: Object.assign({}, planData.floorplan, { imageDataUrl: null }) });
+      const r = aiRulesGenerate(pd2); r.meta.engine = 'rules (Fallback)';
+      r.meta.warnings.unshift('KI-Backend nicht nutzbar (' + (e.message || e) + ') — es wurden die lokalen Regeln verwendet.');
+      return r;
+    }
+  }
+  return aiRulesGenerate(planData);
+}
+
+// ═══════════════════════════════════════════════════
+//  VORSCHAU / ÜBERNEHMEN / RÜCKGÄNGIG
+// ═══════════════════════════════════════════════════
+function aiProposalPx(p) { return { x: p.x * state.floorplan.w, y: p.y * state.floorplan.h }; }
+function aiSetPlan(result, pd, engineLabel) {
+  const norm = aiNormalizeResult(result, pd);
+  const src = (result.meta && result.meta.engine) || engineLabel;
+  norm.proposals.forEach(p => { p.source = String(src).startsWith('ai') ? 'ai' : 'rules'; });
+  const warnings = ((result.meta && result.meta.warnings) || []).slice();
+  const log = ((result.meta && result.meta.log) || []).concat(norm.log);
+  if (norm.log.length) console.warn('[KI-Planung] ' + norm.log.length + ' Einträge ignoriert:', norm.log);
+  if (log.length && !norm.proposals.length) console.info('[KI-Planung] Log:', log);
+  aiPlan = { id: 'plan-' + Date.now().toString(36), createdAt: new Date().toISOString(), standard: pd.standard, engine: src, model: (result.meta && result.meta.model) || '', proposals: norm.proposals, warnings, log, accepted: 0 };
+  aiSelPid = null; aiReviewMode = false;
+  return aiPlan;
+}
+function aiCreateSymbolFromProposal(p) {
+  const px = aiProposalPx(p), s = createSymbolObject(p.symbolKey, px.x, px.y);
+  s.rotation = p.rotation || 0; s.aiPlanId = aiPlan.id; s.aiReason = p.reason || ''; s.roomId = p.roomId;
+  if (p.hoehe != null) s.hoehe = p.hoehe;
+  return s;
+}
+function aiAccept(pids) {
+  if (!aiPlan) return 0;
+  const list = aiPlan.proposals.filter(p => pids.includes(p.pid));
+  if (!list.length) return 0;
+  saveUndo();
+  list.forEach(p => state.symbols.push(aiCreateSymbolFromProposal(p)));
+  aiPlan.proposals = aiPlan.proposals.filter(p => !pids.includes(p.pid));
+  aiPlan.accepted += list.length;
+  let entry = state.aiPlans.find(x => x.id === aiPlan.id);
+  if (!entry) { entry = { id: aiPlan.id, createdAt: aiPlan.createdAt, standard: aiPlan.standard, engine: aiPlan.engine, count: 0 }; state.aiPlans.push(entry); }
+  entry.count += list.length;
+  const uz = document.getElementById('uploadZone'); if (uz) uz.style.display = 'none';
+  if (aiSelPid && pids.includes(aiSelPid)) aiSelPid = null;
+  aiAfterChange(); render();
+  return list.length;
+}
+function aiReject(pids) {
+  if (!aiPlan) return;
+  aiPlan.proposals = aiPlan.proposals.filter(p => !pids.includes(p.pid));
+  if (aiSelPid && pids.includes(aiSelPid)) aiSelPid = null;
+  aiAfterChange(); render();
+}
+function aiAcceptAll() {
+  if (!aiPlan || !aiPlan.proposals.length) return;
+  const n = aiAccept(aiPlan.proposals.map(p => p.pid));
+  setStatus(`✅ ${n} KI-Vorschläge übernommen — „KI-Planung rückgängig“ entfernt sie mit einem Klick`);
+}
+function aiDiscard() {
+  if (!aiPlan) return;
+  const n = aiPlan.proposals.length;
+  if (n > 1 && !confirm(`${n} offene Vorschläge verwerfen?`)) return;
+  aiPlan.proposals = []; aiSelPid = null; aiReviewMode = false;
+  aiAfterChange(); render(); setStatus('KI-Vorschläge verworfen');
+}
+function aiClearProposals() { aiPlan = null; aiSelPid = null; aiReviewMode = false; aiDrag = null; aiAfterChange(); }
+function undoAIPlan() {
+  const plans = state.aiPlans || [];
+  const last = plans[plans.length - 1];
+  if (!last) { setStatus('Keine KI-Planung zum Rückgängigmachen'); return 0; }
+  const ids = state.symbols.filter(s => s.aiPlanId === last.id);
+  if (!confirm(`KI-Planung vom ${new Date(last.createdAt).toLocaleString('de-DE')} rückgängig machen?\n${ids.length} Symbole werden entfernt.`)) return 0;
+  saveUndo();
+  state.symbols = state.symbols.filter(s => s.aiPlanId !== last.id);
+  state.aiPlans = plans.slice(0, -1);
+  if (aiPlan && aiPlan.id === last.id) aiPlan.accepted = 0;
+  state.selectedId = null; renderProps(null);
+  aiAfterChange(); render();
+  setStatus(`↩ KI-Planung rückgängig: ${ids.length} Symbole entfernt (Strg+Z stellt sie wieder her)`);
+  return ids.length;
+}
+function aiRotateProposal(pid) { const p = aiPlan && aiPlan.proposals.find(x => x.pid === pid); if (p) { p.rotation = ((p.rotation || 0) + 90) % 360; aiRenderReview(); render(); } }
+function aiChangeProposalType(pid, type) {
+  const p = aiPlan && aiPlan.proposals.find(x => x.pid === pid); const k = aiResolveSymbol(type);
+  if (p && k) { p.symbolType = type; p.symbolKey = k; p.source = p.source; aiRenderReview(); render(); }
+}
+function aiSelectProposal(pid, center) {
+  aiSelPid = pid; state.selectedId = null;
+  if (center && aiPlan) { const p = aiPlan.proposals.find(x => x.pid === pid); if (p) aiEnsureVisible(aiProposalPx(p)); }
+  aiRenderReview(); render();
+}
+function aiEnsureVisible(pt) {
+  const sx = pt.x * state.zoom + state.pan.x, sy = pt.y * state.zoom + state.pan.y;
+  if (sx < 40 || sy < 40 || sx > canvas.width - 40 || sy > canvas.height - 40) {
+    state.pan.x = canvas.width / 2 - pt.x * state.zoom; state.pan.y = canvas.height / 2 - pt.y * state.zoom;
+  }
+}
+function aiStartReview() {
+  if (!aiPlan || !aiPlan.proposals.length) return;
+  aiReviewMode = true; aiSelectProposal(aiPlan.proposals[0].pid, true);
+}
+function aiReviewNext() {
+  if (!aiPlan || !aiPlan.proposals.length) return;
+  const i = aiPlan.proposals.findIndex(p => p.pid === aiSelPid);
+  aiSelectProposal(aiPlan.proposals[(i + 1) % aiPlan.proposals.length].pid, true);
+}
+function aiReviewDecide(accept) {
+  if (!aiPlan || !aiSelPid) return;
+  const i = aiPlan.proposals.findIndex(p => p.pid === aiSelPid);
+  const nextPid = aiPlan.proposals.length > 1 ? aiPlan.proposals[(i + 1) % aiPlan.proposals.length].pid : null;
+  accept ? aiAccept([aiSelPid]) : aiReject([aiSelPid]);
+  if (nextPid && aiPlan && aiPlan.proposals.some(p => p.pid === nextPid)) aiSelectProposal(nextPid, true);
+}
+function aiAfterChange() {
+  aiRenderReview(); aiRenderRoomList();
+  const u = document.getElementById('aiBtnUndo'); if (u) u.style.display = (state.aiPlans && state.aiPlans.length) ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════
+//  RÄUME MARKIEREN (Rechteck / Polygon / Türen / Fenster) — Koordinaten relativ zur Grundrissgröße
+// ═══════════════════════════════════════════════════
+const $ai = id => document.getElementById(id);
+function aiEsc(s) { return esc(String(s == null ? '' : s)); }
+function aiRoomsVisible() { return !!state.floorplan && (aiSettings.showRooms || aiTool || ($ai('aiRoomPanel') && $ai('aiRoomPanel').style.display !== 'none')); }
+
+function aiSetTool(t) {
+  if (t && !state.floorplan) { setStatus('Bitte zuerst einen Grundriss laden'); return; }
+  if (t === aiTool) t = null;
+  setTool('select');                  // beendet andere Werkzeuge (setTool setzt aiTool zurück)
+  aiTool = t; aiDraft = null; aiHoverPt = null;
+  if (t) { $ai('aiRoomPanel').style.display = 'block'; canvas.style.cursor = 'crosshair'; }
+  aiUpdateToolButtons(); render();
+}
+function aiUpdateToolButtons() {
+  [['rect', 'aiBtnRect'], ['poly', 'aiBtnPoly'], ['door', 'aiBtnDoor'], ['window', 'aiBtnWin']].forEach(([t, id]) => { const b = $ai(id); if (b) b.classList.toggle('on', aiTool === t); });
+  const hint = { rect: 'Rechteck: zwei gegenüberliegende Ecken anklicken.', poly: 'Polygon: Eckpunkte anklicken, zum Schließen den ersten Punkt anklicken (oder Doppelklick / Enter). Shift = rechtwinklig. Esc = abbrechen.',
+    door: 'Tür: direkt an die Raumwand klicken. Erneut auf eine Markierung klicken = entfernen.', window: 'Fenster: direkt an die Raumwand klicken. Erneut auf eine Markierung klicken = entfernen.' }[aiTool] || 'Werkzeug wählen und im Grundriss zeichnen. Name vorher eintragen.';
+  const h = $ai('aiToolHint'); if (h) h.textContent = hint;
+}
+function aiOpenRoomPanel() {
+  if (!state.floorplan) { setStatus('Bitte zuerst einen Grundriss laden'); return; }
+  const p = $ai('aiRoomPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'none') { aiTool = null; aiDraft = null; aiUpdateToolButtons(); }
+  aiRenderRoomList(); render();
+}
+function aiCloseRoomPanel() { $ai('aiRoomPanel').style.display = 'none'; aiTool = null; aiDraft = null; aiUpdateToolButtons(); render(); }
+
+function aiSnap(pt, e) {
+  let p = { x: pt.x, y: pt.y };
+  const R = 10 / state.zoom;
+  for (const r of state.rooms) for (const v of r.polygon) {
+    const w = { x: v.x * state.floorplan.w, y: v.y * state.floorplan.h };
+    if (aiDist(w, p) < R) return w;
+  }
+  if (e && e.shiftKey && aiDraft && aiDraft.pts.length && aiDraft.kind === 'poly') {
+    const l = aiDraft.pts[aiDraft.pts.length - 1];
+    if (Math.abs(p.x - l.x) > Math.abs(p.y - l.y)) p.y = l.y; else p.x = l.x;
+  }
+  return p;
+}
+function aiNearWall(pt) {
+  const W = state.floorplan.w, H = state.floorplan.h; let best = null;
+  for (const r of state.rooms) { const b = aiBoundaryClosest(pt, r.polygon.map(p => ({ x: p.x * W, y: p.y * H }))); if (!best || b.d < best.d) best = b; }
+  return best && best.d <= 30 / state.zoom ? best.pt : null;
+}
+function aiAddRoom(pxPts) {
+  const W = state.floorplan.w, H = state.floorplan.h, inp = $ai('aiRoomName');
+  const name = (inp.value || '').trim() || ('Raum ' + (state.rooms.length + 1));
+  const room = { roomId: aiRid(), name, type: aiGuessRoomType(name), polygon: pxPts.map(p => ({ x: +(p.x / W).toFixed(5), y: +(p.y / H).toFixed(5) })), createdAt: new Date().toISOString() };
+  state.rooms.push(room); inp.value = ''; aiDraft = null; aiAfterChange(); render();
+  setStatus(`▱ Raum „${name}“ angelegt (${state.rooms.length} Räume)`);
+  return room;
+}
+function aiFinishPoly() {
+  if (!aiDraft || aiDraft.kind !== 'poly') return;
+  const pts = aiDraft.pts.filter((p, i, a) => !i || aiDist(p, a[i - 1]) > 4 / state.zoom);
+  if (pts.length < 3) { setStatus('Ein Polygon braucht mindestens 3 Punkte'); return; }
+  aiAddRoom(pts);
+}
+function aiHandleDown(pt, e) {
+  if (!state.floorplan || state.calibrating) return false;
+  if (aiTool) {
+    if (e && e.button === 2) { aiDraft = null; render(); return true; }
+    const p = aiSnap(pt, e);
+    if (aiTool === 'rect') {
+      if (!aiDraft) { aiDraft = { kind: 'rect', pts: [p] }; }
+      else { const a = aiDraft.pts[0]; if (Math.abs(p.x - a.x) < 12 || Math.abs(p.y - a.y) < 12) { setStatus('Rechteck zu klein'); return true; }
+        aiAddRoom([{ x: a.x, y: a.y }, { x: p.x, y: a.y }, { x: p.x, y: p.y }, { x: a.x, y: p.y }]); }
+    } else if (aiTool === 'poly') {
+      if (!aiDraft) aiDraft = { kind: 'poly', pts: [p] };
+      else if (aiDraft.pts.length >= 3 && aiDist(p, aiDraft.pts[0]) < 14 / state.zoom) aiFinishPoly();
+      else aiDraft.pts.push(p);
+    } else if (aiTool === 'door' || aiTool === 'window') {
+      const list = aiTool === 'door' ? state.doors : state.windows, W = state.floorplan.w, H = state.floorplan.h;
+      const ex = list.findIndex(d => aiDist({ x: d.x * W, y: d.y * H }, pt) < 16 / state.zoom);
+      if (ex >= 0) { list.splice(ex, 1); setStatus((aiTool === 'door' ? 'Tür' : 'Fenster') + ' entfernt'); }
+      else { const q = aiNearWall(pt); if (!q) setStatus('Bitte direkt an einer Raumwand klicken (zuerst Raum markieren)'); else { list.push({ id: (aiTool === 'door' ? 'door-' : 'win-') + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), x: +(q.x / W).toFixed(5), y: +(q.y / H).toFixed(5) }); setStatus((aiTool === 'door' ? '🚪 Tür' : '🪟 Fenster') + ' gesetzt'); } }
+      aiAfterChange();
+    }
+    render(); return true;
+  }
+  if (aiPlan && aiPlan.proposals.length) {
+    const R = Math.max(20, 26 / state.zoom);
+    let best = null, bd = R;                                  // nächstgelegener Vorschlag im Greifradius
+    for (const p of aiPlan.proposals) { const d = aiDist(aiProposalPx(p), pt); if (d < bd) { bd = d; best = p; } }
+    if (best) { const q = aiProposalPx(best); aiDrag = { pid: best.pid, offX: pt.x - q.x, offY: pt.y - q.y }; aiSelectProposal(best.pid); return true; }
+  }
+  return false;
+}
+function aiHandleMove(pt, e) {
+  if (aiDrag && aiPlan) {
+    const p = aiPlan.proposals.find(x => x.pid === aiDrag.pid);
+    if (p) { p.x = Math.min(1, Math.max(0, (pt.x - aiDrag.offX) / state.floorplan.w)); p.y = Math.min(1, Math.max(0, (pt.y - aiDrag.offY) / state.floorplan.h)); render(); }
+    return true;
+  }
+  if (aiTool && state.floorplan) { aiHoverPt = aiSnap(pt, e); if (aiDraft || aiTool === 'door' || aiTool === 'window') render(); }
+  return false;
+}
+function aiHandleUp() { if (aiDrag) { aiDrag = null; aiRenderReview(); return true; } return false; }
+
+// ── Zeichnen ──
+function aiRoomColor(i, a) { return `hsla(${(i * 67) % 360},75%,55%,${a})`; }
+function aiDrawRooms() {
+  if (!aiRoomsVisible()) return;
+  const W = state.floorplan.w, H = state.floorplan.h, z = state.zoom;
+  state.rooms.forEach((r, i) => {
+    ctx.save(); ctx.beginPath(); r.polygon.forEach((p, k) => k ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H)); ctx.closePath();
+    ctx.fillStyle = aiRoomColor(i, .13); ctx.fill(); ctx.strokeStyle = aiRoomColor(i, .95); ctx.lineWidth = 2 / z; ctx.setLineDash([6 / z, 4 / z]); ctx.stroke(); ctx.setLineDash([]);
+    const c = aiCentroid(r.polygon.map(p => ({ x: p.x * W, y: p.y * H })));
+    ctx.font = `bold ${13 / z}px IBM Plex Sans,sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 / z; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(r.name, c.x, c.y); ctx.fillStyle = '#1a1a2e'; ctx.fillText(r.name, c.x, c.y);
+    ctx.restore();
+  });
+  const mark = (arr, col, ch) => (arr || []).forEach(d => { ctx.save(); ctx.fillStyle = col; const s = 12 / z; ctx.fillRect(d.x * W - s / 2, d.y * H - s / 2, s, s); ctx.fillStyle = '#fff'; ctx.font = `bold ${9 / z}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText(ch, d.x * W, d.y * H + 3.2 / z); ctx.restore(); });
+  mark(state.doors, '#d32f2f', 'T'); mark(state.windows, '#1976d2', 'F');
+}
+function aiDrawOverlay() {
+  if (!state.floorplan) return;
+  const z = state.zoom;
+  if (aiDraft && aiDraft.pts.length) {
+    ctx.save(); ctx.strokeStyle = '#bc8cff'; ctx.fillStyle = 'rgba(188,140,255,.15)'; ctx.lineWidth = 2 / z;
+    const pts = aiDraft.pts.slice(), h = aiHoverPt;
+    if (aiDraft.kind === 'rect' && h) { const a = pts[0]; ctx.beginPath(); ctx.rect(Math.min(a.x, h.x), Math.min(a.y, h.y), Math.abs(h.x - a.x), Math.abs(h.y - a.y)); ctx.fill(); ctx.stroke(); }
+    else { ctx.beginPath(); pts.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); if (h) ctx.lineTo(h.x, h.y); ctx.stroke(); }
+    pts.forEach((p, k) => { ctx.beginPath(); ctx.arc(p.x, p.y, (k === 0 ? 6 : 4) / z, 0, 7); ctx.fillStyle = k === 0 ? '#f5a623' : '#bc8cff'; ctx.fill(); });
+    ctx.restore();
+  } else if ((aiTool === 'door' || aiTool === 'window') && aiHoverPt) {
+    const q = aiNearWall(aiHoverPt); if (q) { ctx.save(); ctx.strokeStyle = aiTool === 'door' ? '#d32f2f' : '#1976d2'; ctx.lineWidth = 2 / z; ctx.beginPath(); ctx.arc(q.x, q.y, 9 / z, 0, 7); ctx.stroke(); ctx.restore(); }
+  }
+  if (aiPlan && aiPlan.proposals.length) {
+    const SZ = 36;
+    for (const p of aiPlan.proposals) {
+      const def = SYMBOLS[p.symbolKey]; if (!def) continue;
+      const q = aiProposalPx(p), sel = p.pid === aiSelPid;
+      ctx.save(); ctx.translate(q.x, q.y); if (p.rotation) ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.globalAlpha = sel ? .95 : .72;
+      ctx.beginPath(); ctx.arc(0, 0, SZ / 2, 0, Math.PI * 2); ctx.fillStyle = 'rgba(245,238,255,.95)'; ctx.fill();
+      ctx.setLineDash([4 / z, 3 / z]); ctx.strokeStyle = sel ? '#f5a623' : '#9b59ff'; ctx.lineWidth = (sel ? 3 : 2) / z; ctx.stroke(); ctx.setLineDash([]);
+      ctx.drawImage(getSymbolCanvas(p.symbolKey, def, SZ), -SZ / 2, -SZ / 2, SZ, SZ);
+      ctx.restore();
+      ctx.save(); ctx.translate(q.x + SZ * .42, q.y - SZ * .42); ctx.beginPath(); ctx.arc(0, 0, 6 / z, 0, 7); ctx.fillStyle = '#9b59ff'; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `bold ${7 / z}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('KI', 0, 2.5 / z); ctx.restore();
+    }
+  }
+}
+
+// ── Raumliste ──
+function aiRenderRoomList() {
+  const el = $ai('aiRoomList'); if (!el) return;
+  if (!state.rooms.length) { el.innerHTML = '<div class="ai-empty">Noch keine Räume. Name eintragen, Werkzeug wählen und zeichnen.</div>'; return; }
+  el.innerHTML = state.rooms.map((r, i) => `<div class="ai-room"><span class="ai-dot" style="background:${aiRoomColor(i, 1)}"></span>
+    <input value="${aiEsc(r.name)}" onchange="aiRoomRename('${r.roomId}',this.value)" title="Raumname">
+    <select onchange="aiRoomType('${r.roomId}',this.value)" title="Raumtyp (steuert die Regeln)">${Object.entries(AI_ROOM_TYPES).map(([k, v]) => `<option value="${k}"${(r.type || aiGuessRoomType(r.name)) === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+    <button onclick="aiRoomDelete('${r.roomId}')" title="Raum löschen">✕</button></div>`).join('') +
+    `<div class="ai-empty">${state.doors.length} Türen · ${state.windows.length} Fenster markiert</div>`;
+}
+function aiRoomRename(id, v) { const r = state.rooms.find(x => x.roomId === id); if (r && v.trim()) { r.name = v.trim(); r.type = aiGuessRoomType(r.name); aiAfterChange(); render(); } }
+function aiRoomType(id, v) { const r = state.rooms.find(x => x.roomId === id); if (r) { r.type = v; render(); } }
+function aiRoomDelete(id) {
+  const r = state.rooms.find(x => x.roomId === id); if (!r || !confirm(`Raum „${r.name}“ löschen?`)) return;
+  state.rooms = state.rooms.filter(x => x.roomId !== id);
+  if (aiPlan) aiPlan.proposals = aiPlan.proposals.filter(p => p.roomId !== id);
+  aiAfterChange(); render();
+}
+
+// ═══════════════════════════════════════════════════
+//  DIALOG „KI Elektroplanung“
+// ═══════════════════════════════════════════════════
+function aiOpenDialog() {
+  if (!state.floorplan) { alert('Bitte zuerst einen Grundriss laden.'); return; }
+  if (!state.rooms.length) {
+    if (confirm('Es sind noch keine Räume markiert.\n\nJetzt Räume im Grundriss markieren?')) aiOpenRoomPanel();
+    return;
+  }
+  const s = aiSettings;
+  $ai('aiStd').value = s.standard; ['sockets', 'lights', 'switches', 'network', 'tv', 'smoke', 'existing'].forEach(k => { $ai('aiOpt_' + k).checked = !!s.opts[k]; });
+  ['s', 'l', 'n', 't'].forEach(k => { $ai('aiCu_' + k).value = s.custom[k]; });
+  $ai('aiEngine').value = s.engine; $ai('aiBackendUrl').value = s.backendUrl; $ai('aiFallback').checked = !!s.fallbackToRules;
+  $ai('aiDlgRooms').innerHTML = state.rooms.map((r, i) => `<label class="ai-chk"><input type="checkbox" class="aiRoomChk" value="${r.roomId}" checked> <span class="ai-dot" style="background:${aiRoomColor(i, 1)}"></span>${aiEsc(r.name)} <small>(${AI_ROOM_TYPES[r.type || aiGuessRoomType(r.name)]})</small></label>`).join('');
+  aiDlgToggle(); $ai('aiDlg').classList.remove('hid');
+}
+function aiDlgToggle() {
+  $ai('aiCustomBox').style.display = $ai('aiStd').value === 'custom' ? 'grid' : 'none';
+  const ai = $ai('aiEngine').value === 'ai';
+  $ai('aiBackendBox').style.display = ai ? 'block' : 'none';
+}
+async function aiRunFromDialog() {
+  if (aiBusy) return;
+  const ids = Array.from(document.querySelectorAll('.aiRoomChk:checked')).map(c => c.value);
+  if (!ids.length) { alert('Bitte mindestens einen Raum auswählen.'); return; }
+  const s = aiSettings;
+  s.standard = $ai('aiStd').value; ['sockets', 'lights', 'switches', 'network', 'tv', 'smoke', 'existing'].forEach(k => { s.opts[k] = $ai('aiOpt_' + k).checked; });
+  ['s', 'l', 'n', 't'].forEach(k => { s.custom[k] = $ai('aiCu_' + k).value; });
+  s.engine = $ai('aiEngine').value; s.backendUrl = $ai('aiBackendUrl').value.trim(); s.fallbackToRules = $ai('aiFallback').checked;
+  if (!s.opts.sockets && !s.opts.lights && !s.opts.switches && !s.opts.network && !s.opts.tv && !s.opts.smoke) { alert('Bitte mindestens eine Planungsart auswählen.'); return; }
+  aiSaveSettings();
+  if (aiPlan && aiPlan.proposals.length && !confirm('Es gibt noch offene KI-Vorschläge. Diese werden durch die neue Planung ersetzt. Fortfahren?')) return;
+  const btn = $ai('aiRunBtn'); aiBusy = true; btn.disabled = true; btn.textContent = '⏳ Plane …';
+  try {
+    const pd = aiBuildPlanData(ids);
+    const result = await generateElectricalPlan(pd);
+    const plan = aiSetPlan(result, pd, s.engine);
+    plan.total = plan.proposals.length;
+    $ai('aiDlg').classList.add('hid');
+    if (plan.proposals.length) aiCloseRoomPanel();            // Platz für die Vorschau (wichtig auf schmalen Displays)
+    if (!plan.proposals.length) { alert('Es konnten keine Vorschläge erstellt werden.\n\n' + (plan.warnings.concat(plan.log).slice(0, 6).join('\n') || 'Räume/Optionen prüfen.')); aiClearProposals(); }
+    else { aiAfterChange(); render(); setStatus(`🤖 ${plan.total} Vorschläge erstellt — bitte prüfen`); }
+  } catch (e) {
+    console.warn('[KI-Planung]', e); alert('KI-Planung fehlgeschlagen:\n' + (e.message || e));
+  } finally { aiBusy = false; btn.disabled = false; btn.textContent = '🤖 Vorschläge erstellen'; }
+}
+
+// ═══════════════════════════════════════════════════
+//  VORSCHAU-PANEL
+// ═══════════════════════════════════════════════════
+function aiRenderReview() {
+  const el = $ai('aiReview'); if (!el) return;
+  if (!aiPlan || !aiPlan.proposals.length) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const types = aiGetAvailableSymbolTypes(), pr = aiPlan.proposals, total = aiPlan.total || pr.length + aiPlan.accepted;
+  const byRoom = {}; pr.forEach(p => (byRoom[p.roomId] = byRoom[p.roomId] || []).push(p));
+  const rows = Object.entries(byRoom).map(([rid, arr]) => {
+    const room = state.rooms.find(r => r.roomId === rid);
+    return `<div class="ai-rh">${aiEsc(room ? room.name : rid)} <small>${arr.length}</small></div>` + arr.map(p => `
+      <div class="ai-prow${p.pid === aiSelPid ? ' sel' : ''}" onclick="aiSelectProposal('${p.pid}',true)">
+        <select onclick="event.stopPropagation()" onchange="aiChangeProposalType('${p.pid}',this.value)">${types.map(t => `<option value="${aiEsc(t.symbolType)}"${t.symbolKey === p.symbolKey ? ' selected' : ''}>${aiEsc(t.label)}</option>`).join('')}</select>
+        <div class="ai-why" title="${aiEsc(p.reason)}">${aiEsc(p.reason || '')}${p.note ? ' ⚠ ' + aiEsc(p.note) : ''}</div>
+        <button onclick="event.stopPropagation();aiRotateProposal('${p.pid}')" title="90° drehen">↻</button>
+        <button class="ok" onclick="event.stopPropagation();aiAccept(['${p.pid}'])" title="Übernehmen">✓</button>
+        <button class="no" onclick="event.stopPropagation();aiReject(['${p.pid}'])" title="Verwerfen">✕</button>
+      </div>`).join('');
+  }).join('');
+  const warn = aiPlan.warnings.map(w => `<li>${aiEsc(w)}</li>`).join('');
+  const logs = aiPlan.log.length ? `<details><summary>${aiPlan.log.length} Prüfhinweise (ignorierte/angepasste Objekte)</summary><ul>${aiPlan.log.slice(0, 30).map(w => `<li>${aiEsc(w)}</li>`).join('')}</ul></details>` : '';
+  const idx = pr.findIndex(p => p.pid === aiSelPid);
+  el.innerHTML = `<h4>🤖 KI-Vorschläge <button class="ai-x" style="margin-left:auto" onclick="aiListOpen=!aiListOpen;aiRenderReview()" title="Liste ein-/ausklappen">${aiListOpen ? '▾' : '▸'}</button><button class="ai-x" style="margin-left:4px" onclick="aiDiscard()" title="Verwerfen">✕</button></h4>
+    <div class="ai-count"><b>${total} Vorschläge erstellt</b><small> · offen: ${pr.length}${aiPlan.accepted ? ' · übernommen: ' + aiPlan.accepted : ''} · Quelle: ${aiEsc(aiPlan.engine)}</small></div>
+    <div class="ai-disc">⚠ ${AI_DISCLAIMER}</div>
+    ${aiListOpen && warn ? `<ul class="ai-warn">${warn}</ul>` : ''}${aiListOpen ? logs : ''}
+    <div class="ai-btns"><button class="pri" onclick="aiAcceptAll()">Alle übernehmen</button><button onclick="aiStartReview()">Einzeln prüfen</button><button onclick="aiDiscard()">Verwerfen</button></div>
+    ${aiReviewMode && idx >= 0 ? `<div class="ai-step">Vorschlag ${idx + 1}/${pr.length}: <button class="ok" onclick="aiReviewDecide(true)">✓ Übernehmen</button><button class="no" onclick="aiReviewDecide(false)">✕ Verwerfen</button><button onclick="aiReviewNext()">Weiter ›</button></div>` : ''}
+    ${aiListOpen ? `<div class="ai-hint">Vorschläge im Plan per Ziehen verschieben · Entf = verwerfen · Enter = übernehmen</div>
+    <div class="ai-plist">${rows}</div>` : ''}`;
+}
+function aiKey(e) {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement && document.activeElement.tagName)) return;
+  if (aiDraft) {
+    if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); aiFinishPoly(); }
+    else if (e.key === 'Escape') { e.stopImmediatePropagation(); aiDraft = null; render(); }
+    else if (e.key === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); aiDraft.pts.pop(); if (!aiDraft.pts.length) aiDraft = null; render(); }
+    return;
+  }
+  if (aiTool && e.key === 'Escape') { aiSetTool(null); return; }
+  if (aiPlan && aiSelPid && aiPlan.proposals.length) {
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); aiReject([aiSelPid]); }
+    else if (e.key === 'Enter') { e.preventDefault(); aiReviewMode ? aiReviewDecide(true) : aiAccept([aiSelPid]); }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT (Oberfläche wird per JS ergänzt — bestehende HTML-Struktur bleibt unverändert)
+// ═══════════════════════════════════════════════════
+function aiInit() {
+  aiLoadSettings();
+  const css = document.createElement('style');
+  css.textContent = `
+  .ai-panel{position:absolute;z-index:35;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px;font-size:11px;color:var(--tx);box-shadow:0 6px 24px rgba(0,0,0,.45);max-height:calc(100% - 24px);overflow:auto}
+  .ai-panel h4{font-size:12px;font-weight:700;color:var(--pu);margin:0 0 8px;display:flex;align-items:center;gap:6px;cursor:move;touch-action:none;user-select:none}
+  .ai-x{margin-left:auto;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:14px}
+  .ai-btns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .ai-btns button,.ai-step button,.ai-prow button,.ai-room button{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px}
+  .ai-btns button.on{background:rgba(188,140,255,.25);border-color:var(--pu)} .ai-btns button.pri{background:var(--ac);color:#000;border-color:var(--ac);font-weight:700}
+  button.ok{color:var(--gr)!important} button.no{color:var(--rd)!important}
+  .ai-hint,.ai-empty{color:var(--tx2);font-size:10px;margin:4px 0}
+  .ai-room{display:flex;gap:4px;align-items:center;margin:3px 0} .ai-room input{flex:1;min-width:0;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:4px;padding:3px 5px;font-size:11px}
+  .ai-room select{width:96px;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:4px;padding:3px;font-size:10px}
+  .ai-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  #aiRoomPanel input#aiRoomName{width:100%;box-sizing:border-box;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:4px;padding:5px 7px;font-size:11px}
+  .ai-disc{background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.45);border-radius:6px;padding:6px 8px;margin:6px 0;font-size:10.5px;line-height:1.35}
+  .ai-warn{margin:4px 0;padding-left:16px;color:var(--yl);font-size:10px} .ai-count small{color:var(--tx2)}
+  .ai-rh{font-weight:700;margin:8px 0 3px;color:var(--bl)} .ai-rh small{color:var(--tx2);font-weight:400}
+  .ai-prow{display:flex;gap:4px;align-items:center;padding:3px;border-radius:5px;cursor:pointer;border:1px solid transparent} .ai-prow.sel{border-color:var(--ac);background:rgba(245,166,35,.1)}
+  .ai-prow select{width:118px;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:4px;font-size:10px;padding:2px}
+  .ai-why{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx2);font-size:10px}
+  .ai-step{background:var(--sf2);border-radius:6px;padding:6px;margin:6px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .ai-plist{max-height:300px;overflow:auto;margin-top:4px}
+  .ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0} .ai-chk{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px}
+  #aiDlg .modal label.l{font-size:10px;color:var(--tx2);display:block;margin:8px 0 3px;text-transform:uppercase;letter-spacing:.5px}
+  #aiDlg select,#aiDlg input[type=text],#aiDlg input[type=number]{width:100%;box-sizing:border-box}
+  .tool-btn.ai-b,.btn.ai-b{white-space:nowrap}`;
+  document.head.appendChild(css);
+
+  const roomPanel = document.createElement('div'); roomPanel.id = 'aiRoomPanel'; roomPanel.className = 'ai-panel'; roomPanel.style.cssText = 'display:none;left:12px;top:12px;width:min(300px,46%)';
+  roomPanel.innerHTML = `<h4>▱ Räume markieren <button class="ai-x" onclick="aiCloseRoomPanel()">✕</button></h4>
+    <input id="aiRoomName" list="aiRoomNames" placeholder="Raumname, z. B. Wohnzimmer" autocomplete="off"><datalist id="aiRoomNames">${AI_ROOM_NAMES.map(n => `<option value="${n}">`).join('')}</datalist>
+    <div class="ai-btns"><button id="aiBtnRect" onclick="aiSetTool('rect')">▭ Rechteck</button><button id="aiBtnPoly" onclick="aiSetTool('poly')">⬠ Polygon</button><button id="aiBtnDoor" onclick="aiSetTool('door')">🚪 Tür</button><button id="aiBtnWin" onclick="aiSetTool('window')">🪟 Fenster</button></div>
+    <div class="ai-hint" id="aiToolHint"></div>
+    <label class="ai-chk"><input type="checkbox" id="aiShowRooms" onchange="aiSettings.showRooms=this.checked;aiSaveSettings();render()"> Räume im Plan anzeigen</label>
+    <div id="aiRoomList"></div>
+    <div class="ai-btns"><button class="pri" onclick="aiOpenDialog()">🤖 KI Elektroplanung …</button></div>`;
+  wrap.appendChild(roomPanel);
+  const rev = document.createElement('div'); rev.id = 'aiReview'; rev.className = 'ai-panel'; rev.style.cssText = 'display:none;right:12px;top:12px;width:min(340px,46%)'; wrap.appendChild(rev);
+
+  const dlg = document.createElement('div'); dlg.className = 'modal-ov hid'; dlg.id = 'aiDlg';
+  dlg.innerHTML = `<div class="modal" style="width:540px;max-width:96vw;max-height:92vh;overflow:auto"><h3>🤖 KI Elektroplanung</h3>
+    <label class="l">Planungsstandard</label>
+    <select class="rp-sel" id="aiStd" onchange="aiDlgToggle()"><option value="basis">Basis</option><option value="standard">Standard</option><option value="komfort">Komfort</option><option value="custom">Benutzerdefiniert</option></select>
+    <div class="ai-grid" id="aiCustomBox" style="display:none">
+      <div><label class="l">Steckdosen je Raum</label><input class="rp-input" type="number" min="0" id="aiCu_s" placeholder="Standardwert"></div>
+      <div><label class="l">Lichtauslässe je Raum</label><input class="rp-input" type="number" min="0" id="aiCu_l" placeholder="Standardwert"></div>
+      <div><label class="l">Netzwerkdosen je Raum</label><input class="rp-input" type="number" min="0" id="aiCu_n" placeholder="Standardwert"></div>
+      <div><label class="l">TV-Dosen je Raum</label><input class="rp-input" type="number" min="0" id="aiCu_t" placeholder="Standardwert"></div></div>
+    <label class="l">Was soll geplant werden?</label>
+    <div class="ai-grid"><label class="ai-chk"><input type="checkbox" id="aiOpt_sockets"> Steckdosen planen</label><label class="ai-chk"><input type="checkbox" id="aiOpt_lights"> Beleuchtung planen</label>
+      <label class="ai-chk"><input type="checkbox" id="aiOpt_switches"> Schalter planen</label><label class="ai-chk"><input type="checkbox" id="aiOpt_network"> Netzwerk planen</label>
+      <label class="ai-chk"><input type="checkbox" id="aiOpt_tv"> TV planen</label><label class="ai-chk"><input type="checkbox" id="aiOpt_smoke"> Rauchmelder (optional)</label></div>
+    <label class="ai-chk"><input type="checkbox" id="aiOpt_existing"> Bereits platzierte Symbole berücksichtigen</label>
+    <label class="l">Räume</label><div id="aiDlgRooms" style="max-height:150px;overflow:auto"></div>
+    <label class="l">Planungs-Engine</label>
+    <select class="rp-sel" id="aiEngine" onchange="aiDlgToggle()"><option value="rules">Lokale Regeln (ohne KI, sofort)</option><option value="ai">KI über Backend (POST /api/ai/electrical-plan)</option></select>
+    <div id="aiBackendBox" style="display:none"><label class="l">Backend-URL (kein API-Schlüssel hier eintragen!)</label><input class="rp-input" type="text" id="aiBackendUrl" placeholder="https://mein-backend.example.com/api/ai/electrical-plan">
+      <label class="ai-chk"><input type="checkbox" id="aiFallback"> Bei KI-Fehler lokale Regeln verwenden</label>
+      <div class="ai-hint">Datenschutz: Grundrissbild (mit Raumumrissen) und Raumdaten werden an Ihr Backend und von dort an den KI-Anbieter gesendet.</div></div>
+    <div class="ai-disc">⚠ ${AI_DISCLAIMER}</div>
+    <div class="mft"><button class="btn bg" onclick="document.getElementById('aiDlg').classList.add('hid')">Abbrechen</button><div style="flex:1"></div><button class="btn ba" id="aiRunBtn" onclick="aiRunFromDialog()">🤖 Vorschläge erstellen</button></div></div>`;
+  document.body.appendChild(dlg);
+
+  const tb = document.querySelector('.canvas-toolbar'), lab = Array.from(tb.querySelectorAll('label')).find(l => /Grundriss laden/.test(l.textContent));
+  const holder = document.createElement('span'); holder.style.cssText = 'display:inline-flex;gap:6px;align-items:center';
+  holder.innerHTML = `<div class="vs"></div><button class="btn ai-b" style="background:rgba(188,140,255,.2);color:var(--pu);border:1px solid rgba(188,140,255,.5);font-size:11px" onclick="aiOpenRoomPanel()" title="Räume, Türen und Fenster markieren">▱ Räume</button>
+    <button class="btn ai-b" style="background:rgba(188,140,255,.2);color:var(--pu);border:1px solid rgba(188,140,255,.5);font-size:11px" onclick="aiOpenDialog()" id="aiBtnPlan">🤖 KI Elektroplanung</button>
+    <button class="btn ai-b bg" style="font-size:11px;display:none" onclick="undoAIPlan()" id="aiBtnUndo" title="Letzte KI-Planung mit einem Klick rückgängig machen">↩ KI-Planung rückgängig</button>`;
+  (lab || tb.lastElementChild).insertAdjacentElement('afterend', holder);
+  // Panels per Kopfzeile verschiebbar (Maus + Touch), damit sie den Plan nicht verdecken
+  const drag = (panel) => {
+    panel.addEventListener('pointerdown', ev => {
+      const h = ev.target.closest('h4'); if (!h || ev.target.closest('button')) return;
+      const pr = panel.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), ox = ev.clientX - pr.left, oy = ev.clientY - pr.top;
+      h.setPointerCapture(ev.pointerId);
+      const mv = e2 => { panel.style.left = Math.max(0, Math.min(wr.width - 60, e2.clientX - wr.left - ox)) + 'px'; panel.style.top = Math.max(0, Math.min(wr.height - 30, e2.clientY - wr.top - oy)) + 'px'; panel.style.right = 'auto'; };
+      const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); };
+      h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up);
+    });
+  };
+  drag(roomPanel); drag(rev);
+  $ai('aiShowRooms').checked = !!aiSettings.showRooms;
+  document.addEventListener('keydown', aiKey, true);
+  aiRenderRoomList(); aiAfterChange();
+}
+// Öffentliche Fassade (für spätere Befehle: „Plane nur das Wohnzimmer“, „Füge mehr Steckdosen hinzu“, …)
+window.AIPlanner = { generateElectricalPlan, buildPlanData: aiBuildPlanData, rulesGenerate: aiRulesGenerate, normalizeResult: aiNormalizeResult,
+  undoAIPlan, availableSymbolTypes: aiGetAvailableSymbolTypes, resolveSymbol: aiResolveSymbol, DISCLAIMER: AI_DISCLAIMER, SCHEMA_VERSION: AI_SCHEMA_VERSION };
 
 </script>
 </body>
