@@ -1113,8 +1113,10 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);height:48px;displa
         📥 Config importieren
         <input type="file" accept=".json" style="display:none" onchange="importSymbolConfig(event)">
       </label>
+      <button class="btn bg" onclick="optimizeStoredSymbols()" title="Vorhandene eigene Symbole nachträglich verkleinern">🗜 Speicher optimieren</button>
       <button class="btn ba" onclick="resetToBuiltin()">↺ Standard zurücksetzen</button>
     </div>
+    <div id="symStorageInfo" style="font-size:11px;color:var(--tx2);margin:-6px 0 12px 0">Eigene Symbole: …</div>
 
     <!-- UPLOAD ZONE -->
     <div class="upload-sym-zone" id="symUploadZone" onclick="document.getElementById('symFileInput').click()">
@@ -2367,6 +2369,161 @@ let overriddenStdSymbols = {};       // key -> original SYMBOLS[key] backup
 const LS_CUSTOM    = 'grundriss_custom_symbols';
 const LS_DELETED   = 'grundriss_deleted_std';
 const LS_OVERRIDES = 'grundriss_overrides';
+const SYM_MAX_EDGE = 512;
+const SYM_TARGET_BYTES = 150 * 1024;
+
+function symFmtBytes(n) {
+  n = Number(n)||0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+function symDataUrlBytes(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return 0;
+  const comma = dataUrl.indexOf(',');
+  if (comma < 0) return new Blob([dataUrl]).size;
+  const head = dataUrl.slice(0,comma), body = dataUrl.slice(comma+1);
+  return /;base64/i.test(head) ? Math.max(0, Math.floor(body.length*3/4) - (body.endsWith('==')?2:body.endsWith('=')?1:0)) : new Blob([decodeURIComponent(body)]).size;
+}
+function symReadAsDataURL(blob) {
+  return new Promise((resolve,reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error('Datei konnte nicht gelesen werden'));
+    r.readAsDataURL(blob);
+  });
+}
+function symReadAsText(blob) {
+  return new Promise((resolve,reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result||''));
+    r.onerror = () => reject(r.error || new Error('SVG konnte nicht gelesen werden'));
+    r.readAsText(blob);
+  });
+}
+async function symHashDataUrl(dataUrl) {
+  try {
+    const bytes = new TextEncoder().encode(dataUrl);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  } catch(e) { return ''; }
+}
+function symCanvasBlob(canvas,type,quality) {
+  return new Promise((resolve,reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Bildkomprimierung fehlgeschlagen')), type, quality));
+}
+function symLoadImage(dataUrl) {
+  return new Promise((resolve,reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Bild konnte nicht dekodiert werden'));
+    img.src = dataUrl;
+  });
+}
+async function optimizeSymbolFile(file) {
+  const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name||'');
+  if (isSvg) {
+    let text = await symReadAsText(file);
+    if (!/<svg[\s>]/i.test(text)) throw new Error('Ungültige SVG-Datei');
+    text = text
+      .replace(/<script[\s\S]*?<\/script\s*>/gi,'')
+      .replace(/<!--([\s\S]*?)-->/g,'')
+      .replace(/<metadata[\s\S]*?<\/metadata\s*>/gi,'')
+      .replace(/\s+(inkscape|sodipodi):[\w-]+="[^"]*"/gi,'')
+      .trim();
+    const blob = new Blob([text],{type:'image/svg+xml'});
+    const dataUrl = await symReadAsDataURL(blob);
+    return {dataUrl, size:blob.size, hash:await symHashDataUrl(dataUrl), imgType:'svg'};
+  }
+
+  if (!(file.type||'').startsWith('image/')) throw new Error('Nicht unterstütztes Bildformat');
+  const originalUrl = await symReadAsDataURL(file);
+  const img = await symLoadImage(originalUrl);
+  let edge = Math.min(SYM_MAX_EDGE, Math.max(img.naturalWidth||img.width, img.naturalHeight||img.height));
+  const steps = [512,384,256,192,128].filter(v=>v<=edge);
+  if (!steps.length) steps.push(edge);
+  const outType = /jpe?g/i.test(file.type||'') ? 'image/jpeg' : 'image/png';
+  let bestBlob = file;
+  for (const maxEdge of steps) {
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth||img.width, img.naturalHeight||img.height));
+    const w = Math.max(1, Math.round((img.naturalWidth||img.width)*scale));
+    const h = Math.max(1, Math.round((img.naturalHeight||img.height)*scale));
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const cx = c.getContext('2d');
+    if (outType === 'image/jpeg') { cx.fillStyle='#fff'; cx.fillRect(0,0,w,h); }
+    cx.drawImage(img,0,0,w,h);
+    if (outType === 'image/jpeg') {
+      let candidate = null;
+      for (const q of [0.82,0.72,0.62]) {
+        candidate = await symCanvasBlob(c,outType,q);
+        if (candidate.size <= SYM_TARGET_BYTES) break;
+      }
+      bestBlob = candidate;
+    } else {
+      bestBlob = await symCanvasBlob(c,outType);
+    }
+    if (bestBlob.size <= SYM_TARGET_BYTES) break;
+  }
+  const dataUrl = await symReadAsDataURL(bestBlob);
+  return {dataUrl, size:bestBlob.size, hash:await symHashDataUrl(dataUrl), imgType:'img'};
+}
+function symTimestamp(s) {
+  const t = Date.parse(s?.updatedAt || s?.createdAt || '');
+  return Number.isFinite(t) ? t : 0;
+}
+// Incoming project/cloud libraries are merged symbol-by-symbol. Never replace the whole local library.
+function mergeIncomingCustomSymbols(incoming, source='Projekt') {
+  let added=0, updated=0, kept=0;
+  if (!incoming || typeof incoming !== 'object') return {added,updated,kept};
+  for (const [key,remoteRaw] of Object.entries(incoming)) {
+    if (!remoteRaw || !remoteRaw.imgData) continue;
+    const remote = {...remoteRaw};
+    const local = customSymbols[key];
+    if (!local) { customSymbols[key]=remote; added++; continue; }
+    const sameHash = local.hash && remote.hash && local.hash === remote.hash;
+    const lt=symTimestamp(local), rt=symTimestamp(remote);
+    if (sameHash) {
+      if (rt>lt) { customSymbols[key]={...local,...remote}; updated++; } else kept++;
+      continue;
+    }
+    if (rt>lt || (!lt && rt)) { customSymbols[key]=remote; updated++; }
+    else kept++;
+  }
+  if (added || updated) {
+    mergeCustomSymbols();
+    saveCustomSymbols().catch(e=>console.warn('[Symbole] Merge speichern:',e));
+  }
+  return {added,updated,kept,source};
+}
+function renderSymbolStorageInfo() {
+  const el=document.getElementById('symStorageInfo');
+  if (!el) return;
+  const entries=Object.values(customSymbols||{});
+  const bytes=entries.reduce((n,s)=>n+(s.size||symDataUrlBytes(s.imgData)),0);
+  el.innerHTML='Eigene Symbole: <b>'+entries.length+'</b> &nbsp;·&nbsp; Speicherbedarf: <b>'+symFmtBytes(bytes)+'</b>';
+}
+async function optimizeStoredSymbols() {
+  const entries=Object.entries(customSymbols||{});
+  if (!entries.length) { alert('Keine eigenen Symbole vorhanden.'); return; }
+  let before=0, after=0, changed=0, failed=0;
+  for (let i=0;i<entries.length;i++) {
+    const [key,sym]=entries[i];
+    const oldSize=sym.size||symDataUrlBytes(sym.imgData); before+=oldSize;
+    try {
+      const res=await fetch(sym.imgData);
+      const blob=await res.blob();
+      const file=new File([blob], (sym.name||key)+(sym.imgType==='svg'?'.svg':'.png'), {type:blob.type||'image/png'});
+      const opt=await optimizeSymbolFile(file);
+      if (opt.size < oldSize*0.95) {
+        customSymbols[key]={...sym,imgData:opt.dataUrl,imgType:opt.imgType,hash:opt.hash,size:opt.size,updatedAt:new Date().toISOString()};
+        delete symCache[key]; changed++; after+=opt.size;
+      } else after+=oldSize;
+      setStatus('⏳ Optimiere Symbole '+(i+1)+'/'+entries.length+' …');
+    } catch(e) { failed++; after+=oldSize; console.warn('[Symbole] Optimieren:',key,e); }
+  }
+  await saveCustomSymbols();
+  mergeCustomSymbols(); renderSymbolManager(); buildPalette(); render();
+  setStatus('✅ Speicher optimiert: '+symFmtBytes(before)+' → '+symFmtBytes(after)+' ('+changed+' verkleinert'+(failed?', '+failed+' übersprungen':'')+')');
+}
 
 async function loadCustomSymbols() {
   try {
@@ -2431,43 +2588,36 @@ function mergeCustomSymbols() {
 
 // ── UPLOAD HANDLING ──
 function handleSymbolUpload(event) {
-  const files = Array.from(event.target.files);
+  const files = Array.from(event.target.files||[]).filter(f => (f.type||'').startsWith('image/') || /\.svg$/i.test(f.name||''));
   if (!files.length) return;
-  event.target.value = '';
-
-  // Queue aufbauen — alle Dateien in Reihe abarbeiten
-  let queue = files.slice();
-  let total  = queue.length;
-  let doneCount = 0;
-
-  function processNext() {
-    if (!queue.length) {
-      // Alle Bilder verarbeitet
-      setStatus('✅ ' + total + ' Symbol(e) hochgeladen');
-      return;
-    }
-    const file = queue.shift();
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      pendingUpload = {
-        file,
-        dataUrl: e.target.result,
-        name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+  try { event.target.value=''; } catch(e) {}
+  const queue=files.slice(), total=queue.length;
+  let doneCount=0, processing=false;
+  const processNext=async () => {
+    if (processing || pendingUpload) return;
+    if (!queue.length) { setStatus('✅ '+doneCount+' Symbol(e) verarbeitet'); renderSymbolStorageInfo(); return; }
+    processing=true;
+    const file=queue.shift();
+    try {
+      setStatus('⏳ Optimiere "'+file.name+'" …');
+      const opt=await optimizeSymbolFile(file);
+      pendingUpload={
+        file, dataUrl:opt.dataUrl, hash:opt.hash, size:opt.size, imgType:opt.imgType,
+        originalSize:file.size||0,
+        name:file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ')
       };
-      // Fortschrittsanzeige im Formular-Header
-      const progressLabel = total > 1
-        ? ` (${doneCount + 1}/${total})`
-        : '';
-      showSymbolEditForm(pendingUpload, progressLabel, () => {
-        doneCount++;
-        processNext(); // nächstes Bild nach Speichern/Überspringen
-      });
-    };
-    reader.readAsDataURL(file);
-  }
+      const progressLabel=total>1 ? ' ('+(doneCount+1)+'/'+total+')' : '';
+      showSymbolEditForm(pendingUpload,progressLabel,()=>{ doneCount++; pendingUpload=null; processNext(); });
+      if (file.size && opt.size && opt.size<file.size) setStatus('✅ Symbol optimiert: '+symFmtBytes(file.size)+' → '+symFmtBytes(opt.size));
+    } catch(e) {
+      console.warn('[Symbole] Upload:',e);
+      alert('„'+file.name+'“ konnte nicht verarbeitet werden:\n'+(e.message||e));
+      doneCount++; processing=false; processNext(); return;
+    }
+    processing=false;
+  };
   processNext();
 }
-
 function showSymbolEditForm(upload, progressLabel, onNext) {
   document.getElementById('symEditForm').style.display = 'flex';
   document.getElementById('symPreviewImg').src = upload.dataUrl;
@@ -2525,11 +2675,13 @@ async function saveNewSymbol() {
   const kabel = document.getElementById('seKabel').value;
   if (!name || !abbr) { alert('Bitte Bezeichnung und Kürzel eingeben!'); return; }
   const key = 'custom_' + abbr.toLowerCase() + '_' + Date.now();
-  const isSVG = pendingUpload.file.type === 'image/svg+xml' || pendingUpload.file.name.endsWith('.svg');
+  const now = new Date().toISOString();
   customSymbols[key] = {
     name, abbr, cat, phase, nennstrom, kabel,
     imgData: pendingUpload.dataUrl,
-    imgType: isSVG ? 'svg' : 'img',
+    imgType: pendingUpload.imgType || ((pendingUpload.file.type === 'image/svg+xml' || /\.svg$/i.test(pendingUpload.file.name)) ? 'svg' : 'img'),
+    hash: pendingUpload.hash || '', size: pendingUpload.size || symDataUrlBytes(pendingUpload.dataUrl),
+    createdAt: now, updatedAt: now,
     color: '#555'
   };
   await saveCustomSymbols();
@@ -2606,30 +2758,31 @@ function openSymbolEdit(key) {
   modal.classList.remove('hid');
 }
 
-function replaceSymbolImage(event) {
+async function replaceSymbolImage(event) {
   const file = event.target.files[0];
   if (!file || !editingSymKey) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const imgData = e.target.result;
-    document.getElementById('seModalImg').src = imgData;
-    // Sofort in temporären Speicher
+  event.target.value = '';
+  try {
+    setStatus('⏳ Optimiere Ersatzbild …');
+    const opt = await optimizeSymbolFile(file);
+    document.getElementById('seModalImg').src = opt.dataUrl;
+    const now = new Date().toISOString();
     if (customSymbols[editingSymKey]) {
-      customSymbols[editingSymKey].imgData = imgData;
-    }
-    // Für Standard-Symbol: Override anlegen
-    if (!customSymbols[editingSymKey]) {
+      customSymbols[editingSymKey] = {...customSymbols[editingSymKey],
+        imgData:opt.dataUrl,imgType:opt.imgType,hash:opt.hash,size:opt.size,updatedAt:now};
+    } else {
       const orig = SYMBOLS[editingSymKey] || {};
       overriddenStdSymbols[editingSymKey] = {
-        ...orig, imgData, imgType: file.name.endsWith('.svg') ? 'svg' : 'img',
+        ...orig, imgData:opt.dataUrl, imgType:opt.imgType, hash:opt.hash, size:opt.size, updatedAt:now
       };
     }
     if (typeof symCache !== 'undefined') delete symCache[editingSymKey];
-  };
-  reader.readAsDataURL(file);
-  event.target.value = '';
+    setStatus(file.size && opt.size<file.size ? '✅ Ersatzbild optimiert: '+symFmtBytes(file.size)+' → '+symFmtBytes(opt.size) : '✅ Ersatzbild vorbereitet');
+  } catch(e) {
+    console.warn('[Symbole] Ersatzbild:',e);
+    alert('Bild konnte nicht ersetzt werden:\n'+(e.message||e));
+  }
 }
-
 async function saveEditedSymbol() {
   if (!editingSymKey) return;
   const name      = document.getElementById('seModalName').value.trim();
@@ -2644,6 +2797,7 @@ async function saveEditedSymbol() {
     const cs = customSymbols[editingSymKey];
     cs.name = name; cs.abbr = abbr; cs.cat = cat;
     cs.phase = phase; cs.nennstrom = nennstrom; cs.kabel = kabel;
+    cs.updatedAt = new Date().toISOString();
   } else {
     // Standard-Symbol: Override anlegen oder aktualisieren
     const orig = SYMBOLS[editingSymKey] || {};
@@ -2656,6 +2810,7 @@ async function saveEditedSymbol() {
     overriddenStdSymbols[editingSymKey].phase     = phase;
     overriddenStdSymbols[editingSymKey].nennstrom = nennstrom;
     overriddenStdSymbols[editingSymKey].kabel     = kabel;
+    overriddenStdSymbols[editingSymKey].updatedAt  = new Date().toISOString();
     // Direkt in SYMBOLS übernehmen
     SYMBOLS[editingSymKey] = { ...SYMBOLS[editingSymKey], name, abbr, cat, phase, nennstrom, kabel, isOverride: true };
   }
@@ -2687,6 +2842,7 @@ async function deleteSymbol() {
 
 // ── RENDER SYMBOL MANAGER GRID ──
 function renderSymbolManager() {
+  renderSymbolStorageInfo();
   const body    = document.getElementById('symMgrBody');
   const search  = (document.getElementById('symMgrSearch')?.value || '').toLowerCase();
   const catFilt = document.getElementById('symMgrCatFilter')?.value || '';
@@ -2924,7 +3080,7 @@ async function importSymbolConfig(event) {
     try {
       const data = JSON.parse(e.target.result);
       const importedSymbols = data.symbols || data.customSymbols || {};
-      customSymbols = { ...(customSymbols||{}), ...importedSymbols };
+      const mergeResult = mergeIncomingCustomSymbols(importedSymbols, 'Config-Import');
       if (Array.isArray(data.deletedStdSymbols)) deletedStdSymbols = new Set(data.deletedStdSymbols);
       if (data.overriddenStdSymbols) overriddenStdSymbols = data.overriddenStdSymbols;
       await saveCustomSymbols();
@@ -2932,7 +3088,7 @@ async function importSymbolConfig(event) {
       buildPalette();
       renderSymbolManager();
       render();
-      setStatus('Symbol-Backup importiert: ' + Object.keys(importedSymbols).length + ' eigene Symbole');
+      setStatus('Symbol-Backup importiert: ' + mergeResult.added + ' neu, ' + mergeResult.updated + ' aktualisiert');
     } catch(err) { alert('Fehler beim Importieren: ' + err.message); }
   };
   reader.readAsText(file);
@@ -3240,8 +3396,18 @@ function listenToProject(id) {
   fbUnsubscribe = fbDb.collection(GRUNDRISS_COLLECTION).doc(id).onSnapshot(snap => {
     if (snap.metadata.hasPendingWrites || _cloudBusy || currentProjectId!==id) return;
     if (!snap.exists) { setFbStatus('offline','Cloud-Projekt gelöscht – lokalen Stand exportieren'); return; }
-    if (cloudVersion(snap.data()) !== _cloudVersion)
-      setFbStatus('offline','Anderer Cloud-Stand – vor Speichern Projekt neu öffnen');
+    if (cloudVersion(snap.data()) !== _cloudVersion) {
+      setFbStatus('offline','Anderer Cloud-Stand – Projektänderung erkannt');
+      const manifest=snap.data();
+      readCloudProject(id,manifest).then(async data => {
+        const m=mergeIncomingCustomSymbols(data.customSymbols,'Cloud-Live-Sync');
+        if (m.added || m.updated) {
+          await saveCustomSymbols();
+          mergeCustomSymbols(); buildPalette(); renderSymbolManager(); render();
+          setStatus('☁ Symbolbibliothek aktualisiert: '+m.added+' neu, '+m.updated+' geändert');
+        }
+      }).catch(err=>console.warn('[Symbole] Cloud-Live-Sync:',err));
+    }
     // Never replace the user's working canvas in a background listener.
   },e => { setFbStatus('offline','Synchronisierung fehlgeschlagen'); console.warn(e); });
 }
@@ -3639,6 +3805,7 @@ window.addEventListener('load', async () => {
   ensureSymbolsBackup();
   await initLocalStorage();
   await loadCustomSymbols();
+  renderSymbolStorageInfo();
   loadCustomWireTypes();
   buildPalette();
   initFirebase();
@@ -6600,7 +6767,10 @@ function loadProjectData(d) {
     state.pan=d.pan||{x:0,y:0}; state.zoom=d.zoom||1; state.raumhoehe=d.raumhoehe||250;
     if (d.floorplanData) addFloorplanFromDataUrl(d.floorplanData, 'Grundriss 1', true); else { state.floorplan=null; captureActiveFloorplan(); updateFloorplanTabs(); render(); renderProps(null); }
   }
-  if (d.customSymbols) { customSymbols = d.customSymbols; mergeCustomSymbols(); buildPalette(); }
+  if (d.customSymbols) {
+    const merged = mergeIncomingCustomSymbols(d.customSymbols, 'Projekt/Cloud');
+    if (merged.added || merged.updated) { mergeCustomSymbols(); buildPalette(); }
+  }
   renderProjectPage();
 }
 function resetWorkspaceForNewProject(name) {
@@ -7180,10 +7350,10 @@ function clearAll() {
 // ═══════════════════════════════════════════════════
 //  SAVE / LOAD / EXPORT
 // ═══════════════════════════════════════════════════
-function saveProject() {
+async function saveProject() {
   exportProjectLocalFile();
-  saveProjectToLibrary(true).catch(storageFailure);
-  if (currentProjectId && currentUser) saveToCloud();
+  try { await saveProjectToLibrary(true); } catch(e) { storageFailure(e); }
+  if (currentProjectId && currentUser) await saveToCloud();
 }
 
 function loadProject() { document.getElementById('fileIn').click(); }
